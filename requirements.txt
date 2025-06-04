@@ -1,0 +1,6 @@
+streamlit>=1.28.0
+PyMuPDF>=1.23.0
+python-docx>=0.8.11
+Pillow>=10.0.0
+pathlib2>=2.3.7
+streamlit-pdf-viewer>=0.0.12 
