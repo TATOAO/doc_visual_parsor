@@ -157,19 +157,30 @@ def display_pdf_viewer(pages: List):
 
 
 def display_pdf_with_viewer(uploaded_file) -> bool:
-    """Try to display PDF with streamlit-pdf-viewer, fallback to images"""
+    """Display PDF with streamlit-pdf-viewer for text selection"""
     try:
         import streamlit_pdf_viewer as pdf_viewer
         
-        # Try to display with PDF viewer
-        pdf_viewer.pdf_viewer(uploaded_file.getvalue())
+        # Display PDF with streamlit-pdf-viewer with text selection enabled
+        pdf_viewer.pdf_viewer(
+            input=uploaded_file.getvalue(),
+            width="100%",
+            height=600,
+            render_text=True,  # Enable text selection and copying
+            key="pdf_viewer_main"
+        )
+        
+        # Show text selection instructions
+        st.info("💡 **Text Selection Enabled**: You can now select and copy text directly from the PDF above!")
         return True
         
     except ImportError:
-        st.info("PDF viewer not available, using image display")
+        st.warning("📄 **streamlit-pdf-viewer not installed**")
+        st.info("To enable text selection from PDFs, install: `pip install streamlit-pdf-viewer`")
         return False
     except Exception as e:
-        st.warning(f"PDF viewer failed: {str(e)}, using image display")
+        st.warning(f"PDF viewer failed: {str(e)}")
+        st.info("Falling back to image-based display...")
         return False
 
 

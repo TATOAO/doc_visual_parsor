@@ -15,6 +15,7 @@ The application now uses a **microservices architecture** with separate backend 
 - 📝 **DOCX Processing**: Extract content and analyze document structure  
 - 🔍 **Structure Analysis**: AI-powered detection of headings, sections, and document hierarchy
 - 🖼️ **Visual Display**: Interactive PDF viewer with page navigation
+- ✂️ **Text Selection**: Select and copy text directly from PDFs (with streamlit-pdf-viewer)
 - 🌐 **API-First**: RESTful API for integration with other applications
 - 📊 **Document Info**: Detailed metadata and statistics
 
@@ -49,9 +50,10 @@ python run_app.py
 
 ## API Endpoints
 
-- `POST /api/upload-document` - Upload and process a document
+- `POST /api/upload-document` - Upload and process a document (includes image conversion)
+- `POST /api/analyze-pdf-structure` - Analyze PDF structure only (no image conversion)
 - `POST /api/analyze-structure` - Analyze document structure only
-- `POST /api/extract-pdf-pages` - Extract PDF pages as images
+- `POST /api/extract-pdf-pages-into-images` - Extract PDF pages as images
 - `POST /api/extract-docx-content` - Extract DOCX content
 - `GET /` - Health check
 
@@ -103,6 +105,25 @@ streamlit run frontend/app.py --server.port 8501
 - **python-docx**: DOCX document processing
 - **Pillow**: Image processing
 - **Requests**: HTTP client for API communication
+- **streamlit-pdf-viewer** (optional): Enables text selection and copying from PDFs
+
+## PDF Text Selection
+
+The application supports two PDF viewing modes:
+
+1. **With Text Selection** (Recommended):
+   - Install: `pip install streamlit-pdf-viewer`
+   - Uses the original PDF file for display
+   - Allows selecting and copying text directly from PDFs
+   - Better user experience for text-based documents
+
+2. **Image-Based Fallback**:
+   - Used when streamlit-pdf-viewer is not installed
+   - Converts PDF pages to images via the backend API
+   - Still provides full document analysis functionality
+   - Page navigation with previous/next buttons
+
+The app automatically detects whether streamlit-pdf-viewer is available and uses the best viewing method.
 
 ## License
 

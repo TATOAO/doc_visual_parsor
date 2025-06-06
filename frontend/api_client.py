@@ -66,6 +66,28 @@ class DocumentAPIClient:
             st.error(f"Error analyzing structure: {str(e)}")
             return None
     
+    def analyze_pdf_structure(self, uploaded_file) -> Optional[Dict[str, Any]]:
+        """Analyze PDF structure only (no image conversion)"""
+        try:
+            files = {
+                'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)
+            }
+            
+            response = self.session.post(
+                f"{self.base_url}/api/analyze-pdf-structure",
+                files=files
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                st.error(f"PDF structure analysis failed: {response.json().get('detail', 'Unknown error')}")
+                return None
+                
+        except Exception as e:
+            st.error(f"Error analyzing PDF structure: {str(e)}")
+            return None
+    
     def extract_pdf_pages(self, uploaded_file) -> Optional[Dict[str, Any]]:
         """Extract PDF pages as images"""
         try:
@@ -74,7 +96,7 @@ class DocumentAPIClient:
             }
             
             response = self.session.post(
-                f"{self.base_url}/api/extract-pdf-pages",
+                f"{self.base_url}/api/extract-pdf-pages-into-images",
                 files=files
             )
             

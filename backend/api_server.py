@@ -17,7 +17,26 @@ from .document_analyzer import (
     get_structure_summary
 )
 
+# Import layout detection module
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from models.layout_detection import DocLayoutDetector
+
+
+
 app = FastAPI(title="Document Visual Parser API", version="1.0.0")
+
+
+"""
+app.post("/api/upload-document") # upload and process a document
+app.post("/api/analyze-structure") # analyze document structure only
+app.post("/api/analyze-pdf-structure") # analyze PDF structure only (no image conversion)
+app.post("/api/extract-pdf-pages-into-images") # extract PDF pages as images
+app.post("/api/extract-docx-content") # extract DOCX content
+
+"""
+
 
 # Add CORS middleware for frontend access
 app.add_middleware(
@@ -145,7 +164,39 @@ async def analyze_structure(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error analyzing structure: {str(e)}")
 
 
-@app.post("/api/extract-pdf-pages")
+@app.post("/api/analyze-pdf-structure")
+async def analyze_pdf_structure(file: UploadFile = File(...)):
+    """Analyze PDF structure only (no image conversion)"""
+    try:
+        if file.content_type != "application/pdf":
+            raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        
+        file_content = await file.read()
+        
+        # Extract document structure only
+        structure = extract_pdf_document_structure(file_content)
+        
+        # Get total pages from PDF
+        import fitz  # PyMuPDF
+        doc = fitz.open(stream=file_content, filetype="pdf")
+        total_pages = len(doc)
+        doc.close()
+        
+        return {
+            "filename": file.filename,
+            "file_type": file.content_type,
+            "size": len(file_content),
+            "structure": structure,
+            "structure_summary": get_structure_summary(structure),
+            "total_pages": total_pages,
+            "success": True
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analyzing PDF structure: {str(e)}")
+
+
+@app.post("/api/extract-pdf-pages-into-images")
 async def extract_pdf_pages_endpoint(file: UploadFile = File(...)):
     """Extract PDF pages as images"""
     try:
@@ -217,6 +268,287 @@ async def extract_docx_content_endpoint(file: UploadFile = File(...)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error extracting DOCX content: {str(e)}")
+
+
+# Global layout detector instance (lazy loading)
+_layout_detector = None
+
+def get_layout_detector():
+    """Get or create the layout detector instance"""
+    global _layout_detector
+    if _layout_detector is None:
+        _layout_detector = DocLayoutDetector(model_name="docstructbench")
+    return _layout_detector
+
+
+@app.post("/api/detect-layout")
+async def detect_layout(
+    file: UploadFile = File(...),
+    confidence: float = 0.25,
+    model_name: str = "docstructbench",
+    image_size: int = 1024
+):
+    """
+    Detect document layout elements in an uploaded image or document.
+    
+    Args:
+        file: Image file (PNG, JPG, etc.) or PDF file
+        confidence: Confidence threshold for detections (0.0-1.0)
+        model_name: Model to use ('docstructbench', 'd4la', 'doclaynet')
+        image_size: Input image size for the model
+    
+    Returns:
+        JSON with detected layout elements
+    """
+    try:
+        # Validate file type
+        allowed_image_types = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/bmp"]
+        allowed_document_types = ["application/pdf"]
+        all_allowed_types = allowed_image_types + allowed_document_types
+        
+        if file.content_type not in all_allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {file.content_type}. "
+                      f"Supported types: {', '.join(all_allowed_types)}"
+            )
+        
+        # Read file content
+        file_content = await file.read()
+        
+        # Initialize detector with requested model
+        try:
+            detector = DocLayoutDetector(
+                model_name=model_name,
+                confidence_threshold=confidence,
+                image_size=image_size
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
+        
+        results = []
+        
+        # Handle different file types
+        if file.content_type in allowed_image_types:
+            # Direct image processing
+            # Save content to temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file.filename.split('.')[-1]}") as tmp_file:
+                tmp_file.write(file_content)
+                tmp_path = tmp_file.name
+            
+            try:
+                # Detect layout
+                result = detector.detect(tmp_path)
+                elements = result.get_elements()
+                
+                results.append({
+                    "page_number": 0,
+                    "elements": elements,
+                    "total_elements": len(elements)
+                })
+                
+            finally:
+                # Clean up temporary file
+                os.unlink(tmp_path)
+        
+        elif file.content_type == "application/pdf":
+            # Extract PDF pages as images and process each
+            class MockUploadedFile:
+                def __init__(self, content, content_type, name):
+                    self._content = content
+                    self.type = content_type
+                    self.name = name
+                
+                def getvalue(self):
+                    return self._content
+            
+            mock_file = MockUploadedFile(file_content, file.content_type, file.filename)
+            pages = extract_pdf_pages(mock_file)
+            
+            if not pages:
+                raise HTTPException(status_code=500, detail="Failed to extract PDF pages")
+            
+            # Process each page
+            for page_num, page_img in enumerate(pages):
+                # Save page to temporary file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
+                    page_img.save(tmp_file.name, format='PNG')
+                    tmp_path = tmp_file.name
+                
+                try:
+                    # Detect layout on this page
+                    result = detector.detect(tmp_path)
+                    elements = result.get_elements()
+                    
+                    results.append({
+                        "page_number": page_num,
+                        "elements": elements,
+                        "total_elements": len(elements)
+                    })
+                    
+                finally:
+                    # Clean up temporary file
+                    os.unlink(tmp_path)
+        
+        # Compile summary statistics
+        total_elements = sum(page["total_elements"] for page in results)
+        element_type_counts = {}
+        
+        for page in results:
+            for element in page["elements"]:
+                element_type = element["type"]
+                element_type_counts[element_type] = element_type_counts.get(element_type, 0) + 1
+        
+        return {
+            "filename": file.filename,
+            "file_type": file.content_type,
+            "model_used": model_name,
+            "confidence_threshold": confidence,
+            "total_pages": len(results),
+            "total_elements": total_elements,
+            "element_type_summary": element_type_counts,
+            "pages": results,
+            "success": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error detecting layout: {str(e)}")
+
+
+@app.post("/api/visualize-layout")
+async def visualize_layout(
+    file: UploadFile = File(...),
+    confidence: float = 0.25,
+    model_name: str = "docstructbench",
+    image_size: int = 1024,
+    page_number: int = 0
+):
+    """
+    Detect layout and return annotated images.
+    
+    Args:
+        file: Image file or PDF file
+        confidence: Confidence threshold for detections
+        model_name: Model to use
+        image_size: Input image size for the model
+        page_number: Page number to process (for PDFs, -1 for all pages)
+    
+    Returns:
+        JSON with annotated images as base64
+    """
+    try:
+        # Similar validation as detect_layout
+        allowed_image_types = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/bmp"]
+        allowed_document_types = ["application/pdf"]
+        all_allowed_types = allowed_image_types + allowed_document_types
+        
+        if file.content_type not in all_allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {file.content_type}"
+            )
+        
+        file_content = await file.read()
+        
+        # Initialize detector
+        detector = DocLayoutDetector(
+            model_name=model_name,
+            confidence_threshold=confidence,
+            image_size=image_size
+        )
+        
+        annotated_images = []
+        
+        if file.content_type in allowed_image_types:
+            # Process single image
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file.filename.split('.')[-1]}") as tmp_file:
+                tmp_file.write(file_content)
+                tmp_path = tmp_file.name
+            
+            try:
+                # Detect and visualize
+                result = detector.detect(tmp_path)
+                annotated_img = detector.visualize(tmp_path, result)
+                
+                # Convert to base64
+                img_pil = Image.fromarray(annotated_img)
+                img_buffer = io.BytesIO()
+                img_pil.save(img_buffer, format='PNG')
+                img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
+                
+                annotated_images.append({
+                    "page_number": 0,
+                    "annotated_image": img_base64,
+                    "total_elements": len(result.get_elements())
+                })
+                
+            finally:
+                os.unlink(tmp_path)
+        
+        elif file.content_type == "application/pdf":
+            # Process PDF pages
+            class MockUploadedFile:
+                def __init__(self, content, content_type, name):
+                    self._content = content
+                    self.type = content_type
+                    self.name = name
+                
+                def getvalue(self):
+                    return self._content
+            
+            mock_file = MockUploadedFile(file_content, file.content_type, file.filename)
+            pages = extract_pdf_pages(mock_file)
+            
+            if not pages:
+                raise HTTPException(status_code=500, detail="Failed to extract PDF pages")
+            
+            # Process specified page(s)
+            pages_to_process = range(len(pages)) if page_number == -1 else [page_number]
+            
+            for page_num in pages_to_process:
+                if page_num >= len(pages):
+                    continue
+                    
+                page_img = pages[page_num]
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
+                    page_img.save(tmp_file.name, format='PNG')
+                    tmp_path = tmp_file.name
+                
+                try:
+                    # Detect and visualize
+                    result = detector.detect(tmp_path)
+                    annotated_img = detector.visualize(tmp_path, result)
+                    
+                    # Convert to base64
+                    img_pil = Image.fromarray(annotated_img)
+                    img_buffer = io.BytesIO()
+                    img_pil.save(img_buffer, format='PNG')
+                    img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
+                    
+                    annotated_images.append({
+                        "page_number": page_num,
+                        "annotated_image": img_base64,
+                        "total_elements": len(result.get_elements())
+                    })
+                    
+                finally:
+                    os.unlink(tmp_path)
+        
+        return {
+            "filename": file.filename,
+            "model_used": model_name,
+            "total_pages": len(annotated_images),
+            "annotated_pages": annotated_images,
+            "success": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error visualizing layout: {str(e)}")
 
 
 if __name__ == "__main__":

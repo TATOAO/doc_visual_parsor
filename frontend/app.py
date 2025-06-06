@@ -91,7 +91,8 @@ def process_pdf_document(uploaded_file):
     # Check if document structure needs to be extracted
     if not st.session_state.document_structure:
         with st.spinner("🔍 Analyzing document structure..."):
-            result = api_client.upload_document(uploaded_file)
+            # Use the new PDF structure analysis endpoint (no image conversion)
+            result = api_client.analyze_pdf_structure(uploaded_file)
             
             if result and result.get('success'):
                 # Update session state with API response
@@ -108,30 +109,33 @@ def process_pdf_document(uploaded_file):
                 }
                 update_document_info(doc_info)
                 
-                # Convert base64 images to PIL Images for pages
-                if 'pages' in result:
-                    pages = []
-                    for page_data in result['pages']:
-                        img_data = base64.b64decode(page_data['image_data'])
-                        from PIL import Image
-                        img = Image.open(BytesIO(img_data))
-                        pages.append(img)
-                    set_document_pages(pages)
-                
                 if structure:
                     st.success(f"✅ Found {len(structure)} headings in document structure")
                 else:
                     st.info("📝 No clear document structure detected. The document may not have distinct headings or may use non-standard formatting.")
             else:
-                st.error("❌ Failed to process PDF document")
+                st.error("❌ Failed to analyze PDF document structure")
                 return
     
-    # Try to use the PDF viewer first for better experience
+    # Try to use the PDF viewer first for better experience with text selection
     pdf_viewer_success = display_pdf_with_viewer(uploaded_file)
     
     if not pdf_viewer_success:
         # Fallback to image-based display
-        st.info("Using fallback image-based PDF display...")
+        st.info("📸 Using image-based PDF display...")
+        
+        # Load pages only when needed for fallback
+        if not st.session_state.document_pages:
+            with st.spinner("🖼️ Converting PDF pages to images..."):
+                pages_result = api_client.extract_pdf_pages(uploaded_file)
+                if pages_result and 'pages' in pages_result:
+                    pages = []
+                    for page_data in pages_result['pages']:
+                        img_data = base64.b64decode(page_data['image_data'])
+                        from PIL import Image
+                        img = Image.open(BytesIO(img_data))
+                        pages.append(img)
+                    set_document_pages(pages)
         
         # Use pages from session state
         if st.session_state.document_pages:
@@ -139,8 +143,6 @@ def process_pdf_document(uploaded_file):
             st.success(f"✅ PDF loaded successfully! ({len(st.session_state.document_pages)} pages)")
         else:
             st.error("❌ Failed to load PDF pages")
-    else:
-        st.success("✅ PDF loaded successfully with text selection enabled!")
 
 
 def process_docx_document(uploaded_file):
@@ -203,6 +205,18 @@ def main():
         render_sidebar_structure(st.session_state.document_structure)
         
         st.markdown("---")
+        
+        # Show PDF viewer status
+        if st.session_state.get('uploaded_file') and st.session_state.uploaded_file.type == "application/pdf":
+            try:
+                import streamlit_pdf_viewer
+                st.success("✅ PDF text selection enabled")
+                st.info("📝 You can select and copy text from PDFs")
+            except ImportError:
+                st.warning("⚠️ Text selection disabled")
+                st.info("📝 To enable text selection:")
+                st.code("pip install streamlit-pdf-viewer")
+            st.markdown("---")
         
         # Render document info
         doc_info = get_document_info()
