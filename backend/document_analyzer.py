@@ -1,5 +1,4 @@
 import re
-import streamlit as st
 from typing import List, Dict
 from .pdf_processor import get_pdf_document_object
 
@@ -52,8 +51,7 @@ def extract_pdf_document_structure(pdf_file: bytes) -> List[Dict]:
         if not pdf_doc:
             return structure
         
-        # Store pdf_doc in session state for navigation
-        st.session_state.pdf_document = pdf_doc
+        # Note: In API mode, we don't store in session state
         
         # Extract text blocks with formatting information
         for page_num in range(pdf_doc.page_count):
@@ -137,7 +135,15 @@ def extract_pdf_document_structure(pdf_file: bytes) -> List[Dict]:
         unique_structure.sort(key=lambda x: (x['page'], -x['y_position']))
         
     except Exception as e:
-        st.error(f"❌ Error extracting document structure: {str(e)}")
+        print(f"Error extracting document structure: {str(e)}")
+        
+    finally:
+        # Clean up PDF document
+        if pdf_doc:
+            try:
+                pdf_doc.close()
+            except:
+                pass
         
     return unique_structure
 
@@ -160,7 +166,7 @@ def analyze_document_structure(uploaded_file):
             })
         return converted_structure
     else:
-        st.warning(f"Document structure analysis not supported for file type: {uploaded_file.type}")
+        print(f"Document structure analysis not supported for file type: {uploaded_file.type}")
         return []
 
 

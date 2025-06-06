@@ -1,25 +1,27 @@
 import streamlit as st
 from pathlib import Path
-import sys
+import base64
+from io import BytesIO
 
-# Add backend to path
+# Add project root to path for imports
+import sys
+from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-# Import backend modules
-from backend import (
-    # Session management
+# Import frontend modules
+from frontend.api_client import get_api_client
+from frontend.session_manager import (
     initialize_session_state,
     is_new_file,
     reset_document_state,
     get_document_info,
-    
-    # Document processing
-    extract_pdf_pages,
-    extract_docx_content,
-    analyze_document_structure,
-    
-    # UI components
-    check_pdf_viewer_availability,
+    update_document_info,
+    set_document_structure,
+    set_document_pages,
+    set_document_content,
+)
+from frontend.ui_components import (
+    check_api_connection,
     display_pdf_viewer,
     display_pdf_with_viewer,
     display_docx_content,
@@ -27,6 +29,7 @@ from backend import (
     render_document_info,
     render_control_panel,
     render_upload_area,
+    display_api_status,
 )
 
 # Page configuration
@@ -80,18 +83,48 @@ st.markdown("""
 
 
 def process_pdf_document(uploaded_file):
-    """Process PDF document and extract structure"""
+    """Process PDF document using API"""
     st.info("📄 Processing PDF document...")
     
-    # Extract document structure immediately after upload
+    api_client = get_api_client()
+    
+    # Check if document structure needs to be extracted
     if not st.session_state.document_structure:
         with st.spinner("🔍 Analyzing document structure..."):
-            structure = analyze_document_structure(uploaded_file)
-            st.session_state.document_structure = structure
-            if structure:
-                st.success(f"✅ Found {len(structure)} headings in document structure")
+            result = api_client.upload_document(uploaded_file)
+            
+            if result and result.get('success'):
+                # Update session state with API response
+                structure = result.get('structure', [])
+                set_document_structure(structure)
+                
+                # Update document info
+                doc_info = {
+                    'filename': result.get('filename'),
+                    'file_type': result.get('file_type'),
+                    'size': result.get('size'),
+                    'total_pages': result.get('total_pages'),
+                    'structure_summary': result.get('structure_summary')
+                }
+                update_document_info(doc_info)
+                
+                # Convert base64 images to PIL Images for pages
+                if 'pages' in result:
+                    pages = []
+                    for page_data in result['pages']:
+                        img_data = base64.b64decode(page_data['image_data'])
+                        from PIL import Image
+                        img = Image.open(BytesIO(img_data))
+                        pages.append(img)
+                    set_document_pages(pages)
+                
+                if structure:
+                    st.success(f"✅ Found {len(structure)} headings in document structure")
+                else:
+                    st.info("📝 No clear document structure detected. The document may not have distinct headings or may use non-standard formatting.")
             else:
-                st.info("📝 No clear document structure detected. The document may not have distinct headings or may use non-standard formatting.")
+                st.error("❌ Failed to process PDF document")
+                return
     
     # Try to use the PDF viewer first for better experience
     pdf_viewer_success = display_pdf_with_viewer(uploaded_file)
@@ -100,48 +133,54 @@ def process_pdf_document(uploaded_file):
         # Fallback to image-based display
         st.info("Using fallback image-based PDF display...")
         
-        # Extract pages if not already done
-        if not st.session_state.document_pages:
-            with st.spinner("Converting PDF pages to images..."):
-                pages = extract_pdf_pages(uploaded_file)
-                if pages and len(pages) > 0:
-                    st.session_state.document_pages = pages
-                    st.session_state.current_page = 0
-                    st.success(f"✅ PDF loaded successfully! ({len(pages)} pages)")
-                else:
-                    st.error("❌ Failed to load PDF pages - no pages were extracted")
-        
-        # Display the image-based viewer
+        # Use pages from session state
         if st.session_state.document_pages:
             display_pdf_viewer(st.session_state.document_pages)
-    
+            st.success(f"✅ PDF loaded successfully! ({len(st.session_state.document_pages)} pages)")
+        else:
+            st.error("❌ Failed to load PDF pages")
     else:
         st.success("✅ PDF loaded successfully with text selection enabled!")
 
 
 def process_docx_document(uploaded_file):
-    """Process DOCX document"""
-    with st.spinner("Processing DOCX document..."):
-        content = extract_docx_content(uploaded_file)
-        
-        # Also extract structure for DOCX
-        if not st.session_state.document_structure:
-            structure = analyze_document_structure(uploaded_file)
-            st.session_state.document_structure = structure
+    """Process DOCX document using API"""
+    st.info("📄 Processing DOCX document...")
     
-    if content:
-        st.success("✅ DOCX loaded successfully!")
-        display_docx_content(content)
-    else:
-        st.error("Failed to load DOCX content")
+    api_client = get_api_client()
+    
+    with st.spinner("Processing DOCX document..."):
+        # Get document content
+        content_result = api_client.extract_docx_content(uploaded_file)
+        
+        # Get document structure
+        structure_result = api_client.analyze_structure(uploaded_file)
+        
+        if content_result and structure_result:
+            # Update session state
+            content = content_result.get('content', '')
+            structure = structure_result.get('structure', [])
+            
+            set_document_content(content)
+            set_document_structure(structure)
+            
+            # Update document info
+            doc_info = {
+                'filename': content_result.get('filename'),
+                'file_type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'structure_summary': structure_result.get('structure_summary')
+            }
+            update_document_info(doc_info)
+            
+            st.success("✅ DOCX loaded successfully!")
+            display_docx_content(content)
+        else:
+            st.error("Failed to load DOCX content")
 
 
 def main():
     """Main application function"""
     initialize_session_state()
-    
-    # Check PDF viewer availability
-    check_pdf_viewer_availability()
     
     # Header
     st.markdown("""
@@ -150,6 +189,10 @@ def main():
         <p>Upload and analyze your documents with AI-powered structure detection</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    # Check API connection first
+    if not display_api_status():
+        return
     
     # Sidebar for chapters/sections
     with st.sidebar:

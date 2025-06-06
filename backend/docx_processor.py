@@ -1,7 +1,6 @@
 import docx
 import tempfile
 import os
-import streamlit as st
 
 
 def extract_docx_content(docx_file):
@@ -20,11 +19,11 @@ def extract_docx_content(docx_file):
                 content.append(paragraph.text)
         
         os.unlink(tmp_file_path)  # Clean up temp file
-        return content
+        return "\n\n".join(content)
         
     except Exception as e:
-        st.error(f"Error processing DOCX: {str(e)}")
-        return []
+        print(f"Error processing DOCX: {str(e)}")
+        return ""
 
 
 def extract_docx_structure(docx_file):
@@ -72,5 +71,5 @@ def extract_docx_structure(docx_file):
         return structure
         
     except Exception as e:
-        st.error(f"Error extracting DOCX structure: {str(e)}")
+        print(f"Error extracting DOCX structure: {str(e)}")
         return [] 
