@@ -12,6 +12,9 @@ requests>=2.31.0
 python-multipart>=0.0.6 
 openai>=1.0.0
 
+# langchain
+langchain-openai
+
 # DocLayout-YOLO and related dependencies
 doclayout-yolo
 huggingface-hub>=0.16.0
