@@ -28,19 +28,23 @@ MODELS = {
     }
 }
 
-def get_model_cache_dir():
+def get_model_cache_dir(custom_path: str = None):
     """Get the model cache directory."""
-    cache_dir = Path.home() / ".cache" / "doclayout_yolo"
+    if custom_path:
+        cache_dir = Path(custom_path)
+    else:
+        cache_dir = Path.home() / ".cache" / "doclayout_yolo"
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 
-def download_model(model_name: str = "docstructbench", force_download: bool = False):
+def download_model(model_name: str = "docstructbench", force_download: bool = False, cache_dir: str = None):
     """
     Download a DocLayout-YOLO model from Hugging Face.
     
     Args:
         model_name: Name of the model to download ('docstructbench', 'd4la', 'doclaynet')
         force_download: Whether to force re-download even if model exists
+        cache_dir: Custom directory to download models to (optional)
         
     Returns:
         Path to the downloaded model file
@@ -49,8 +53,8 @@ def download_model(model_name: str = "docstructbench", force_download: bool = Fa
         raise ValueError(f"Unknown model: {model_name}. Available models: {list(MODELS.keys())}")
     
     model_config = MODELS[model_name]
-    cache_dir = get_model_cache_dir()
-    local_path = cache_dir / f"{model_name}_{model_config['filename']}"
+    cache_directory = get_model_cache_dir(cache_dir)
+    local_path = cache_directory / f"{model_name}_{model_config['filename']}"
     
     if local_path.exists() and not force_download:
         logger.info(f"Model {model_name} already exists at {local_path}")
@@ -62,7 +66,7 @@ def download_model(model_name: str = "docstructbench", force_download: bool = Fa
         downloaded_path = hf_hub_download(
             repo_id=model_config["repo_id"],
             filename=model_config["filename"],
-            cache_dir=str(cache_dir),
+            cache_dir=str(cache_directory),
             force_download=force_download
         )
         
@@ -78,15 +82,17 @@ def download_model(model_name: str = "docstructbench", force_download: bool = Fa
         logger.error(f"Failed to download model {model_name}: {str(e)}")
         raise
 
-def list_available_models():
+def list_available_models(cache_dir: str = None):
     """List all available models and their descriptions."""
     print("Available DocLayout-YOLO models:")
     for name, config in MODELS.items():
-        cache_dir = get_model_cache_dir()
-        local_path = cache_dir / f"{name}_{config['filename']}"
+        cache_directory = get_model_cache_dir(cache_dir)
+        local_path = cache_directory / f"{name}_{config['filename']}"
         status = "✓ Downloaded" if local_path.exists() else "✗ Not downloaded"
         print(f"  {name}: {config['description']} [{status}]")
 
+
+# python -m models.layout_detection.download_model --model docstructbench --force --dest ./models/layout_detection/model_parameters
 if __name__ == "__main__":
     import argparse
     
@@ -98,10 +104,12 @@ if __name__ == "__main__":
                        help="Force re-download even if model exists")
     parser.add_argument("--list", action="store_true",
                        help="List available models")
+    parser.add_argument("--dest", "--destination", type=str,
+                       help="Custom destination directory for model downloads")
     
     args = parser.parse_args()
     
     if args.list:
-        list_available_models()
+        list_available_models(args.dest)
     else:
-        download_model(args.model, args.force)
+        download_model(args.model, args.force, args.dest)

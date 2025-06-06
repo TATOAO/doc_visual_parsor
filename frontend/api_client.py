@@ -88,7 +88,7 @@ class DocumentAPIClient:
             st.error(f"Error analyzing PDF structure: {str(e)}")
             return None
     
-    def extract_pdf_pages(self, uploaded_file) -> Optional[Dict[str, Any]]:
+    def extract_pdf_pages_into_images(self, uploaded_file) -> Optional[Dict[str, Any]]:
         """Extract PDF pages as images"""
         try:
             files = {

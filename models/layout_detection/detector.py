@@ -23,7 +23,7 @@ except ImportError:
     except ImportError:
         raise ImportError("Please install doclayout-yolo: pip install doclayout-yolo")
 
-from .download_model import download_model, get_model_cache_dir
+from models.layout_detection.download_model import download_model, get_model_cache_dir
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +195,7 @@ class DocLayoutDetector:
                 device=self.device,
                 verbose=False
             )
-            
+
             # Extract results
             if len(results) == 0:
                 return LayoutDetectionResult([], [], [])
@@ -317,3 +317,18 @@ class DocLayoutDetector:
             'image_size': self.image_size,
             'class_names': LAYOUT_CLASSES
         } 
+
+
+# python -m models.layout_detection.detector
+if __name__ == "__main__":
+    from backend.pdf_processor import extract_pdf_pages_into_images
+    pdf_path = "/Users/tatoaoliang/Downloads/Work/doc_visual_parsor/tests/test_data/1-1 买卖合同（通用版）.pdf"
+    # pdf_file = open(pdf_path, "rb")
+    images = extract_pdf_pages_into_images(pdf_path)
+    print(f"there are {len(images)} pages in the pdf")
+
+    detector = DocLayoutDetector(model_name="docstructbench", model_path="./models/layout_detection/model_parameters/docstructbench_doclayout_yolo_docstructbench_imgsz1024.pt")
+
+    result = detector.detect(images[0])
+
+    print(result)

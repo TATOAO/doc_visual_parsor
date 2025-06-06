@@ -1,33 +1,40 @@
 import fitz  # PyMuPDF
 from PIL import Image
+from typing import Union
+from pathlib import Path
 import io
 import tempfile
 import os
+
 """
 This module is responsible for extracting pages from a PDF file and converting them to images.
 It also provides a function to get a PyMuPDF document object for advanced operations.
 It also provides a function to close a PDF document.
 
-- extract_pdf_pages: Extract pages from PDF as images
+- extract_pdf_pages_into_images: Extract pages from PDF file path as images
 - get_pdf_document_object: Get PyMuPDF document object for advanced operations
 - close_pdf_document: Safely close PDF document
 """
 
 
-def extract_pdf_pages(pdf_file):
+def extract_pdf_pages_into_images(pdf_file: Union[str, Path, io.BytesIO]):
     """Extract pages from PDF as images"""
     pages = []
     pdf_doc = None
     tmp_file_path = None
     
     try:
-        # Save uploaded file to temporary location
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-            tmp_file.write(pdf_file.getvalue())
-            tmp_file_path = tmp_file.name
+        if isinstance(pdf_file, (str, Path)):
+            # Open PDF file directly
+            pdf_doc = fitz.open(pdf_file)
+        else:
+            # Save uploaded file to temporary location
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                tmp_file.write(pdf_file.getvalue())
+                tmp_file_path = tmp_file.name
         
-        # Open PDF with PyMuPDF
-        pdf_doc = fitz.open(tmp_file_path)
+                # Open PDF with PyMuPDF
+                pdf_doc = fitz.open(tmp_file_path)
         
         # Process each page
         for page_num in range(pdf_doc.page_count):

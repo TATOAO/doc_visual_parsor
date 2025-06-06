@@ -1,6 +1,6 @@
 # Backend package for Document Visual Parser
 
-from .pdf_processor import extract_pdf_pages, get_pdf_document_object, close_pdf_document
+from .pdf_processor import extract_pdf_pages_into_images, get_pdf_document_object, close_pdf_document
 from .docx_processor import extract_docx_content, extract_docx_structure
 from .document_analyzer import (
     extract_pdf_document_structure, 
@@ -27,7 +27,7 @@ from .ui_components import (
 
 __all__ = [
     # PDF processing
-    'extract_pdf_pages',
+    'extract_pdf_pages_into_images',
     'get_pdf_document_object',
     'close_pdf_document',
     

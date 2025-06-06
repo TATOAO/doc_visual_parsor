@@ -10,7 +10,7 @@ The backend module contains the core functionality for the Document Visual Parse
 
 Handles all PDF-related processing operations:
 
-- `extract_pdf_pages(pdf_file)` - Extract PDF pages as images for display
+- `extract_pdf_pages_into_images(pdf_file)` - Extract PDF pages as images for display
 - `get_pdf_document_object(pdf_file)` - Get PyMuPDF document object for advanced operations
 - `close_pdf_document(pdf_doc)` - Safely close PDF document objects
 

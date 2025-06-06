@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from backend.pdf_processor import extract_pdf_pages, get_pdf_document_object, close_pdf_document
+from backend.pdf_processor import extract_pdf_pages_into_images, get_pdf_document_object, close_pdf_document
 
 
 class TestPDFProcessor:
@@ -59,7 +59,7 @@ class TestPDFProcessor:
                 mock_matrix_class.return_value = mock_matrix
                 
                 # Test the function
-                result = extract_pdf_pages(self.mock_pdf_file)
+                result = extract_pdf_pages_into_images(self.mock_pdf_file)
                 
                 # Assertions
                 assert len(result) == 2
@@ -73,7 +73,7 @@ class TestPDFProcessor:
     @patch('backend.pdf_processor.tempfile.NamedTemporaryFile')
     @patch('backend.pdf_processor.fitz.open')
     @patch('backend.pdf_processor.st')
-    def test_extract_pdf_pages_error(self, mock_st, mock_fitz_open, mock_temp_file):
+    def test_extract_pdf_pages_into_images_error(self, mock_st, mock_fitz_open, mock_temp_file):
         """Test PDF page extraction with error."""
         # Setup mocks to raise exception
         mock_temp = Mock()
@@ -85,7 +85,7 @@ class TestPDFProcessor:
         mock_fitz_open.side_effect = Exception("PDF open error")
         
         # Test the function
-        result = extract_pdf_pages(self.mock_pdf_file)
+        result = extract_pdf_pages_into_images(self.mock_pdf_file)
         
         # Assertions
         assert result == []

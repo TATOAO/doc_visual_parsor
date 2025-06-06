@@ -9,7 +9,7 @@ import tempfile
 import os
 
 # Import existing backend modules
-from .pdf_processor import extract_pdf_pages, get_pdf_document_object, close_pdf_document
+from .pdf_processor import extract_pdf_pages_into_images, get_pdf_document_object, close_pdf_document
 from .docx_processor import extract_docx_content, extract_docx_structure
 from .document_analyzer import (
     extract_pdf_document_structure, 
@@ -103,7 +103,7 @@ async def upload_document(file: UploadFile = File(...)):
             result["structure_summary"] = get_structure_summary(structure)
             
             # Extract pages as images
-            pages = extract_pdf_pages(mock_file)
+            pages = extract_pdf_pages_into_images(mock_file)
             if pages:
                 # Convert images to base64 for JSON response
                 page_images = []
@@ -215,11 +215,11 @@ async def extract_pdf_pages_endpoint(file: UploadFile = File(...)):
                 return self.content
         
         mock_file = MockUploadedFile(file_content, file.content_type, file.filename)
-        pages = extract_pdf_pages(mock_file)
+        page_images = extract_pdf_pages_into_images(mock_file)
         
-        if pages:
+        if page_images:
             page_images = []
-            for i, page_img in enumerate(pages):
+            for i, page_img in enumerate(page_images):
                 img_buffer = io.BytesIO()
                 page_img.save(img_buffer, format='PNG')
                 img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
@@ -231,7 +231,7 @@ async def extract_pdf_pages_endpoint(file: UploadFile = File(...)):
             return {
                 "filename": file.filename,
                 "pages": page_images,
-                "total_pages": len(pages)
+                "total_pages": len(page_images)
             }
         else:
             raise HTTPException(status_code=500, detail="Failed to extract PDF pages")

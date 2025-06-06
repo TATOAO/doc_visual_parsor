@@ -127,7 +127,7 @@ def process_pdf_document(uploaded_file):
         # Load pages only when needed for fallback
         if not st.session_state.document_pages:
             with st.spinner("🖼️ Converting PDF pages to images..."):
-                pages_result = api_client.extract_pdf_pages(uploaded_file)
+                pages_result = api_client.extract_pdf_pages_into_images(uploaded_file)
                 if pages_result and 'pages' in pages_result:
                     pages = []
                     for page_data in pages_result['pages']:
