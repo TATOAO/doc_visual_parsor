@@ -1,10 +1,6 @@
-# given a tree like title structure (which extracted from the raw text), 
-# we now need to insert/apply the highlight (with special index token) into the raw text, which is like a middle step of the section token parsor
-# I want the process is purely based on text processing without models
+# given a "Section Tree Object" (which extracted from the raw text) find the position of the section title in the raw text
 
 from models.utils.schemas import Section
-import re
-from difflib import SequenceMatcher
 from typing import List, Tuple
 
 from fuzzysearch import find_near_matches
@@ -30,107 +26,89 @@ def find_ordered_fuzzy_sequence(text: str, keywords: List[str], max_l_dist: int 
         start, end = match.start + cursor, match.end + cursor
         matches.append((start, end))
         cursor = end  # Move cursor forward
-        print(matches)
 
     return matches
 
-def flatten_section_tree_to_tokens(section_tree: Section) -> List[str]:
+def flatten_section_tree_to_tokens(section_tree: Section) -> List[Section]:
     """
-    Flatten the section tree into a list of sections
-    <start-section-title-1>
-    <end-section-title-1>
-    <start-section-content-1>
-    <start-section-title-1-1>
-    <end-section-title-1-1>
-    <start-section-content-1-1>
-    <end-section-content-1-1>
-
-    <start-section-title-1-2>
-    1.2 另一个子标题
-    <end-section-title-1-2>
-    <start-section-content-1-2>
-    这里是1.2节的具体内容...
-    <end-section-content-1-2>
-
-    <end-section-content-1>
-
-    <start-section-title-2>
-    第二章 标题
-    <end-section-title-2>
-    <start-section-content-2>
-    这里是第二章的内容...
-    <end-section-content-2>
-
+    Flatten the section tree into a flat list of Section objects, with the root section at the first position
     """
-    def _flatten_section(section: Section, section_id: str) -> List[str]:
-        tokens = []
+    def _flatten_section(section: Section) -> List[Section]:
+        sections = [section]  # Start with the current section
         
-        # Add section title tokens
-        if section.title:
-            tokens.append(f"<start-section-title-{section_id}>")
-            tokens.append(section.title)
-            tokens.append(f"<end-section-title-{section_id}>")
+        # Recursively add all subsections
+        for sub_section in section.sub_sections:
+            sections.extend(_flatten_section(sub_section))
         
-        # Add section content start token
-        tokens.append(f"<start-section-content-{section_id}>")
-        
-        # Add section content (if any)
-        if section.content:
-            tokens.append(section.content)
-        
-        # Process all subsections recursively
-        for i, sub_section in enumerate(section.sub_sections, 1):
-            sub_section_id = f"{section_id}-{i}"
-            tokens.extend(_flatten_section(sub_section, sub_section_id))
-        
-        # Add section content end token (after all subsections)
-        tokens.append(f"<end-section-content-{section_id}>")
-        
-        return tokens
+        return sections
     
     # Start with root sections
     if section_tree.sub_sections:
-        all_tokens = []
-        for i, section in enumerate(section_tree.sub_sections, 1):
-            all_tokens.extend(_flatten_section(section, str(i)))
-        return all_tokens
+        all_sections = [section_tree]
+        for section in section_tree.sub_sections:
+            all_sections.extend(_flatten_section(section))
+        return all_sections
     else:
         # If no subsections, treat the section itself as the root
-        return _flatten_section(section_tree, "1")
+        return _flatten_section(section_tree)
 
-def insert_tokens_into_raw_text_with_given_section_tree(section_tree: Section, raw_text: str) -> str:
+def set_section_position_index(section_tree: Section, raw_text: str) -> str:
     """
-    Insert section tokens into raw text based on the section tree structure
+    Set the position index of the section title and content in the raw text
     """
 
+    sections = flatten_section_tree_to_tokens(section_tree)
+    title_list = [section.title for section in sections]
 
-    pass
+    matches = find_ordered_fuzzy_sequence(raw_text, title_list)
+    
+    # First pass: set all title positions
+    for i, (section, match) in enumerate(zip(sections, matches)):
+        section.title_position_index = match
+    
+    # Second pass: set content positions based on hierarchical structure
+    def set_content_positions(section: Section, flattened_sections: List[Section]) -> None:
+        """Recursively set content positions for sections and their subsections"""
+        
+        if section.sub_sections:
+            # Section has subsections - process them first
+            for sub_section in section.sub_sections:
+                set_content_positions(sub_section, flattened_sections)
+            
+            # Content spans from title end to last subsection's content end
+            last_subsection = section.sub_sections[-1]
+            section.content_position_index = (
+                section.title_position_index[1] + 1, 
+                last_subsection.content_position_index[1]
+            )
+        else:
+            # Section has no subsections - find next sibling or next section in hierarchy
+            current_idx = flattened_sections.index(section)
+            
+            if current_idx < len(flattened_sections) - 1:
+                next_section = flattened_sections[current_idx + 1]
+                section.content_position_index = (
+                    section.title_position_index[1] + 1, 
+                    next_section.title_position_index[0] - 1
+                )
+            else:
+                # Last section overall
+                section.content_position_index = (
+                    section.title_position_index[1] + 1, 
+                    len(raw_text)
+                )
+    
+    # Start from root and process hierarchically
+    set_content_positions(section_tree, sections)
+
+    return section_tree
 
 # python -m models.naive_llm.tree_like_structure_mapping
 if __name__ == "__main__":
 
-    # from backend.docx_processor import extract_docx_content
-    # docx_path = "/Users/tatoaoliang/Downloads/Work/doc_visual_parsor/tests/test_data/1-1 买卖合同（通用版）.docx"
-    # raw_text = extract_docx_content(docx_path)
-
-
-#     raw_titles = """第一章 买卖合同:
-# 第一节 买卖合同（通用版）:
-# 一、定义
-# 二、主要风险及常见易发问题提示:
-# （一）主要业务风险
-# （二）合同管理常见易发问题
-# 三、风险防范措施
-# 四、相关法律法规:
-# 《民法典》
-# 《最高人民法院关于审理买卖合同纠纷案件适用法律问题的解释》
-# 买卖合同（通用版）"""
-
-#     title_list = [t.strip() for t in raw_titles.split('\n')]
-#     matches = find_ordered_fuzzy_sequence(raw_text, title_list)
-#     print(matches)
-
-
+    from backend.docx_processor import extract_docx_content
+    docx_path = "/Users/tatoaoliang/Downloads/Work/doc_visual_parsor/tests/test_data/1-1 买卖合同（通用版）.docx"
+    raw_text = extract_docx_content(docx_path)
 
     import json 
     with open('section_tree.json', 'r') as f:
@@ -138,12 +116,9 @@ if __name__ == "__main__":
 
     section_tree = Section.model_validate(j)
 
-    tokens = flatten_section_tree_to_tokens(section_tree)
-    print(tokens)
+    section_tree = set_section_position_index(section_tree, raw_text)
 
-    # Now we can use the implemented function
-    # import ipdb; ipdb.set_trace()
-    # result = insert_tokens_into_raw_text_with_given_section_tree(section_tree, raw_text)
-    # print(result)
+    for section in flatten_section_tree_to_tokens(section_tree):
+        print(section.level, section.title, section.title_position_index, section.content_position_index)
 
     print('end')

@@ -2,6 +2,11 @@ import re
 from typing import Dict, List, Tuple
 from models.utils.schemas import Section
 
+
+"""
+Parse from "Section Token tress" to "Section Tree Object"
+"""
+
 sample_text = """
 <start-section-title-1>
 第一章 买卖合同
