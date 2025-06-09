@@ -1,7 +1,10 @@
 from models.utils.schemas import Section
 from models.utils.llm import get_llm_client
 from ..helpers import generate_section_tree_from_tokens, set_section_position_index, flatten_section_tree_to_tokens
+import asyncio
+import logging
 
+logger = logging.getLogger(__name__)
 
 """
 The general idea is use llm to understand the text and inserting special tokens to indicate the section structure.
@@ -40,13 +43,36 @@ The special tokens are:
 """
 
 
+def check_text_length(text: str, max_chars: int = 50000) -> bool:
+    """Check if text length is within reasonable limits for LLM processing"""
+    return len(text) <= max_chars
 
-async def get_section_tree_by_llm(text: str) -> str:
+
+async def get_section_tree_by_llm_with_retry(text: str, max_retries: int = 3) -> str:
     """
-    using llm parsing the text into a section tree
+    Get section tree by LLM with retry logic and better error handling
     """
-    llm_client = get_llm_client(model="qwen-max-latest")
-    prompt = f"""
+    
+    # Check text length first
+    if not check_text_length(text):
+        logger.warning(f"Text length ({len(text)} chars) exceeds recommended limit. Consider chunking.")
+        # For very long texts, we might want to truncate or use a different strategy
+        if len(text) > 100000:  # 100k characters
+            logger.warning("Text is extremely long, truncating to first 80k characters")
+            text = text[:80000] + "\n\n[文档已截取前80k字符用于处理]"
+    
+    last_exception = None
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Attempt {attempt + 1}/{max_retries} - Processing text of length {len(text)}")
+            
+            # Use longer timeout for longer texts
+            timeout = min(600, max(180, len(text) // 100))  # 3-10 minutes based on text length
+            
+            llm_client = get_llm_client(model="qwen-max-latest", timeout=timeout, max_retries=2)
+            
+            prompt = f"""
 你是一个专业的文档结构分析助手，能够将文本解析为层次化的章节树结构。
 
 任务说明：
@@ -108,14 +134,38 @@ async def get_section_tree_by_llm(text: str) -> str:
 
 请分析以下文本并添加相应的章节标记：
 """
-    from langchain_core.messages import SystemMessage, HumanMessage
-    
-    messages = [
-        SystemMessage(content=prompt),
-        HumanMessage(content=text)
-    ]
-    response = await llm_client.ainvoke(messages)
-    return response.content
+            from langchain_core.messages import SystemMessage, HumanMessage
+            
+            messages = [
+                SystemMessage(content=prompt),
+                HumanMessage(content=text)
+            ]
+            
+            response = await llm_client.ainvoke(messages)
+            logger.info(f"Successfully processed text on attempt {attempt + 1}")
+            return response.content
+            
+        except Exception as e:
+            last_exception = e
+            logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
+            
+            if attempt < max_retries - 1:
+                # Wait before retry with exponential backoff
+                wait_time = (2 ** attempt) * 5  # 5, 10, 20 seconds
+                logger.info(f"Waiting {wait_time} seconds before retry...")
+                await asyncio.sleep(wait_time)
+            
+    # If all retries failed, raise the last exception
+    logger.error(f"All {max_retries} attempts failed. Last error: {str(last_exception)}")
+    raise last_exception
+
+
+async def get_section_tree_by_llm(text: str) -> str:
+    """
+    using llm parsing the text into a section tree
+    """
+    return await get_section_tree_by_llm_with_retry(text)
+
 
 def parsed_llm_result_into_section_tree(llm_result: str, raw_text: str, max_depth: int = -1) -> Section:
     """
