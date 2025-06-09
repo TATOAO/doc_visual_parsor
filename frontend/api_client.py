@@ -132,6 +132,28 @@ class DocumentAPIClient:
             st.error(f"Error extracting DOCX content: {str(e)}")
             return None
     
+    def analyze_docx_with_naive_llm(self, uploaded_file) -> Optional[Dict[str, Any]]:
+        """Analyze DOCX structure using naive_llm method"""
+        try:
+            files = {
+                'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)
+            }
+            
+            response = self.session.post(
+                f"{self.base_url}/api/analyze-docx-with-naive-llm",
+                files=files
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                st.error(f"Naive LLM analysis failed: {response.json().get('detail', 'Unknown error')}")
+                return None
+                
+        except Exception as e:
+            st.error(f"Error analyzing DOCX with naive_llm: {str(e)}")
+            return None
+    
     def base64_to_image(self, base64_string: str) -> Image.Image:
         """Convert base64 string to PIL Image"""
         img_data = base64.b64decode(base64_string)

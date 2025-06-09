@@ -10,7 +10,7 @@ import os
 
 # Import existing backend modules
 from .pdf_processor import extract_pdf_pages_into_images, get_pdf_document_object, close_pdf_document
-from .docx_processor import extract_docx_content, extract_docx_structure
+from .docx_processor import extract_docx_content, extract_docx_structure, extract_docx_structure_with_naive_llm
 from .document_analyzer import (
     extract_pdf_document_structure, 
     analyze_document_structure, 
@@ -268,6 +268,47 @@ async def extract_docx_content_endpoint(file: UploadFile = File(...)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error extracting DOCX content: {str(e)}")
+
+
+@app.post("/api/analyze-docx-with-naive-llm")
+async def analyze_docx_with_naive_llm(file: UploadFile = File(...)):
+    """Analyze DOCX structure using naive_llm method"""
+    try:
+        if file.content_type != "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            raise HTTPException(status_code=400, detail="Only DOCX files are supported")
+        
+        file_content = await file.read()
+        
+        class MockUploadedFile:
+            def __init__(self, content, content_type, name):
+                self.content = content
+                self.type = content_type
+                self.name = name
+            
+            def getvalue(self):
+                return self.content
+        
+        mock_file = MockUploadedFile(file_content, file.content_type, file.filename)
+        
+        # Process with naive_llm
+        result = extract_docx_structure_with_naive_llm(mock_file)
+        
+        if result["success"]:
+            return {
+                "filename": file.filename,
+                "file_type": file.content_type,
+                "success": True,
+                "section_tree": result["section_tree"],
+                "raw_text": result["raw_text"],
+                "llm_annotated_text": result["llm_annotated_text"]
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result["error"])
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing DOCX with naive_llm: {str(e)}")
 
 
 # Global layout detector instance (lazy loading)

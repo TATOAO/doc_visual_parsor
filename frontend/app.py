@@ -19,15 +19,20 @@ from frontend.session_manager import (
     set_document_structure,
     set_document_pages,
     set_document_content,
+    get_section_tree,
+    get_llm_annotated_text,
 )
 from frontend.ui_components import (
     check_api_connection,
     display_pdf_viewer,
     display_pdf_with_viewer,
     display_docx_content,
+    display_docx_sections_with_highlighting,
     render_sidebar_structure,
+    render_section_tree_sidebar,
     render_document_info,
     render_control_panel,
+    render_naive_llm_controls,
     render_upload_area,
     display_api_status,
 )
@@ -175,7 +180,15 @@ def process_docx_document(uploaded_file):
             update_document_info(doc_info)
             
             st.success("✅ DOCX loaded successfully!")
-            display_docx_content(content)
+            
+            # Check if we have section tree data from naive_llm
+            section_tree = get_section_tree()
+            if section_tree and content:
+                # Display with AI highlighting
+                display_docx_sections_with_highlighting(content, section_tree)
+            else:
+                # Display regular content
+                display_docx_content(content)
         else:
             st.error("Failed to load DOCX content")
 
@@ -201,8 +214,14 @@ def main():
         st.markdown("### 📑 Document Structure")
         st.markdown("---")
         
-        # Render document structure
-        render_sidebar_structure(st.session_state.document_structure)
+        # Check if we have section tree from naive_llm
+        section_tree = get_section_tree()
+        if section_tree:
+            # Render AI-parsed section tree
+            render_section_tree_sidebar(section_tree)
+        else:
+            # Render traditional document structure
+            render_sidebar_structure(st.session_state.document_structure)
         
         st.markdown("---")
         
@@ -255,6 +274,11 @@ def main():
     with col2:
         # Control panel
         render_control_panel(st.session_state.uploaded_file)
+
+        # Naive LLM controls for DOCX files
+        render_naive_llm_controls(st.session_state.uploaded_file)
+
+
 
 
 if __name__ == "__main__":

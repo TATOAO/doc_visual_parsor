@@ -229,4 +229,178 @@ def display_api_status():
         """)
         return False
     
-    return True 
+    return True
+
+
+def display_docx_sections_with_highlighting(raw_text: str, section_tree: Dict[str, Any]):
+    """Display DOCX content with section highlighting based on position indices"""
+    if not raw_text or not section_tree:
+        st.error("No content or section tree to display")
+        return
+    
+    st.markdown("### 📄 Document Sections (LLM Parsed)")
+    
+    # Function to recursively collect all sections
+    def collect_sections(section_data):
+        sections = []
+        if isinstance(section_data, dict):
+            if section_data.get('title') and section_data.get('title_position_index'):
+                sections.append(section_data)
+            
+            for sub_section in section_data.get('sub_sections', []):
+                sections.extend(collect_sections(sub_section))
+        
+        return sections
+    
+    # Collect all sections with position indices
+    all_sections = collect_sections(section_tree)
+    
+    if not all_sections:
+        st.info("No sections with position indices found")
+        return
+    
+    # Sort sections by title position for proper highlighting
+    all_sections.sort(key=lambda x: x.get('title_position_index', [0, 0])[0])
+    
+    # Create HTML with highlighting
+    html_content = ""
+    last_pos = 0
+    
+    for i, section in enumerate(all_sections):
+        title_pos = section.get('title_position_index', [-1, -1])
+        content_pos = section.get('content_position_index', [-1, -1])
+        level = section.get('level', 1)
+        title = section.get('title', 'Untitled')
+        
+        if title_pos[0] >= 0 and title_pos[1] >= 0:
+            # Add text before this section
+            if title_pos[0] > last_pos:
+                html_content += f'<span>{raw_text[last_pos:title_pos[0]]}</span>'
+            
+            # Add highlighted title
+            color_intensity = max(0.3, 1.0 - (level - 1) * 0.15)
+            title_color = f"rgba(255, 215, 0, {color_intensity})"  # Gold color with varying intensity
+            
+            title_text = raw_text[title_pos[0]:title_pos[1]]
+            html_content += f'<span style="background-color: {title_color}; padding: 2px 4px; border-left: 3px solid #ff6b35; font-weight: bold;" title="Section: {title} (Level {level})">{title_text}</span>'
+            
+            # Add highlighted content if available
+            if content_pos[0] >= 0 and content_pos[1] >= 0 and content_pos[0] < content_pos[1]:
+                content_color = f"rgba(173, 216, 230, {color_intensity * 0.5})"  # Light blue
+                content_text = raw_text[content_pos[0]:content_pos[1]]
+                html_content += f'<span style="background-color: {content_color}; padding: 1px 2px;" title="Content for: {title}">{content_text}</span>'
+                last_pos = content_pos[1]
+            else:
+                last_pos = title_pos[1]
+    
+    # Add any remaining text
+    if last_pos < len(raw_text):
+        html_content += f'<span>{raw_text[last_pos:]}</span>'
+    
+    # Display in a scrollable container
+    st.markdown(
+        f"""
+        <div style="
+            max-height: 600px;
+            overflow-y: auto;
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: white;
+            font-family: monospace;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        ">
+            {html_content}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    # Add legend
+    st.markdown("""
+    **Legend:**
+    - 🟡 **Yellow highlights**: Section titles (darker = higher level)
+    - 🔵 **Blue highlights**: Section content
+    - 🟠 **Orange left border**: Section boundary
+    """)
+
+
+def render_section_tree_sidebar(section_tree: Dict[str, Any]):
+    """Render the section tree in sidebar with hierarchical structure"""
+    if not section_tree:
+        st.write("📝 No section tree available")
+        return
+    
+    st.markdown("### 🌳 Section Tree (LLM)")
+    
+    def render_section_node(section_data, level=0):
+        """Recursively render section nodes"""
+        if not isinstance(section_data, dict):
+            return
+        
+        title = section_data.get('title', 'Untitled')
+        section_level = section_data.get('level', level)
+        title_pos = section_data.get('title_position_index', [-1, -1])
+        content_pos = section_data.get('content_position_index', [-1, -1])
+        
+        # Create indentation for hierarchical display
+        indent = "  " * level
+        
+        # Create a button for this section
+        if title and title.strip():
+            button_text = f"{indent}{'📁' if section_data.get('sub_sections') else '📄'} {title[:40]}{'...' if len(title) > 40 else ''}"
+            
+            if st.button(
+                button_text,
+                key=f"section_tree_{level}_{title[:20]}_{title_pos[0]}",
+                help=f"Level {section_level}: {title}\nTitle: {title_pos}\nContent: {content_pos}"
+            ):
+                st.info(f"Selected section: {title}")
+                # You can add navigation logic here if needed
+        
+        # Render sub-sections
+        for sub_section in section_data.get('sub_sections', []):
+            render_section_node(sub_section, level + 1)
+    
+    # Start rendering from root
+    render_section_node(section_tree)
+
+
+def render_naive_llm_controls(uploaded_file):
+    """Render controls for naive_llm processing"""
+    if not uploaded_file or uploaded_file.type != "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        return
+    
+    st.markdown("### 🧠 AI Structure Analysis")
+    
+    # Button to trigger naive_llm processing
+    if st.button("🚀 Parse with AI (Naive LLM)", 
+                key="naive_llm_button",
+                help="Use AI to intelligently parse document structure"):
+        
+        api_client = get_api_client()
+        
+        with st.spinner("🧠 AI is analyzing document structure..."):
+            result = api_client.analyze_docx_with_naive_llm(uploaded_file)
+            
+            if result and result.get('success'):
+                # Import session manager functions
+                from frontend.session_manager import set_section_tree, set_llm_annotated_text
+                
+                # Store results in session state
+                set_section_tree(result['section_tree'])
+                set_llm_annotated_text(result['llm_annotated_text'])
+                
+                st.success("✅ AI analysis completed!")
+                st.rerun()
+            else:
+                st.error("❌ AI analysis failed")
+    
+    # Show status if we have section tree data
+    if st.session_state.get('section_tree'):
+        st.success("🧠 AI analysis available")
+        if st.button("🔄 Clear AI Analysis"):
+            st.session_state.section_tree = None
+            st.session_state.llm_annotated_text = ""
+            st.rerun() 

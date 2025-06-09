@@ -24,6 +24,12 @@ def initialize_session_state():
     
     if 'last_file_hash' not in st.session_state:
         st.session_state.last_file_hash = None
+    
+    if 'section_tree' not in st.session_state:
+        st.session_state.section_tree = None
+    
+    if 'llm_annotated_text' not in st.session_state:
+        st.session_state.llm_annotated_text = ""
 
 
 def reset_document_state():
@@ -33,6 +39,8 @@ def reset_document_state():
     st.session_state.document_content = ""
     st.session_state.current_page = 0
     st.session_state.document_info = {}
+    st.session_state.section_tree = None
+    st.session_state.llm_annotated_text = ""
 
 
 def is_new_file(uploaded_file) -> bool:
@@ -92,4 +100,24 @@ def get_current_page() -> int:
 def get_total_pages() -> int:
     """Get total number of pages"""
     pages = st.session_state.get('document_pages', [])
-    return len(pages) if pages else 0 
+    return len(pages) if pages else 0
+
+
+def set_section_tree(section_tree: Dict[str, Any]):
+    """Set the section tree from naive_llm processing"""
+    st.session_state.section_tree = section_tree
+
+
+def get_section_tree() -> Dict[str, Any]:
+    """Get the current section tree"""
+    return st.session_state.get('section_tree', None)
+
+
+def set_llm_annotated_text(text: str):
+    """Set the LLM annotated text"""
+    st.session_state.llm_annotated_text = text
+
+
+def get_llm_annotated_text() -> str:
+    """Get the LLM annotated text"""
+    return st.session_state.get('llm_annotated_text', "") 

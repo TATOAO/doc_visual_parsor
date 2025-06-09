@@ -79,9 +79,16 @@ sample_text = """
 <end-section-content-1>
 """
 
-def generate_section_tree_from_tokens(text: str) -> Section:
+def generate_section_tree_from_tokens(text: str, max_depth: int = -1) -> Section:
     """
     parsing the special tokens in the text into a section tree
+    Args:
+        text: input text with section tokens
+        max_depth: maximum depth of sections to include
+                  -1: no limit (default)
+                   0: only first level titles, no sub-sections
+                   1: first and second level titles, second level are leaf nodes
+                   n: include sections up to level n+1, level n+1 sections are leaf nodes
     """
     # Find all section title and content tags with their positions and levels
     title_start_pattern = r"<start-section-title-([\d-]+)>"
@@ -128,9 +135,17 @@ def generate_section_tree_from_tokens(text: str) -> Section:
                 }
                 break
     
-    # Add level information to sections
+    # Add level information to sections and filter by max_depth
+    filtered_sections_info = {}
     for section_id in sections_info:
-        sections_info[section_id]['level'] = len(section_id.split('-'))
+        level = len(section_id.split('-'))
+        sections_info[section_id]['level'] = level
+        
+        # Filter sections based on max_depth
+        if max_depth == -1 or level <= max_depth + 1:
+            filtered_sections_info[section_id] = sections_info[section_id]
+    
+    sections_info = filtered_sections_info
     
     # Create Section objects
     sections = {}
@@ -203,6 +218,11 @@ def generate_section_tree_from_tokens(text: str) -> Section:
     # Build the hierarchy
     for section_id, section in sections.items():
         section_parts = section_id.split('-')
+        section_level = len(section_parts)
+        
+        # If this section is at max_depth + 1, make it a leaf node
+        if max_depth != -1 and section_level == max_depth + 1:
+            section.sub_sections = []
         
         if len(section_parts) == 1:
             # Root level section
@@ -213,8 +233,11 @@ def generate_section_tree_from_tokens(text: str) -> Section:
             parent_id = '-'.join(section_parts[:-1])
             if parent_id in sections:
                 parent_section = sections[parent_id]
-                parent_section.sub_sections.append(section)
-                section.parent_section = parent_section
+                # Only add as sub-section if parent is not at max depth limit
+                parent_level = len(parent_id.split('-'))
+                if max_depth == -1 or parent_level < max_depth + 1:
+                    parent_section.sub_sections.append(section)
+                    section.parent_section = parent_section
     
     # If there's only one root section, return it directly
     if len(root_section.sub_sections) == 1:
@@ -230,14 +253,14 @@ def remove_circular_references(section: Section):
     for sub_section in section.sub_sections:
         remove_circular_references(sub_section)
 
-# python -m models.naive_llm.section_token_parsor
+# python -m models.naive_llm.helpers.section_token_parsor
 if __name__ == "__main__":
-    section_tree = generate_section_tree_from_tokens(sample_text)
+    section_tree = generate_section_tree_from_tokens(sample_text, max_depth=2)
     # import ipdb; ipdb.set_trace()
     
     # Remove circular references before JSON serialization
     remove_circular_references(section_tree)
     
     json_sample = section_tree.model_dump_json(indent=2)
-    with open("section_tree.json", "w", encoding="utf-8") as f:
+    with open("section_tree_depth_1.json", "w", encoding="utf-8") as f:
         f.write(json_sample)
