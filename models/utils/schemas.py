@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Tuple, Union, Dict, Any
+from pydantic import BaseModel, Field, computed_field
+from typing import List, Optional, Dict, Any
 from typing_extensions import Self
 from enum import Enum
+import hashlib
 
 
 class DocumentType(str, Enum):
@@ -144,9 +145,36 @@ class Section(BaseModel):
     title_parsed: str = Field(description="The parsed title of the section", default="")
     content_parsed: str = Field(description="The parsed content of the section", default="")
 
+    @computed_field
+    @property
+    def section_hash(self) -> str:
+        """
+        Get the hash of the section based on title_parsed and content_parsed only
+        """
+        # Combine title_parsed and content_parsed for hashing
+        combined_content = f"{self.title_parsed}|{self.content_parsed}"
+        
+        # Generate hash from the combined content
+        return hashlib.sha256(combined_content.encode('utf-8')).hexdigest()
+
 
 def get_section_tree(section: Self) -> Self:
     """
     Get the section tree of the section
     """
     return section
+
+
+
+# python -m models.utils.schemas
+if __name__ == "__main__":
+    section = Section(title="test", content="test")
+    print('test0', section.section_hash)
+
+    section.title_parsed = "test"
+    section.content_parsed = "test"
+    print('test1', section.section_hash)
+
+    section.title_parsed = "test2"
+    section.content_parsed = "test2"
+    print('test2', section.section_hash)

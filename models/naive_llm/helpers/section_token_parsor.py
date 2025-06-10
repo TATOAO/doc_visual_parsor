@@ -1,10 +1,11 @@
 import re
-from typing import Dict, List, Tuple
-from models.utils.schemas import Section
+from typing import Dict, List, Tuple, Optional
+from models.utils.schemas import Section, Positions
+from .tree_like_structure_mapping import set_section_position_index, flatten_section_tree_to_tokens
 
 
 """
-Parse from "Section Token tress" to "Section Tree Object"
+Parse from "Section Token trees" to "Section Tree Object"
 """
 
 sample_text = """
@@ -79,171 +80,393 @@ sample_text = """
 <end-section-content-1>
 """
 
-def generate_section_tree_from_tokens(text: str, max_depth: int = -1) -> Section:
+
+def judge_whether_missing_content(text: str) -> bool:
     """
-    parsing the special tokens in the text into a section tree
+    Check if there's any content left outside of section tags.
+    Returns True if there's untagged content (missing content that should be tagged).
+    """
+    all_tag_pattern = r"<(start|end)-section-(title|content)-([\d-]+)>"
+    tag_matches = [(match.start(), match.end()) for match in re.finditer(all_tag_pattern, text)]
+    tag_matches.sort()
+    
+    # Check content before first tag, between tags, and after last tag
+    if tag_matches:
+        # Before first tag
+        if text[:tag_matches[0][0]].strip():
+            return True
+        
+        # Between tags
+        for i in range(len(tag_matches) - 1):
+            between_content = text[tag_matches[i][1]:tag_matches[i + 1][0]].strip()
+            if between_content:
+                return True
+        
+        # After last tag
+        if text[tag_matches[-1][1]:].strip():
+            return True
+    
+    return False
+
+
+class SectionTagMatcher:
+    """Helper class to extract and match section tags"""
+    
+    def __init__(self, text: str, text_offset: int = 0):
+        self.text = text
+        self.text_offset = text_offset
+        self.title_pattern = r"<(start|end)-section-title-([\d-]+)>"
+        self.content_pattern = r"<(start|end)-section-content-([\d-]+)>"
+    
+    def extract_tag_matches(self) -> Dict[str, Dict]:
+        """Extract all section tags and their positions"""
+        sections_info = {}
+        
+        # Extract title tags
+        self._match_tag_pairs(self.title_pattern, 'title', sections_info)
+        
+        # Extract content tags
+        self._match_tag_pairs(self.content_pattern, 'content', sections_info)
+        
+        return sections_info
+    
+    def _match_tag_pairs(self, pattern: str, tag_type: str, sections_info: Dict):
+        """Match start and end tags for a given pattern"""
+        matches = list(re.finditer(pattern, self.text))
+        start_tags = [(m.start(), m.end(), m.group(2)) for m in matches if m.group(1) == 'start']
+        end_tags = [(m.start(), m.end(), m.group(2)) for m in matches if m.group(1) == 'end']
+        
+        # Match corresponding start and end tags
+        for start_pos, start_end_pos, section_id in start_tags:
+            for end_pos, end_end_pos, end_section_id in end_tags:
+                if section_id == end_section_id:
+                    if section_id not in sections_info:
+                        sections_info[section_id] = {}
+                    
+                    sections_info[section_id][tag_type] = {
+                        'start_pos': start_pos + self.text_offset,
+                        'start_tag_end': start_end_pos + self.text_offset,
+                        'end_pos': end_pos + self.text_offset,
+                        'end_tag_end': end_end_pos + self.text_offset,
+                        'local_start_pos': start_pos,
+                        'local_start_tag_end': start_end_pos,
+                        'local_end_pos': end_pos,
+                        'local_end_tag_end': end_end_pos
+                    }
+                    break
+
+
+class SectionContentExtractor:
+    """Helper class to extract section content and handle nested sections"""
+    
+    def __init__(self, text: str):
+        self.text = text
+    
+    def extract_title(self, title_info: Dict) -> str:
+        """Extract section title from tag info"""
+        if not title_info:
+            return ""
+        
+        start = title_info['local_start_tag_end']
+        end = title_info['local_end_pos']
+        return self.text[start:end].strip()
+    
+    def extract_content_and_nested(self, content_info: Dict, section_id: str) -> Tuple[str, str]:
+        """Extract section content and separate nested sections for recursion"""
+        if not content_info:
+            return "", ""
+        
+        start = content_info['local_start_tag_end']
+        end = content_info['local_end_pos']
+        raw_content = self.text[start:end]
+        
+        content_lines = []
+        nested_lines = []
+        lines = raw_content.split('\n')
+        
+        in_nested_section = False
+        nested_level = 0
+        
+        for line in lines:
+            if self._is_nested_section_start(line, section_id):
+                in_nested_section = True
+                nested_level += 1
+                nested_lines.append(line)
+            elif self._is_nested_section_end(line, section_id) and in_nested_section:
+                nested_lines.append(line)
+                nested_level -= 1
+                if nested_level == 0:
+                    in_nested_section = False
+            elif in_nested_section:
+                nested_lines.append(line)
+            else:
+                content_lines.append(line)
+        
+        content = '\n'.join(content_lines).strip()
+        nested_content = '\n'.join(nested_lines).strip()
+        
+        return content, nested_content
+    
+    def _is_nested_section_start(self, line: str, section_id: str) -> bool:
+        """Check if line contains a nested section start tag"""
+        match = re.search(r'<start-section-(?:title|content)-([\d-]+)>', line.strip())
+        if match:
+            nested_id = match.group(1)
+            return nested_id != section_id and nested_id.startswith(section_id + '-')
+        return False
+    
+    def _is_nested_section_end(self, line: str, section_id: str) -> bool:
+        """Check if line contains a nested section end tag"""
+        match = re.search(r'<end-section-(?:title|content)-([\d-]+)>', line.strip())
+        if match:
+            nested_id = match.group(1)
+            return nested_id != section_id and nested_id.startswith(section_id + '-')
+        return False
+
+
+class SectionHierarchyBuilder:
+    """Helper class to build section hierarchy"""
+    
+    def __init__(self, sections: Dict[str, Section], parent_section: Optional[Section], max_depth: int):
+        self.sections = sections
+        self.parent_section = parent_section
+        self.max_depth = max_depth
+    
+    def build_hierarchy(self) -> Section:
+        """Build the section hierarchy"""
+        root_section = self.parent_section or Section(title="Root", level=0)
+        
+        for section_id, section in self.sections.items():
+            self._attach_section_to_parent(section_id, section, root_section)
+        
+        return root_section
+    
+    def _attach_section_to_parent(self, section_id: str, section: Section, root_section: Section):
+        """Attach a section to its appropriate parent"""
+        section_parts = section_id.split('-')
+        
+        if len(section_parts) == 1:
+            # Top-level section (relative to current processing)
+            target_parent = self.parent_section or root_section
+            target_parent.sub_sections.append(section)
+            section.parent_section = target_parent
+        else:
+            # Find parent section
+            parent_id = '-'.join(section_parts[:-1])
+            if parent_id in self.sections:
+                parent_section_obj = self.sections[parent_id]
+                
+                # Check if parent is within depth limit
+                parent_level = self._calculate_section_level(parent_id)
+                if self.max_depth == -1 or parent_level < self.max_depth + 1:
+                    parent_section_obj.sub_sections.append(section)
+                    section.parent_section = parent_section_obj
+    
+    def _calculate_section_level(self, section_id: str) -> int:
+        """Calculate the actual level of a section considering parent depth"""
+        base_level = len(section_id.split('-'))
+        if self.parent_section:
+            base_level += self.parent_section.level
+        return base_level
+
+
+def generate_section_tree_from_tokens(
+    token_text: str, 
+    raw_text: Optional[str] = None, 
+    max_depth: int = -1, 
+    parent_section: Optional[Section] = None,
+    text_offset: int = 0
+) -> Section:
+    """
+    Parse special tokens in text into a section tree structure.
+    
     Args:
-        text: input text with section tokens
-        max_depth: maximum depth of sections to include
+        text: Input text with section tokens
+        raw_text: Original raw text for position calculation (defaults to text if not provided)
+        max_depth: Maximum depth of sections to include
                   -1: no limit (default)
                    0: only first level titles, no sub-sections
                    1: first and second level titles, second level are leaf nodes
                    n: include sections up to level n+1, level n+1 sections are leaf nodes
+        parent_section: Parent section object for recursive processing
+        text_offset: Offset position in the original raw_text (for recursive calls)
+    
+    Returns:
+        Root section of the parsed tree
     """
-    # Find all section title and content tags with their positions and levels
-    title_start_pattern = r"<start-section-title-([\d-]+)>"
-    title_end_pattern = r"<end-section-title-([\d-]+)>"
-    content_start_pattern = r"<start-section-content-([\d-]+)>"
-    content_end_pattern = r"<end-section-content-([\d-]+)>"
+    if raw_text is None:
+        raw_text = token_text
     
-    # Find all title and content tags with their positions
-    title_start_matches = [(m.start(), m.end(), m.group(1)) for m in re.finditer(title_start_pattern, text)]
-    title_end_matches = [(m.start(), m.end(), m.group(1)) for m in re.finditer(title_end_pattern, text)]
-    content_start_matches = [(m.start(), m.end(), m.group(1)) for m in re.finditer(content_start_pattern, text)]
-    content_end_matches = [(m.start(), m.end(), m.group(1)) for m in re.finditer(content_end_pattern, text)]
+    # Extract section tags and their positions
+    tag_matcher = SectionTagMatcher(token_text, text_offset)
+    sections_info = tag_matcher.extract_tag_matches()
     
-    # Create a mapping of section IDs to their title and content positions
-    sections_info = {}
+    # Filter sections by depth and add level information
+    sections_info = _filter_sections_by_depth(sections_info, parent_section, max_depth)
     
-    # Match title start and end tags
-    for start_pos, start_end_pos, section_id in title_start_matches:
-        # Find the corresponding title end tag
-        for end_pos, end_end_pos, end_section_id in title_end_matches:
-            if section_id == end_section_id:
-                if section_id not in sections_info:
-                    sections_info[section_id] = {}
-                sections_info[section_id]['title'] = {
-                    'start_pos': start_pos,
-                    'start_tag_end': start_end_pos,
-                    'end_pos': end_pos,
-                    'end_tag_end': end_end_pos
-                }
-                break
+    # Create section objects
+    sections = _create_section_objects(token_text, sections_info, parent_section)
     
-    # Match content start and end tags
-    for start_pos, start_end_pos, section_id in content_start_matches:
-        # Find the corresponding content end tag
-        for end_pos, end_end_pos, end_section_id in content_end_matches:
-            if section_id == end_section_id:
-                if section_id not in sections_info:
-                    sections_info[section_id] = {}
-                sections_info[section_id]['content'] = {
-                    'start_pos': start_pos,
-                    'start_tag_end': start_end_pos,
-                    'end_pos': end_pos,
-                    'end_tag_end': end_end_pos
-                }
-                break
+    # Build hierarchy
+    hierarchy_builder = SectionHierarchyBuilder(sections, parent_section, max_depth)
+    root_section = hierarchy_builder.build_hierarchy()
     
-    # Add level information to sections and filter by max_depth
-    filtered_sections_info = {}
-    for section_id in sections_info:
-        level = len(section_id.split('-'))
-        sections_info[section_id]['level'] = level
+    # Set positions only for top-level calls
+    if parent_section is None:
+        root_section = _set_section_positions(root_section, raw_text)
         
-        # Filter sections based on max_depth
+        # Return single root section if only one exists
+        if len(root_section.sub_sections) == 1:
+            return root_section.sub_sections[0]
+    
+    return root_section
+
+
+def _filter_sections_by_depth(
+    sections_info: Dict, 
+    parent_section: Optional[Section], 
+    max_depth: int
+) -> Dict:
+    """Filter sections based on maximum depth"""
+    filtered_sections = {}
+    
+    for section_id, info in sections_info.items():
+        level = len(section_id.split('-'))
+        
+        # Adjust level based on parent section depth
+        if parent_section is not None:
+            level += parent_section.level
+        
+        info['level'] = level
+        
+        # Include section if within depth limit
         if max_depth == -1 or level <= max_depth + 1:
-            filtered_sections_info[section_id] = sections_info[section_id]
+            filtered_sections[section_id] = info
     
-    sections_info = filtered_sections_info
-    
-    # Create Section objects
+    return filtered_sections
+
+
+def _create_section_objects(
+    text: str, 
+    sections_info: Dict, 
+    parent_section: Optional[Section]
+) -> Dict[str, Section]:
+    """Create Section objects from extracted information"""
     sections = {}
-    root_section = Section(title="Root", level=0)
+    content_extractor = SectionContentExtractor(text)
     
-    # Sort sections by their level and then by position to process them in order
-    sorted_sections = sorted(sections_info.items(), key=lambda x: (x[1]['level'], x[1].get('title', {}).get('start_pos', float('inf'))))
+    # Sort sections by level and position for proper processing order
+    sorted_sections = sorted(
+        sections_info.items(), 
+        key=lambda x: (x[1]['level'], x[1].get('title', {}).get('local_start_pos', float('inf')))
+    )
     
     for section_id, info in sorted_sections:
         # Extract title
-        title = ""
-        if 'title' in info:
-            title_start = info['title']['start_tag_end']
-            title_end = info['title']['end_pos']
-            title = text[title_start:title_end].strip()
+        title = content_extractor.extract_title(info.get('title', {}))
         
-        # Extract content (excluding nested sections)
-        content = ""
-        if 'content' in info:
-            content_start = info['content']['start_tag_end']
-            content_end = info['content']['end_pos']
-            raw_content = text[content_start:content_end]
-            
-            # Remove nested section tags from content
-            content_lines = []
-            lines = raw_content.split('\n')
-            skip_lines = False
-            nested_level = 0
-            
-            for line in lines:
-                line_stripped = line.strip()
-                
-                # Check for nested section start tags
-                if re.search(r'<start-section-(?:title|content)-([\d-]+)>', line_stripped):
-                    nested_match = re.search(r'<start-section-(?:title|content)-([\d-]+)>', line_stripped)
-                    if nested_match:
-                        nested_id = nested_match.group(1)
-                        # Check if this is a direct child section
-                        if nested_id != section_id and nested_id.startswith(section_id + '-'):
-                            skip_lines = True
-                            nested_level += 1
-                            continue
-                
-                # Check for nested section end tags
-                elif re.search(r'<end-section-(?:title|content)-([\d-]+)>', line_stripped):
-                    nested_match = re.search(r'<end-section-(?:title|content)-([\d-]+)>', line_stripped)
-                    if nested_match and skip_lines:
-                        nested_id = nested_match.group(1)
-                        if nested_id != section_id and nested_id.startswith(section_id + '-'):
-                            nested_level -= 1
-                            if nested_level == 0:
-                                skip_lines = False
-                            continue
-                
-                # Add line to content if not in nested section
-                if not skip_lines:
-                    content_lines.append(line)
-            
-            content = '\n'.join(content_lines).strip()
+        # Extract content and nested sections
+        content, nested_content = content_extractor.extract_content_and_nested(
+            info.get('content', {}), section_id
+        )
         
-        # Create the Section object
+        # Create section object
         section = Section(
             title=title,
             content=content,
             level=info['level']
         )
         
-        sections[section_id] = section
-    
-    # Build the hierarchy
-    for section_id, section in sections.items():
-        section_parts = section_id.split('-')
-        section_level = len(section_parts)
+        # Store metadata for potential recursion
+        section._recursion_content = nested_content
+        section._global_positions = {
+            'title': info.get('title', {}),
+            'content': info.get('content', {})
+        }
         
-        # If this section is at max_depth + 1, make it a leaf node
-        if max_depth != -1 and section_level == max_depth + 1:
+        # Apply depth limit for leaf nodes
+        if info['level'] == _get_max_allowed_level(parent_section, max_depth):
             section.sub_sections = []
         
-        if len(section_parts) == 1:
-            # Root level section
-            root_section.sub_sections.append(section)
-            section.parent_section = root_section
-        else:
-            # Find parent section
-            parent_id = '-'.join(section_parts[:-1])
-            if parent_id in sections:
-                parent_section = sections[parent_id]
-                # Only add as sub-section if parent is not at max depth limit
-                parent_level = len(parent_id.split('-'))
-                if max_depth == -1 or parent_level < max_depth + 1:
-                    parent_section.sub_sections.append(section)
-                    section.parent_section = parent_section
+        sections[section_id] = section
     
-    # If there's only one root section, return it directly
-    if len(root_section.sub_sections) == 1:
-        return root_section.sub_sections[0]
+    return sections
+
+
+def _get_max_allowed_level(parent_section: Optional[Section], max_depth: int) -> int:
+    """Calculate the maximum allowed level for sections"""
+    if max_depth == -1:
+        return float('inf')
+    
+    base_level = max_depth + 1
+    if parent_section is not None:
+        base_level += parent_section.level
+    
+    return base_level
+
+
+def _set_section_positions(root_section: Section, raw_text: str) -> Section:
+    """Set position information for all sections in the tree"""
+    root_section = set_section_position_index(root_section, raw_text)
+    
+    for section in flatten_section_tree_to_tokens(root_section):
+        if hasattr(section, 'title_position') and hasattr(section, 'content_position'):
+            section.title_parsed = raw_text[
+                section.title_position.text_position.start:section.title_position.text_position.end
+            ]
+            section.content_parsed = raw_text[
+                section.content_position.text_position.start:section.content_position.text_position.end
+            ]
     
     return root_section
+
+
+def process_section_recursively(
+    section: Section, 
+    raw_text: str, 
+    max_depth: int = -1
+) -> Section:
+    """
+    Recursively process a section's content for nested sections.
+    Useful when LLM generates incomplete sections that need later processing.
+    
+    Args:
+        section: Section object to process recursively
+        raw_text: Original raw text for position calculation
+        max_depth: Maximum depth for recursive processing
+    
+    Returns:
+        The processed section with updated sub-sections
+    """
+    if not hasattr(section, '_recursion_content') or not section._recursion_content:
+        return section
+    
+    # Calculate content offset in original text
+    content_offset = 0
+    if hasattr(section, '_global_positions') and 'content' in section._global_positions:
+        content_offset = section._global_positions['content'].get('start_tag_end', 0)
+    
+    # Process nested content recursively
+    generate_section_tree_from_tokens(
+        token_text=section._recursion_content,
+        raw_text=raw_text,
+        max_depth=max_depth,
+        parent_section=section,
+        text_offset=content_offset
+    )
+    
+    # Clean up temporary attributes
+    _cleanup_section_metadata(section)
+    
+    return section
+
+
+def _cleanup_section_metadata(section: Section):
+    """Remove temporary metadata attributes from section"""
+    for attr in ['_recursion_content', '_global_positions']:
+        if hasattr(section, attr):
+            delattr(section, attr)
+
 
 def remove_circular_references(section: Section):
     """
@@ -253,10 +476,10 @@ def remove_circular_references(section: Section):
     for sub_section in section.sub_sections:
         remove_circular_references(sub_section)
 
+
 # python -m models.naive_llm.helpers.section_token_parsor
 if __name__ == "__main__":
-    section_tree = generate_section_tree_from_tokens(sample_text, max_depth=2)
-    # import ipdb; ipdb.set_trace()
+    section_tree = generate_section_tree_from_tokens(sample_text, raw_text=sample_text, max_depth=2)
     
     # Remove circular references before JSON serialization
     remove_circular_references(section_tree)

@@ -23,7 +23,8 @@ async def whether_raw_section_title(section: Section) -> bool:
         SystemMessage(content=prompt),
         HumanMessage(content=text)
     ]
-    chain = llm_client | JsonOutputParser()
+    chain = llm_client | JsonOutputParser() 
+    
 
     response = await chain.ainvoke(messages)
     return response.get("is_raw_section_title", False)

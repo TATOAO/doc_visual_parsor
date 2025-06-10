@@ -1,87 +1,21 @@
 from models.utils.schemas import Section
 from models.utils.llm import get_llm_client
-from ..helpers import generate_section_tree_from_tokens, set_section_position_index, flatten_section_tree_to_tokens
+from ..helpers import generate_section_tree_from_tokens, flatten_section_tree_to_tokens
+from typing import AsyncGenerator, Tuple
 import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
 
-"""
-The general idea is use llm to understand the text and inserting special tokens to indicate the section structure.
-Then use another regex to parse the tokens and generate a section tree.
-
-The special tokens are:
-<start-section-title-1>
-<end-section-title-1>
-<start-section-content-1>
-
-<start-section-title-1-1>
-<end-section-title-1-1>
-<start-section-content-1-1>
-<end-section-content-1-1>
-
-<start-section-title-1-2>
-<end-section-title-1-2>
-<start-section-content-1-2>
-<end-section-content-1-2>
-
-<start-section-title-2>
-<end-section-title-2>
-<start-section-content-2>
-
-<start-section-title-2-1>
-<end-section-title-2-1>
-<start-section-content-2-1>
-<end-section-content-2-1>
-
-<start-section-title-2-2>
-<end-section-title-2-2>
-<start-section-content-2-2>
-<end-section-content-2-2>
-
-<end-section-content-2>
-"""
-
-
-def check_text_length(text: str, max_chars: int = 50000) -> bool:
-    """Check if text length is within reasonable limits for LLM processing"""
-    return len(text) <= max_chars
-
-
-async def get_section_tree_by_llm_with_retry(text: str, max_retries: int = 3) -> str:
-    """
-    Get section tree by LLM with retry logic and better error handling
-    """
-    
-    # Check text length first
-    if not check_text_length(text):
-        logger.warning(f"Text length ({len(text)} chars) exceeds recommended limit. Consider chunking.")
-        # For very long texts, we might want to truncate or use a different strategy
-        if len(text) > 100000:  # 100k characters
-            logger.warning("Text is extremely long, truncating to first 80k characters")
-            text = text[:80000] + "\n\n[文档已截取前80k字符用于处理]"
-    
-    last_exception = None
-    
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"Attempt {attempt + 1}/{max_retries} - Processing text of length {len(text)}")
-            
-            # Use longer timeout for longer texts
-            timeout = min(600, max(180, len(text) // 100))  # 3-10 minutes based on text length
-            
-            llm_client = get_llm_client(model="qwen-max-latest", timeout=timeout, max_retries=2)
-            
-            prompt = f"""
-你是一个专业的文档结构分析助手，能够将文本解析为层次化的章节树结构。
+# Single prompt template for all LLM operations
+SECTION_ANALYSIS_PROMPT = """你是一个专业的文档结构分析助手，能够将文本解析为层次化的章节树结构。
 
 任务说明：
 请分析给定的文本内容，识别其中的章节结构，并使用特殊标记来分别标示章节标题和内容的开始和结束位置。
 
 **注意**
 1. 不要总结，不要概括，不要添加任何解释， 不要自己生成标题。
-2. 请确保输出的内容是原文对照的，不要出现原文未出现的语句。
-3. 可以没有子章节，但是必须有标题和内容。
+2. 内容可以适当省略，但是标题必须完整。
 
 特殊标记格式：
 - 第一级章节标题：<start-section-title-1> 标题内容 <end-section-title-1>
@@ -101,6 +35,8 @@ async def get_section_tree_by_llm_with_retry(text: str, max_retries: int = 3) ->
 4. 章节内容用 <start-section-content-X> 和 <end-section-content-X> 包围
 5. 确保标记的嵌套关系正确反映文档的层次结构
 6. 每个开始标记都必须有对应的结束标记
+7. **重要**：绝对不能在标记外留下任何内容。所有文本都必须包含在 <start-section-title-X>...<end-section-title-X> 或 <start-section-content-X>...<end-section-content-X> 标记内
+8. **严禁**：在 <end-section-content-X> 和 <start-section-title-Y> 之间留下任何文本内容
 
 示例输出格式：
 <start-section-title-1>
@@ -132,63 +68,130 @@ async def get_section_tree_by_llm_with_retry(text: str, max_retries: int = 3) ->
 这里是第二章的内容...
 <end-section-content-2>
 
-请分析以下文本并添加相应的章节标记：
-"""
-            from langchain_core.messages import SystemMessage, HumanMessage
-            
-            messages = [
-                SystemMessage(content=prompt),
-                HumanMessage(content=text)
-            ]
-            
-            response = await llm_client.ainvoke(messages)
-            logger.info(f"Successfully processed text on attempt {attempt + 1}")
-            return response.content
-            
-        except Exception as e:
-            last_exception = e
-            logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
-            
-            if attempt < max_retries - 1:
-                # Wait before retry with exponential backoff
-                wait_time = (2 ** attempt) * 5  # 5, 10, 20 seconds
-                logger.info(f"Waiting {wait_time} seconds before retry...")
-                await asyncio.sleep(wait_time)
-            
-    # If all retries failed, raise the last exception
-    logger.error(f"All {max_retries} attempts failed. Last error: {str(last_exception)}")
-    raise last_exception
+错误示例（绝对禁止）：
+<start-section-content-1-1>
+这里是内容...
+<end-section-content-1-1>
+
+这里有遗漏的内容！！！ ← 这种情况绝对不允许
+
+<start-section-title-1-2>
+下一个标题
+<end-section-title-1-2>
+
+请分析以下文本并添加相应的章节标记："""
 
 
-async def get_section_tree_by_llm(text: str) -> str:
+async def get_tagged_text_by_llm_streaming(text: str, progress_callback=None) -> AsyncGenerator[str, None]:
     """
-    using llm parsing the text into a section tree
+    Streaming version that yields partial results as they come in
+    
+    Args:
+        text: Input text to process
+        progress_callback: Optional callback function to handle progress updates
+    
+    Yields:
+        str: Partial responses as they stream in
     """
-    return await get_section_tree_by_llm_with_retry(text)
+    try:
+        logger.info(f"Starting LLM processing - text length: {len(text)}")
+        
+        # Use longer timeout for longer texts
+        timeout = min(600, max(180, len(text) // 100))  # 3-10 minutes based on text length
+        llm_client = get_llm_client(model="qwen-max-latest", timeout=timeout, max_retries=2)
+        
+        from langchain_core.messages import SystemMessage, HumanMessage
+        
+        messages = [
+            SystemMessage(content=SECTION_ANALYSIS_PROMPT),
+            HumanMessage(content=text)
+        ]
+        
+        full_response = ""
+        async for chunk in llm_client.astream(messages):
+            if hasattr(chunk, 'content') and chunk.content:
+                full_response += chunk.content
+                
+                # Call progress callback if provided
+                if progress_callback:
+                    await progress_callback(chunk.content, full_response)
+                
+                # Yield the chunk for real-time processing
+                yield chunk.content
+        
+        logger.info(f"LLM processing completed - total length: {len(full_response)}")
+        
+    except Exception as e:
+        logger.error(f"LLM processing failed: {str(e)}")
+        raise
 
 
-def parsed_llm_result_into_section_tree(llm_result: str, raw_text: str, max_depth: int = -1) -> Section:
+async def cut_section_tree_streaming(raw_text: str, max_depth: int = -1, progress_callback=None) -> AsyncGenerator[Tuple[bool, Section], None]:
     """
-    parsed the llm result into a section tree
+    Streaming version of cut_section_tree that yields partial results
+    
+    Args:
+        raw_text: Input text to process
+        max_depth: Maximum depth for section tree
+        progress_callback: Optional callback for progress updates
+    
+    Yields:
+        tuple: (is_complete: bool, section_tree: Section or None)
     """
+    
+    # Yield initial status
+    yield (False, None)
+    
+    full_llm_result = ""
+    yield_length_limit = 1000
+    
+    # Stream the LLM processing every 1000 characters
+    async for chunk in get_tagged_text_by_llm_streaming(raw_text, progress_callback):
+        full_llm_result += chunk
 
-    section_tree = generate_section_tree_from_tokens(llm_result, max_depth)
-    section_tree = set_section_position_index(section_tree, raw_text)
+        print(chunk, end="", flush=True)
 
-    return section_tree
+        # Try to parse partial results if we have enough content
+        if len(full_llm_result) > yield_length_limit and '<end-section-title-' in full_llm_result:
+            try:
+                # Try to create a partial section tree
+                partial_section_tree = generate_section_tree_from_tokens(full_llm_result, raw_text, max_depth)
+                
+                # Yield partial results
+                yield_length_limit += 1000
+                yield (False, partial_section_tree)
+                
+            except Exception as e:
+                # If parsing fails, continue streaming
+                logger.debug(f"Partial parsing failed: {e}")
+                continue
+    
+    # Final processing
+    try:
+        final_section_tree = generate_section_tree_from_tokens(full_llm_result, raw_text, max_depth)
+
+        for section in flatten_section_tree_to_tokens(final_section_tree):
+            section.title_parsed = raw_text[section.title_position.text_position.start:section.title_position.text_position.end]
+            section.content_parsed = raw_text[section.content_position.text_position.start:section.content_position.text_position.end]
+
+        # Yield final complete result
+        yield (True, final_section_tree)
+        
+    except Exception as e:
+        logger.error(f"Final parsing failed: {e}")
+        yield (True, None)
+
 
 async def cut_section_tree(raw_text: str, max_depth: int = -1) -> Section:
     """
-    cut the raw text into a section tree
+    Non-streaming wrapper for cut_section_tree_streaming
+    Returns only the final complete result
     """
-    llm_result = await get_section_tree_by_llm(raw_text)
-    section_tree = parsed_llm_result_into_section_tree(llm_result, raw_text, max_depth)
-
-    for section in flatten_section_tree_to_tokens(section_tree):
-        section.title_parsed = raw_text[section.title_position.text_position.start:section.title_position.text_position.end]
-        section.content_parsed = raw_text[section.content_position.text_position.start:section.content_position.text_position.end]
-
-    return section_tree
+    async for is_complete, section_tree in cut_section_tree_streaming(raw_text, max_depth):
+        if is_complete and section_tree is not None:
+            return section_tree
+    
+    raise ValueError("Failed to get section tree from streaming cut")
 
 
 # python -m models.naive_llm.agents.section_cutter
@@ -199,12 +202,21 @@ if __name__ == "__main__":
     text = extract_docx_content(docx_path)
     
     async def main():
-        section_tree = await cut_section_tree(text)
 
+
+        # streaming version
+        chunk_index = 0
         from ..helpers import remove_circular_references
-        remove_circular_references(section_tree)
         import json
-        with open('section_tree_cut.json', 'w') as f:
-            json.dump(section_tree.model_dump(), f, indent=4, ensure_ascii=False)
+        async for is_complete, section_tree in cut_section_tree_streaming(text, max_depth=3):
+            print(f"chunk_index: {chunk_index}, is_complete: {is_complete}")
+            if section_tree is not None:
+                remove_circular_references(section_tree)
+                with open(f'section_tree_cut_{chunk_index}.json', 'w') as f:
+                    json.dump(section_tree.model_dump(), f, indent=4, ensure_ascii=False)
+            else:
+                print("section_tree is None")
+            chunk_index += 1
+
     
     asyncio.run(main())

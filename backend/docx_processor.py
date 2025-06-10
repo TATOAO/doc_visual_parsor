@@ -2,6 +2,7 @@ import docx
 import tempfile
 import os
 from typing import Union, Any, List
+from models.naive_llm.helpers import remove_circular_references
 from pathlib import Path
 
 def extract_docx_content(docx_file: Union[str, bytes, Path, Any]) -> str:
@@ -49,8 +50,7 @@ def extract_docx_structure_with_naive_llm(docx_file: Union[str, bytes, Path, Any
         
         # TODO: use control for finer cut
         from models.naive_llm import get_section_tree_by_llm
-        from models.naive_llm.helpers import generate_section_tree_from_tokens, set_section_position_index
-        
+        from models.naive_llm.helpers import generate_section_tree_from_tokens
         # Extract text content
         raw_text = extract_docx_content(docx_file)
         if not raw_text:
@@ -62,12 +62,9 @@ def extract_docx_structure_with_naive_llm(docx_file: Union[str, bytes, Path, Any
             return {"success": False, "error": "Failed to get LLM response"}
         
         # Step 2: Parse tokens into section tree
-        section_tree = generate_section_tree_from_tokens(llm_response)
+        section_tree = generate_section_tree_from_tokens(llm_response, raw_text)
         if not section_tree:
             return {"success": False, "error": "Failed to parse section tree from tokens"}
-        
-        # Step 3: Set position indices
-        section_tree = set_section_position_index(section_tree, raw_text)
         
         # Step 4: Remove circular references for JSON serialization
         remove_circular_references(section_tree)
