@@ -2,7 +2,7 @@
 Examples of using the new Position system for different document types
 """
 
-from models.utils.schemas import Position, BoundingBox, Section
+from models.schemas.schemas import Position, BoundingBox, Section
 
 # Example 1: Text position (simple case)
 text_position = Position.from_text(
@@ -63,7 +63,7 @@ section = Section(
 print("Section with positions:", section)
 
 # Example 6: Backward compatibility with legacy PositionIndex
-from models.utils.schemas import PositionIndex
+from models.schemas.schemas import PositionIndex
 
 legacy_pos = PositionIndex(start=100, end=200)
 new_pos = legacy_pos.to_position()

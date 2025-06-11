@@ -1,5 +1,5 @@
 import re
-from models.utils.schemas import Section
+from models.schemas.schemas import Section
 from models.utils.llm import get_llm_client
 
 # python -m models.naive_llm.__init__

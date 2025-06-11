@@ -1,6 +1,6 @@
 import re
 from typing import Dict, List, Tuple, Optional
-from models.utils.schemas import Section, Positions
+from models.schemas.schemas import Section, Positions
 from .tree_like_structure_mapping import set_section_position_index, flatten_section_tree_to_tokens
 
 
@@ -294,30 +294,37 @@ def generate_section_tree_from_tokens(
     Returns:
         Root section of the parsed tree
     """
-    if raw_text is None:
-        raw_text = token_text
+    # Handle raw_text for parent section case
+    if parent_section is not None:
+        # When we have a parent section, raw_text should be the parent's content
+        if raw_text is None:
+            raw_text = f"{parent_section.title_parsed}\n{parent_section.content_parsed}"
+        # Don't use text_offset for SectionTagMatcher since we're working with substring
+        tag_matcher = SectionTagMatcher(token_text, 0)
+    else:
+        if raw_text is None:
+            raw_text = token_text
+        # Extract section tags and their positions
+        tag_matcher = SectionTagMatcher(token_text, text_offset)
     
-    # Extract section tags and their positions
-    tag_matcher = SectionTagMatcher(token_text, text_offset)
     sections_info = tag_matcher.extract_tag_matches()
     
     # Filter sections by depth and add level information
     sections_info = _filter_sections_by_depth(sections_info, parent_section, max_depth)
     
     # Create section objects
-    sections = _create_section_objects(token_text, sections_info, parent_section)
-    
+    sections = _create_section_objects(token_text, sections_info, parent_section, max_depth)
+
     # Build hierarchy
     hierarchy_builder = SectionHierarchyBuilder(sections, parent_section, max_depth)
     root_section = hierarchy_builder.build_hierarchy()
     
-    # Set positions only for top-level calls
-    if parent_section is None:
-        root_section = _set_section_positions(root_section, raw_text)
-        
-        # Return single root section if only one exists
-        if len(root_section.sub_sections) == 1:
-            return root_section.sub_sections[0]
+    # Set positions for all sections
+    root_section = _set_section_positions(root_section, raw_text, parent_section)
+    
+    # Return single root section if only one exists and no parent_section
+    if parent_section is None and len(root_section.sub_sections) == 1:
+        return root_section.sub_sections[0]
     
     return root_section
 
@@ -347,13 +354,14 @@ def _filter_sections_by_depth(
 
 
 def _create_section_objects(
-    text: str, 
+    token_text: str, 
     sections_info: Dict, 
-    parent_section: Optional[Section]
+    parent_section: Optional[Section],
+    max_depth: int
 ) -> Dict[str, Section]:
     """Create Section objects from extracted information"""
     sections = {}
-    content_extractor = SectionContentExtractor(text)
+    content_extractor = SectionContentExtractor(token_text)
     
     # Sort sections by level and position for proper processing order
     sorted_sections = sorted(
@@ -405,17 +413,46 @@ def _get_max_allowed_level(parent_section: Optional[Section], max_depth: int) ->
     return base_level
 
 
-def _set_section_positions(root_section: Section, raw_text: str) -> Section:
+def _set_section_positions(root_section: Section, raw_text: str, parent_section: Optional[Section] = None) -> Section:
     """Set position information for all sections in the tree"""
-    root_section = set_section_position_index(root_section, raw_text)
     
-    for section in flatten_section_tree_to_tokens(root_section):
+    # Only calculate positions for newly parsed sub-sections, not for existing parent section
+    if parent_section is None:
+        # No parent section, set positions for all sections normally
+        root_section = set_section_position_index(root_section, raw_text)
+    else:
+        # We have a parent section, only set positions for sub-sections
+        if root_section.sub_sections:
+            # Create a temporary section tree with only the sub-sections for position calculation
+            temp_section = Section(title="temp", level=0)
+            temp_section.sub_sections = root_section.sub_sections
+            temp_section = set_section_position_index(temp_section, raw_text)
+            # Copy back the calculated positions to the original sub-sections
+            root_section.sub_sections = temp_section.sub_sections
+    
+    # Calculate parent offset if we have a parent section
+    parent_offset = 0
+    if parent_section is not None and hasattr(parent_section, 'content_position'):
+        parent_offset = parent_section.content_position.text_position.start
+    
+    # Process all sections but skip the root section if it's a parent section
+    all_sections = flatten_section_tree_to_tokens(root_section)
+    sections_to_process = all_sections[1:] if parent_section is not None else all_sections
+    
+    for section in sections_to_process:
         if hasattr(section, 'title_position') and hasattr(section, 'content_position'):
+            # Apply parent offset to make positions absolute in the original document
+            if parent_section is not None:
+                section.title_position.text_position.start += parent_offset
+                section.title_position.text_position.end += parent_offset
+                section.content_position.text_position.start += parent_offset
+                section.content_position.text_position.end += parent_offset
+            
             section.title_parsed = raw_text[
-                section.title_position.text_position.start:section.title_position.text_position.end
+                section.title_position.text_position.start - parent_offset:section.title_position.text_position.end - parent_offset
             ]
             section.content_parsed = raw_text[
-                section.content_position.text_position.start:section.content_position.text_position.end
+                section.content_position.text_position.start - parent_offset:section.content_position.text_position.end - parent_offset
             ]
     
     return root_section
@@ -447,6 +484,7 @@ def process_section_recursively(
         content_offset = section._global_positions['content'].get('start_tag_end', 0)
     
     # Process nested content recursively
+    # For recursive processing, pass the full raw_text so positions are calculated correctly
     generate_section_tree_from_tokens(
         token_text=section._recursion_content,
         raw_text=raw_text,
@@ -479,11 +517,20 @@ def remove_circular_references(section: Section):
 
 # python -m models.naive_llm.helpers.section_token_parsor
 if __name__ == "__main__":
-    section_tree = generate_section_tree_from_tokens(sample_text, raw_text=sample_text, max_depth=2)
+
+    from models.schemas.schemas import TextPosition, DocumentType
+
+    root_section = Section(title="Root", level=3)
+    root_section.title_position = Positions(document_type=DocumentType.TEXT, text_position=TextPosition(start=10019, end=10024))
+    root_section.content_position = Positions(document_type=DocumentType.TEXT, text_position=TextPosition(start=10025, end=10025 + len(sample_text)))
+    root_section.title_parsed = "Root"
+    root_section.content_parsed = sample_text
+    
+    section_tree = generate_section_tree_from_tokens(sample_text, raw_text=sample_text, max_depth=5, parent_section=root_section)
     
     # Remove circular references before JSON serialization
     remove_circular_references(section_tree)
     
     json_sample = section_tree.model_dump_json(indent=2)
-    with open("section_tree_depth_1.json", "w", encoding="utf-8") as f:
+    with open("section_tree_unit_test_depth_2.json", "w", encoding="utf-8") as f:
         f.write(json_sample)

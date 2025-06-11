@@ -1,0 +1,1783 @@
+Document Layout Analysis Results
+========================================
+
+Total Elements: 295
+Element Types:
+  Text: 41
+  Paragraph: 253
+  Table: 1
+
+Detected Elements:
+--------------------
+ID: 0
+Type: Text
+Confidence: 0.70
+Text: 第一章  买卖合同
+Metadata: {'paragraph_index': 1, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 1
+Type: Paragraph
+Confidence: 0.70
+Text: 共计5个合同示范文本,分别是买卖合同（通用版）、设备采购合同、产品经销合同、集采零配件买卖合同、原材料采购合同。编制主要依据是《民法典》《最高人民法院关于审理买卖合同纠纷案件适用法律问题的解释》《最高...
+Metadata: {'paragraph_index': 3, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 2
+Type: Text
+Confidence: 0.70
+Text: 第一节  买卖合同（通用版）
+Metadata: {'paragraph_index': 6, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 3
+Type: Text
+Confidence: 0.70
+Text: 一、定义
+Metadata: {'paragraph_index': 8, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 4
+Type: Paragraph
+Confidence: 0.70
+Text: 买卖合同是出卖人转移标的物的所有权于买受人，买受人支付价款的合同。买卖合同属于《民法典》合同编规定的典型合同。
+Metadata: {'paragraph_index': 9, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 5
+Type: Text
+Confidence: 0.70
+Text: 二、主要风险及常见易发问题提示
+Metadata: {'paragraph_index': 10, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 6
+Type: Text
+Confidence: 0.70
+Text: （一）主要业务风险
+Metadata: {'paragraph_index': 11, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 7
+Type: Paragraph
+Confidence: 0.70
+Text: 买卖合同中，出卖人交付标的物，买受人支付货款。实务中，买受人可能面临如下法律风险：
+Metadata: {'paragraph_index': 12, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 8
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人未取得标的物的处分权，可能导致标的物所有权不能转移，买受人无法实现合同目的。
+Metadata: {'paragraph_index': 13, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 9
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人未按照约定或者交易习惯向买受人交付提取标的物必要的单证及相关资料，可能导致买受人无法实际取得标的物。
+Metadata: {'paragraph_index': 14, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 10
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人不能按照约定的时间交付标的物，可能导致买受人生产任务等预期目标无法完成。
+Metadata: {'paragraph_index': 15, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 11
+Type: Paragraph
+Confidence: 0.70
+Text: 合同未约定交付地点或约定不明确的，可能导致标的物风险转移节点无法认定，双方责任划分不明。
+Metadata: {'paragraph_index': 16, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 12
+Type: Paragraph
+Confidence: 0.70
+Text: 合同未在价格条款中明确约定“先开发票后付款”支付方式的，发生付款争议时，可能导致买受人因证据不足承担不利后果。
+Metadata: {'paragraph_index': 17, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 13
+Type: Paragraph
+Confidence: 0.70
+Text: 合同未对产品规格、数量以及质量标准进行约定或约定不明确的，可能导致买受人承担不利后果。
+Metadata: {'paragraph_index': 18, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 14
+Type: Paragraph
+Confidence: 0.70
+Text: 合同约定减轻或者免除出卖人对标的物瑕疵承担的责任，可能导致买受人承担不利后果。
+Metadata: {'paragraph_index': 19, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 15
+Type: Paragraph
+Confidence: 0.70
+Text: 合同未明确约定检验期限或质量保证期，或约定的期限过短的，可能导致买受人承担数量或质量不符合合同约定的不利后果；合同约定的检验期限或质量保证期，不符合相关法律、行政法规规定的，可能导致该条款无效。
+Metadata: {'paragraph_index': 20, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 16
+Type: Paragraph
+Confidence: 0.70
+Text: 凭样品买卖的合同，未对样品进行封存的，或未对样品做出质量说明的，出现关于合同标的物的争议时，双方推诿扯皮，可能导致买受人承担不利后果。
+Metadata: {'paragraph_index': 21, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 17
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人制作的送货单、确认单上出现对买受人不利的检验期间的约定时，如“买受人签收本送货单即视为认可货物的数量及质量”，买受人未审慎注意，可能导致买受人承担不利后果。
+Metadata: {'paragraph_index': 22, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 18
+Type: Paragraph
+Confidence: 0.70
+Text: 合同标的物存在知识产权侵权争议，发生纠纷时，因合同中未明确约定责任如何划分，可能导致买受人承担不利后果。
+Metadata: {'paragraph_index': 23, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 19
+Type: Paragraph
+Confidence: 0.70
+Text: 合同未明确约定违约责任或约定的违约金比例过高，可能导致合同条款缺乏操作性，无法履行。
+Metadata: {'paragraph_index': 24, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 20
+Type: Text
+Confidence: 0.70
+Text: （二）合同管理常见易发问题
+Metadata: {'paragraph_index': 25, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 21
+Type: Paragraph
+Confidence: 0.70
+Text: 倒签合同或补签合同，导致合同履行时，双方权利义务关系不明确，存在合规风险。
+Metadata: {'paragraph_index': 26, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 22
+Type: Paragraph
+Confidence: 0.70
+Text: 合同承办人员未严格履行招投标程序或比质比价程序，可能引发廉洁合规风险。
+Metadata: {'paragraph_index': 27, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 23
+Type: Paragraph
+Confidence: 0.70
+Text: 合同承办人员为规避企业合同分级审批管理，拆分合同标的额较大的合同，导致合规风险。
+Metadata: {'paragraph_index': 28, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 24
+Type: Paragraph
+Confidence: 0.70
+Text: 合同签订前未对合同相对方资质、信用状况等进行调查或调查流于形式，可能导致合同无效或事实上无法履行。
+Metadata: {'paragraph_index': 29, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 25
+Type: Paragraph
+Confidence: 0.70
+Text: 合同签订前，未核实合同相对方委托代理人委托代理权限的，可能导致合同无效或被撤销。
+Metadata: {'paragraph_index': 30, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 26
+Type: Paragraph
+Confidence: 0.70
+Text: 合同文本必备条款缺失或不明确，可能导致合同执行困难、交易目的无法圆满实现。
+Metadata: {'paragraph_index': 31, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 27
+Type: Paragraph
+Confidence: 0.70
+Text: 合同履行过程中，双方协商对合同主要条款进行变更，但未及时签订书面补充协议的，可能导致合同后续履行争议。
+Metadata: {'paragraph_index': 32, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 28
+Type: Paragraph
+Confidence: 0.70
+Text: 合同履行过程中，未严格按照合同约定对货物验收情况进行书面记录的，发生争议时，可能因证据缺失，导致增加妥善解决合同争议难度。
+Metadata: {'paragraph_index': 33, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 29
+Type: Paragraph
+Confidence: 0.70
+Text: 合同档案管理松散，发生争议时，支撑己方的证据材料缺失，导致增加妥善解决合同争议难度。
+Metadata: {'paragraph_index': 34, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 30
+Type: Text
+Confidence: 0.70
+Text: 三、风险防范措施
+Metadata: {'paragraph_index': 35, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 31
+Type: Paragraph
+Confidence: 0.70
+Text: 1.为保证买受人能够通过合同履行取得标的物所有权，应在合同项下明确约定出卖人不能交付标的物时的救济措施。
+Metadata: {'paragraph_index': 36, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 32
+Type: Paragraph
+Confidence: 0.70
+Text: 2.合同签订前，应严格按照公司内部供应商准入制度，对合同相对方的资信状况、履约能力等进行全面的调查。
+Metadata: {'paragraph_index': 37, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 33
+Type: Paragraph
+Confidence: 0.70
+Text: 3.合同签订前，要充分考虑合同示范文本选择性条款各选项的不同性及优劣势，合理进行选择。
+Metadata: {'paragraph_index': 38, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 34
+Type: Paragraph
+Confidence: 0.70
+Text: 4.应按照《民法典》第五百九十六条的规定，保证各合同条款的完备和准确。
+Metadata: {'paragraph_index': 39, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 35
+Type: Paragraph
+Confidence: 0.70
+Text: 5.应当对标的物进行详细的描述，做到明确、具体、一目了然。具体包括标的物的名称、品牌、规格、型号、生产厂商、产地、数量等。
+Metadata: {'paragraph_index': 40, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 36
+Type: Paragraph
+Confidence: 0.70
+Text: 6.如出卖人制作的送货单、确认单上有对买受人不利的检验期间的约定，买受人应在送货单、确认单上作保留说明，如“仅清点了货物的数量，质量问题需另行检验。”。
+Metadata: {'paragraph_index': 41, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 37
+Type: Paragraph
+Confidence: 0.70
+Text: 7.应当在合同结算条款中明确约定“先开发票后付款”类字样。司法实务中，将“普通发票、增值税专用发票”认定为辅助单证，在出卖人已经履行交付货物主合同义务的情形下，除非合同有明确约定“先开发票后付款”类字...
+Metadata: {'paragraph_index': 42, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 38
+Type: Paragraph
+Confidence: 0.70
+Text: 8.合同出现纠纷、分歧的，要综合运用和解、调解、仲裁、诉讼等多种手段妥善解决。
+Metadata: {'paragraph_index': 43, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 39
+Type: Paragraph
+Confidence: 0.70
+Text: 9.应当妥善、完整、真实的保存合同履行中的各类过程性文件、档案，以便发生合同纠纷时可以有效维护自身合法权益。
+Metadata: {'paragraph_index': 44, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 40
+Type: Text
+Confidence: 0.70
+Text: 四、相关法律法规
+Metadata: {'paragraph_index': 45, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 41
+Type: Text
+Confidence: 0.70
+Text: 《民法典》
+Metadata: {'paragraph_index': 46, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 42
+Type: Paragraph
+Confidence: 0.70
+Text: 第五百九十五条  买卖合同是出卖人转移标的物的所有权于买受人，买受人支付价款的合同。
+Metadata: {'paragraph_index': 47, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 43
+Type: Paragraph
+Confidence: 0.70
+Text: 第五百九十六条  买卖合同的内容一般包括标的物的名称、数量、质量、价款、履行期限、履行地点和方式、包装方式、检验标准和方法、结算方式、合同使用的文字及其效力等条款。
+Metadata: {'paragraph_index': 48, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 44
+Type: Paragraph
+Confidence: 0.70
+Text: 第五百九十七条  因出卖人未取得处分权致使标的物所有权不能转移的，买受人可以解除合同并请求出卖人承担违约责任。
+Metadata: {'paragraph_index': 49, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 45
+Type: Paragraph
+Confidence: 0.70
+Text: 法律、行政法规禁止或者限制转让的标的物，依照其规定。
+Metadata: {'paragraph_index': 50, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 46
+Type: Paragraph
+Confidence: 0.70
+Text: 第五百九十八条  出卖人应当履行向买受人交付标的物或者交付提取标的物的单证，并转移标的物所有权的义务。
+Metadata: {'paragraph_index': 51, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 47
+Type: Paragraph
+Confidence: 0.70
+Text: 第五百九十九条  出卖人应当按照约定或者交易习惯向买受人交付提取标的物单证以外的有关单证和资料。
+Metadata: {'paragraph_index': 52, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 48
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百条  出卖具有知识产权的标的物的，除法律另有规定或者当事人另有约定外，该标的物的知识产权不属于买受人。
+Metadata: {'paragraph_index': 53, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 49
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百零一条  出卖人应当按照约定的时间交付标的物。约定交付期限的，出卖人可以在该交付期限内的任何时间交付。
+Metadata: {'paragraph_index': 54, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 50
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百零二条  当事人没有约定标的物的交付期限或者约定不明确的，适用本法第五百一十条、第五百一十一条第四项的规定。
+Metadata: {'paragraph_index': 55, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 51
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百零三条  出卖人应当按照约定的地点交付标的物。
+Metadata: {'paragraph_index': 56, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 52
+Type: Paragraph
+Confidence: 0.70
+Text: 当事人没有约定交付地点或者约定不明确，依据本法第五百一十条的规定仍不能确定的，适用下列规定：
+Metadata: {'paragraph_index': 57, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 53
+Type: Paragraph
+Confidence: 0.70
+Text: （一）标的物需要运输的，出卖人应当将标的物交付给第一承运人以运交给买受人；
+Metadata: {'paragraph_index': 58, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 54
+Type: Paragraph
+Confidence: 0.70
+Text: （二）标的物不需要运输，出卖人和买受人订立合同时知道标的物在某一地点的，出卖人应当在该地点交付标的物；不知道标的物在某一地点的，应当在出卖人订立合同时的营业地交付标的物。
+Metadata: {'paragraph_index': 59, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 55
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百零四条  标的物毁损、灭失的风险，在标的物交付之前由出卖人承担，交付之后由买受人承担，但是法律另有规定或者当事人另有约定的除外。
+Metadata: {'paragraph_index': 60, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 56
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百零五条  因买受人的原因致使标的物未按照约定的期限交付的，买受人应当自违反约定时起承担标的物毁损、灭失的风险。
+Metadata: {'paragraph_index': 61, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 57
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百零六条  出卖人出卖交由承运人运输的在途标的物，除当事人另有约定外，毁损、灭失的风险自合同成立时起由买受人承担。
+Metadata: {'paragraph_index': 62, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 58
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百零七条  出卖人按照约定将标的物运送至买受人指定地点并交付给承运人后，标的物毁损、灭失的风险由买受人承担。
+Metadata: {'paragraph_index': 63, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 59
+Type: Paragraph
+Confidence: 0.70
+Text: 当事人没有约定交付地点或者约定不明确，依据本法第六百零三条第二款第一项的规定标的物需要运输的，出卖人将标的物交付给第一承运人后，标的物毁损、灭失的风险由买受人承担。
+Metadata: {'paragraph_index': 64, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 60
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百零八条  出卖人按照约定或者依据本法第六百零三条第二款第二项的规定将标的物置于交付地点，买受人违反约定没有收取的，标的物毁损、灭失的风险自违反约定时起由买受人承担。
+Metadata: {'paragraph_index': 65, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 61
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百零九条  出卖人按照约定未交付有关标的物的单证和资料的，不影响标的物毁损、灭失风险的转移。
+Metadata: {'paragraph_index': 66, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 62
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百一十条  因标的物不符合质量要求，致使不能实现合同目的的，买受人可以拒绝接受标的物或者解除合同。买受人拒绝接受标的物或者解除合同的，标的物毁损、灭失的风险由出卖人承担。
+Metadata: {'paragraph_index': 67, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 63
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百一十一条  标的物毁损、灭失的风险由买受人承担的，不影响因出卖人履行义务不符合约定，买受人请求其承担违约责任的权利。
+Metadata: {'paragraph_index': 68, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 64
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百一十二条  出卖人就交付的标的物，负有保证第三人对该标的物不享有任何权利的义务，但是法律另有规定的除外。
+Metadata: {'paragraph_index': 69, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 65
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百一十三条  买受人订立合同时知道或者应当知道第三人对买卖的标的物享有权利的，出卖人不承担前条规定的义务。
+Metadata: {'paragraph_index': 70, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 66
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百一十四条  买受人有确切证据证明第三人对标的物享有权利的，可以中止支付相应的价款，但是出卖人提供适当担保的除外。
+Metadata: {'paragraph_index': 71, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 67
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百一十五条  出卖人应当按照约定的质量要求交付标的物。出卖人提供有关标的物质量说明的，交付的标的物应当符合该说明的质量要求。
+Metadata: {'paragraph_index': 72, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 68
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百一十六条  当事人对标的物的质量要求没有约定或者约定不明确，依据本法第五百一十条的规定仍不能确定的，适用本法第五百一十一条第一项的规定。
+Metadata: {'paragraph_index': 73, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 69
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百一十七条  出卖人交付的标的物不符合质量要求的，买受人可以依据本法第五百八十二条至第五百八十四条的规定请求承担违约责任。
+Metadata: {'paragraph_index': 74, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 70
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百一十八条  当事人约定减轻或者免除出卖人对标的物瑕疵承担的责任，因出卖人故意或者重大过失不告知买受人标的物瑕疵的，出卖人无权主张减轻或者免除责任。
+Metadata: {'paragraph_index': 75, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 71
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百一十九条  出卖人应当按照约定的包装方式交付标的物。对包装方式没有约定或者约定不明确，依据本法第五百一十条的规定仍不能确定的，应当按照通用的方式包装；没有通用方式的，应当采取足以保护标的物且有利...
+Metadata: {'paragraph_index': 76, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 72
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百二十条  买受人收到标的物时应当在约定的检验期限内检验。没有约定检验期限的，应当及时检验。
+Metadata: {'paragraph_index': 77, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 73
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百二十一条  当事人约定检验期限的，买受人应当在检验期限内将标的物的数量或者质量不符合约定的情形通知出卖人。买受人怠于通知的，视为标的物的数量或者质量符合约定。
+Metadata: {'paragraph_index': 78, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 74
+Type: Paragraph
+Confidence: 0.70
+Text: 当事人没有约定检验期限的，买受人应当在发现或者应当发现标的物的数量或者质量不符合约定的合理期限内通知出卖人。买受人在合理期限内未通知或者自收到标的物之日起二年内未通知出卖人的，视为标的物的数量或者质量...
+Metadata: {'paragraph_index': 79, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 75
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人知道或者应当知道提供的标的物不符合约定的，买受人不受前两款规定的通知时间的限制。
+Metadata: {'paragraph_index': 80, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 76
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百二十二条  当事人约定的检验期限过短，根据标的物的性质和交易习惯，买受人在检验期限内难以完成全面检验的，该期限仅视为买受人对标的物的外观瑕疵提出异议的期限。
+Metadata: {'paragraph_index': 81, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 77
+Type: Paragraph
+Confidence: 0.70
+Text: 约定的检验期限或者质量保证期短于法律、行政法规规定期限的，应当以法律、行政法规规定的期限为准。
+Metadata: {'paragraph_index': 82, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 78
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百二十三条  当事人对检验期限未作约定，买受人签收的送货单、确认单等载明标的物数量、型号、规格的，推定买受人已经对数量和外观瑕疵进行检验，但是有相关证据足以推翻的除外。
+Metadata: {'paragraph_index': 83, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 79
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百二十四条  出卖人依照买受人的指示向第三人交付标的物，出卖人和买受人约定的检验标准与买受人和第三人约定的检验标准不一致的，以出卖人和买受人约定的检验标准为准。
+Metadata: {'paragraph_index': 84, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 80
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百二十六条  买受人应当按照约定的数额和支付方式支付价款。对价款的数额和支付方式没有约定或者约定不明确的，适用本法第五百一十条、第五百一十一条第二项和第五项的规定。
+Metadata: {'paragraph_index': 85, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 81
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百二十七条  买受人应当按照约定的地点支付价款。对支付地点没有约定或者约定不明确，依据本法第五百一十条的规定仍不能确定的，买受人应当在出卖人的营业地支付；但是，约定支付价款以交付标的物或者交付提取...
+Metadata: {'paragraph_index': 86, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 82
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百二十八条  买受人应当按照约定的时间支付价款。对支付时间没有约定或者约定不明确，依据本法第五百一十条的规定仍不能确定的，买受人应当在收到标的物或者提取标的物单证的同时支付。
+Metadata: {'paragraph_index': 87, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 83
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百二十九条  出卖人多交标的物的，买受人可以接收或者拒绝接收多交的部分。买受人接收多交部分的，按照约定的价格支付价款；买受人拒绝接收多交部分的，应当及时通知出卖人。
+Metadata: {'paragraph_index': 88, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 84
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百三十二条  标的物为数物，其中一物不符合约定的，买受人可以就该物解除。但是，该物与他物分离使标的物的价值显受损害的，买受人可以就数物解除合同。
+Metadata: {'paragraph_index': 89, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 85
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百三十三条  出卖人分批交付标的物的，出卖人对其中一批标的物不交付或者交付不符合约定，致使该批标的物不能实现合同目的的，买受人可以就该批标的物解除。
+Metadata: {'paragraph_index': 90, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 86
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人不交付其中一批标的物或者交付不符合约定，致使之后其他各批标的物的交付不能实现合同目的的，买受人可以就该批以及之后其他各批标的物解除。
+Metadata: {'paragraph_index': 91, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 87
+Type: Paragraph
+Confidence: 0.70
+Text: 买受人如果就其中一批标的物解除，该批标的物与其他各批标的物相互依存的，可以就已经交付和未交付的各批标的物解除。
+Metadata: {'paragraph_index': 92, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 88
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百三十四条  分期付款的买受人未支付到期价款的数额达到全部价款的五分之一，经催告后在合理期限内仍未支付到期价款的，出卖人可以请求买受人支付全部价款或者解除合同。
+Metadata: {'paragraph_index': 93, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 89
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人解除合同的，可以向买受人请求支付该标的物的使用费。
+Metadata: {'paragraph_index': 94, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 90
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百三十五条  凭样品买卖的当事人应当封存样品，并可以对样品质量予以说明。出卖人交付的标的物应当与样品及其说明的质量相同。
+Metadata: {'paragraph_index': 95, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 91
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百三十六条  凭样品买卖的买受人不知道样品有隐蔽瑕疵的，即使交付的标的物与样品相同，出卖人交付的标的物的质量仍然应当符合同种物的通常标准。
+Metadata: {'paragraph_index': 96, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 92
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百三十七条  试用买卖的当事人可以约定标的物的试用期限。对试用期限没有约定或者约定不明确，依据本法第五百一十条的规定仍不能确定的，由出卖人确定。
+Metadata: {'paragraph_index': 97, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 93
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百三十八条  试用买卖的买受人在试用期内可以购买标的物，也可以拒绝购买。试用期限届满，买受人对是否购买标的物未作表示的，视为购买。
+Metadata: {'paragraph_index': 98, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 94
+Type: Paragraph
+Confidence: 0.70
+Text: 试用买卖的买受人在试用期内已经支付部分价款或者对标的物实施出卖、出租、设立担保物权等行为的，视为同意购买。
+Metadata: {'paragraph_index': 99, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 95
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百三十九条  试用买卖的当事人对标的物使用费没有约定或者约定不明确的，出卖人无权请求买受人支付。
+Metadata: {'paragraph_index': 100, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 96
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百四十条  标的物在试用期内毁损、灭失的风险由出卖人承担。
+Metadata: {'paragraph_index': 101, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 97
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百四十一条  当事人可以在买卖合同中约定买受人未履行支付价款或者其他义务的，标的物的所有权属于出卖人。
+Metadata: {'paragraph_index': 102, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 98
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人对标的物保留的所有权，未经登记，不得对抗善意第三人。
+Metadata: {'paragraph_index': 103, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 99
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百四十二条  当事人约定出卖人保留合同标的物的所有权，在标的物所有权转移前，买受人有下列情形之一，造成出卖人损害的，除当事人另有约定外，出卖人有权取回标的物：
+Metadata: {'paragraph_index': 104, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 100
+Type: Paragraph
+Confidence: 0.70
+Text: （一）未按照约定支付价款，经催告后在合理期限内仍未支付；
+Metadata: {'paragraph_index': 105, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 101
+Type: Text
+Confidence: 0.70
+Text: （二）未按照约定完成特定条件；
+Metadata: {'paragraph_index': 106, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 102
+Type: Paragraph
+Confidence: 0.70
+Text: （三）将标的物出卖、出质或者作出其他不当处分。
+Metadata: {'paragraph_index': 107, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 103
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人可以与买受人协商取回标的物；协商不成的，可以参照适用担保物权的实现程序。
+Metadata: {'paragraph_index': 108, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 104
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百四十三条  出卖人依据前条第一款的规定取回标的物后，买受人在双方约定或者出卖人指定的合理回赎期限内，消除出卖人取回标的物的事由的，可以请求回赎标的物。
+Metadata: {'paragraph_index': 109, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 105
+Type: Paragraph
+Confidence: 0.70
+Text: 买受人在回赎期限内没有回赎标的物，出卖人可以以合理价格将标的物出卖给第三人，出卖所得价款扣除买受人未支付的价款以及必要费用后仍有剩余的，应当返还买受人；不足部分由买受人清偿。
+Metadata: {'paragraph_index': 110, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 106
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百四十四条  招标投标买卖的当事人的权利和义务以及招标投标程序等，依照有关法律、行政法规的规定。
+Metadata: {'paragraph_index': 111, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 107
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百四十五条  拍卖的当事人的权利和义务以及拍卖程序等，依照有关法律、行政法规的规定。
+Metadata: {'paragraph_index': 112, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 108
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百四十六条  法律对其他有偿合同有规定的，依照其规定；没有规定的，参照适用买卖合同的有关规定。
+Metadata: {'paragraph_index': 113, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 109
+Type: Paragraph
+Confidence: 0.70
+Text: 第六百四十七条  当事人约定易货交易，转移标的物的所有权的，参照适用买卖合同的有关规定。
+Metadata: {'paragraph_index': 114, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 110
+Type: Paragraph
+Confidence: 0.70
+Text: 《最高人民法院关于审理买卖合同纠纷案件适用法律问题的解释》
+    第一条  当事人之间没有书面合同，一方以送货单、收货单、结算单、发票等主张存在买卖合同关系的，人民法院应当结合当事人之间的交易方式、...
+Metadata: {'paragraph_index': 115, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 111
+Type: Paragraph
+Confidence: 0.70
+Text: 对账确认函、债权确认书等函件、凭证没有记载债权人名称，买卖合同当事人一方以此证明存在买卖合同关系的，人民法院应予支持，但有相反证据足以推翻的除外。
+Metadata: {'paragraph_index': 116, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 112
+Type: Paragraph
+Confidence: 0.70
+Text: 第三条  根据民法典第六百二十九条的规定，买受人拒绝接收多交部分标的物的，可以代为保管多交部分标的物。买受人主张出卖人负担代为保管期间的合理费用的，人民法院应予支持。
+Metadata: {'paragraph_index': 117, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 113
+Type: Paragraph
+Confidence: 0.70
+Text: 买受人主张出卖人承担代为保管期间非因买受人故意或者重大过失造成的损失的，人民法院应予支持。
+Metadata: {'paragraph_index': 118, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 114
+Type: Paragraph
+Confidence: 0.70
+Text: 第四条  民法典第五百九十九条规定的“提取标的物单证以外的有关单证和资料”，主要应当包括保险单、保修单、普通发票、增值税专用发票、产品合格证、质量保证书、质量鉴定书、品质检验证书、产品进出口检疫书、原...
+Metadata: {'paragraph_index': 119, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 115
+Type: Paragraph
+Confidence: 0.70
+Text: 第五条  出卖人仅以增值税专用发票及税款抵扣资料证明其已履行交付标的物义务，买受人不认可的，出卖人应当提供其他证据证明交付标的物的事实。
+Metadata: {'paragraph_index': 120, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 116
+Type: Paragraph
+Confidence: 0.70
+Text: 合同约定或者当事人之间习惯以普通发票作为付款凭证，买受人以普通发票证明已经履行付款义务的，人民法院应予支持，但有相反证据足以推翻的除外。
+Metadata: {'paragraph_index': 121, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 117
+Type: Paragraph
+Confidence: 0.70
+Text: 第六条  出卖人就同一普通动产订立多重买卖合同，在买卖合同均有效的情况下，买受人均要求实际履行合同的，应当按照以下情形分别处理：
+Metadata: {'paragraph_index': 122, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 118
+Type: Paragraph
+Confidence: 0.70
+Text: （一）先行受领交付的买受人请求确认所有权已经转移的，人民法院应予支持；
+Metadata: {'paragraph_index': 123, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 119
+Type: Paragraph
+Confidence: 0.70
+Text: （二）均未受领交付，先行支付价款的买受人请求出卖人履行交付标的物等合同义务的，人民法院应予支持；
+Metadata: {'paragraph_index': 124, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 120
+Type: Paragraph
+Confidence: 0.70
+Text: （三）均未受领交付，也未支付价款，依法成立在先合同的买受人请求出卖人履行交付标的物等合同义务的，人民法院应予支持。
+Metadata: {'paragraph_index': 125, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 121
+Type: Paragraph
+Confidence: 0.70
+Text: 第七条  出卖人就同一船舶、航空器、机动车等特殊动产订立多重买卖合同，在买卖合同均有效的情况下，买受人均要求实际履行合同的，应当按照以下情形分别处理：
+Metadata: {'paragraph_index': 126, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 122
+Type: Paragraph
+Confidence: 0.70
+Text: （一）先行受领交付的买受人请求出卖人履行办理所有权转移登记手续等合同义务的，人民法院应予支持；
+Metadata: {'paragraph_index': 127, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 123
+Type: Paragraph
+Confidence: 0.70
+Text: （二）均未受领交付，先行办理所有权转移登记手续的买受人请求出卖人履行交付标的物等合同义务的，人民法院应予支持；
+Metadata: {'paragraph_index': 128, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 124
+Type: Paragraph
+Confidence: 0.70
+Text: （三）均未受领交付，也未办理所有权转移登记手续，依法成立在先合同的买受人请求出卖人履行交付标的物和办理所有权转移登记手续等合同义务的，人民法院应予支持；
+Metadata: {'paragraph_index': 129, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 125
+Type: Paragraph
+Confidence: 0.70
+Text: （四）出卖人将标的物交付给买受人之一，又为其他买受人办理所有权转移登记，已受领交付的买受人请求将标的物所有权登记在自己名下的，人民法院应予支持。
+Metadata: {'paragraph_index': 130, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 126
+Type: Paragraph
+Confidence: 0.70
+Text: 第八条  民法典第六百零三条第二款第一项规定的“标的物需要运输的”，是指标的物由出卖人负责办理托运，承运人系独立于买卖合同当事人之外的运输业者的情形。标的物毁损、灭失的风险负担，按照民法典第六百零七条...
+Metadata: {'paragraph_index': 131, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 127
+Type: Paragraph
+Confidence: 0.70
+Text: 第九条  出卖人根据合同约定将标的物运送至买受人指定地点并交付给承运人后，标的物毁损、灭失的风险由买受人负担，但当事人另有约定的除外。
+Metadata: {'paragraph_index': 132, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 128
+Type: Paragraph
+Confidence: 0.70
+Text: 第十条  出卖人出卖交由承运人运输的在途标的物，在合同成立时知道或者应当知道标的物已经毁损、灭失却未告知买受人，买受人主张出卖人负担标的物毁损、灭失的风险的，人民法院应予支持。
+Metadata: {'paragraph_index': 133, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 129
+Type: Paragraph
+Confidence: 0.70
+Text: 第十一条  当事人对风险负担没有约定，标的物为种类物，出卖人未以装运单据、加盖标记、通知买受人等可识别的方式清楚地将标的物特定于买卖合同，买受人主张不负担标的物毁损、灭失的风险的，人民法院应予支持。
+Metadata: {'paragraph_index': 134, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 130
+Type: Paragraph
+Confidence: 0.70
+Text: 第十二条  人民法院具体认定民法典第六百二十一条第二款规定的“合理期限”时，应当综合当事人之间的交易性质、交易目的、交易方式、交易习惯、标的物的种类、数量、性质、安装和使用情况、瑕疵的性质、买受人应尽...
+Metadata: {'paragraph_index': 135, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 131
+Type: Paragraph
+Confidence: 0.70
+Text: 民法典第六百二十一条第二款规定的“二年”是最长的合理期限。该期限为不变期间，不适用诉讼时效中止、中断或者延长的规定。
+Metadata: {'paragraph_index': 136, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 132
+Type: Paragraph
+Confidence: 0.70
+Text: 第十三条  买受人在合理期限内提出异议，出卖人以买受人已经支付价款、确认欠款数额、使用标的物等为由，主张买受人放弃异议的，人民法院不予支持，但当事人另有约定的除外。
+Metadata: {'paragraph_index': 137, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 133
+Type: Paragraph
+Confidence: 0.70
+Text: 第十四条  民法典第六百二十一条规定的检验期限、合理期限、二年期限经过后，买受人主张标的物的数量或者质量不符合约定的，人民法院不予支持。
+Metadata: {'paragraph_index': 138, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 134
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人自愿承担违约责任后，又以上述期限经过为由翻悔的，人民法院不予支持。
+Metadata: {'paragraph_index': 139, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 135
+Type: Paragraph
+Confidence: 0.70
+Text: 第十五条  买受人依约保留部分价款作为质量保证金，出卖人在质量保证期未及时解决质量问题而影响标的物的价值或者使用效果，出卖人主张支付该部分价款的，人民法院不予支持。
+Metadata: {'paragraph_index': 140, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 136
+Type: Paragraph
+Confidence: 0.70
+Text: 第十六条  买受人在检验期限、质量保证期、合理期限内提出质量异议，出卖人未按要求予以修理或者因情况紧急，买受人自行或者通过第三人修理标的物后，主张出卖人负担因此发生的合理费用的，人民法院应予支持。
+Metadata: {'paragraph_index': 141, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 137
+Type: Paragraph
+Confidence: 0.70
+Text: 第十七条  标的物质量不符合约定，买受人依照民法典第五百八十二条的规定要求减少价款的，人民法院应予支持。当事人主张以符合约定的标的物和实际交付的标的物按交付时的市场价值计算差价的，人民法院应予支持。
+Metadata: {'paragraph_index': 142, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 138
+Type: Paragraph
+Confidence: 0.70
+Text: 价款已经支付，买受人主张返还减价后多出部分价款的，人民法院应予支持。
+Metadata: {'paragraph_index': 143, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 139
+Type: Paragraph
+Confidence: 0.70
+Text: 第十八条  买卖合同对付款期限作出的变更，不影响当事人关于逾期付款违约金的约定，但该违约金的起算点应当随之变更。
+Metadata: {'paragraph_index': 144, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 140
+Type: Paragraph
+Confidence: 0.70
+Text: 买卖合同约定逾期付款违约金，买受人以出卖人接受价款时未主张逾期付款违约金为由拒绝支付该违约金的，人民法院不予支持。
+Metadata: {'paragraph_index': 145, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 141
+Type: Paragraph
+Confidence: 0.70
+Text: 买卖合同约定逾期付款违约金，但对账单、还款协议等未涉及逾期付款责任，出卖人根据对账单、还款协议等主张欠款时请求买受人依约支付逾期付款违约金的，人民法院应予支持，但对账单、还款协议等明确载有本金及逾期付...
+Metadata: {'paragraph_index': 146, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 142
+Type: Paragraph
+Confidence: 0.70
+Text: 买卖合同没有约定逾期付款违约金或者该违约金的计算方法，出卖人以买受人违约为由主张赔偿逾期付款损失，违约行为发生在2019年8月19日之前的，人民法院可以中国人民银行同期同类人民币贷款基准利率为基础，参...
+Metadata: {'paragraph_index': 147, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 143
+Type: Paragraph
+Confidence: 0.70
+Text: 第十九条  出卖人没有履行或者不当履行从给付义务，致使买受人不能实现合同目的，买受人主张解除合同的，人民法院应当根据民法典第五百六十三条第一款第四项的规定，予以支持。
+Metadata: {'paragraph_index': 148, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 144
+Type: Paragraph
+Confidence: 0.70
+Text: 第二十条  买卖合同因违约而解除后，守约方主张继续适用违约金条款的，人民法院应予支持；但约定的违约金过分高于造成的损失的，人民法院可以参照民法典第五百八十五条第二款的规定处理。
+Metadata: {'paragraph_index': 149, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 145
+Type: Paragraph
+Confidence: 0.70
+Text: 第二十一条  买卖合同当事人一方以对方违约为由主张支付违约金，对方以合同不成立、合同未生效、合同无效或者不构成违约等为由进行免责抗辩而未主张调整过高的违约金的，人民法院应当就法院若不支持免责抗辩，当事...
+Metadata: {'paragraph_index': 150, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 146
+Type: Paragraph
+Confidence: 0.70
+Text: 一审法院认为免责抗辩成立且未予释明，二审法院认为应当判决支付违约金的，可以直接释明并改判。
+Metadata: {'paragraph_index': 151, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 147
+Type: Paragraph
+Confidence: 0.70
+Text: 第二十二条  买卖合同当事人一方违约造成对方损失，对方主张赔偿可得利益损失的，人民法院在确定违约责任范围时，应当根据当事人的主张，依据民法典第五百八十四条、第五百九十一条、第五百九十二条、本解释第二十...
+Metadata: {'paragraph_index': 152, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 148
+Type: Paragraph
+Confidence: 0.70
+Text: 第二十三条  买卖合同当事人一方因对方违约而获有利益，违约方主张从损失赔偿额中扣除该部分利益的，人民法院应予支持。
+Metadata: {'paragraph_index': 153, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 149
+Type: Paragraph
+Confidence: 0.70
+Text: 第二十四条  买受人在缔约时知道或者应当知道标的物质量存在瑕疵，主张出卖人承担瑕疵担保责任的，人民法院不予支持，但买受人在缔约时不知道该瑕疵会导致标的物的基本效用显著降低的除外。
+Metadata: {'paragraph_index': 154, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 150
+Type: Paragraph
+Confidence: 0.70
+Text: 第二十五条  买卖合同当事人主张民法典第六百四十一条关于标的物所有权保留的规定适用于不动产的，人民法院不予支持。
+Metadata: {'paragraph_index': 155, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 151
+Type: Paragraph
+Confidence: 0.70
+Text: 第二十六条  买受人已经支付标的物总价款的百分之七十五以上，出卖人主张取回标的物的，人民法院不予支持。
+Metadata: {'paragraph_index': 156, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 152
+Type: Paragraph
+Confidence: 0.70
+Text: 在民法典第六百四十二条第一款第三项情形下，第三人依据民法典第三百一十一条的规定已经善意取得标的物所有权或者其他物权，出卖人主张取回标的物的，人民法院不予支持。
+Metadata: {'paragraph_index': 157, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 153
+Type: Paragraph
+Confidence: 0.70
+Text: 第二十七条  民法典第六百三十四条第一款规定的“分期付款”，系指买受人将应付的总价款在一定期限内至少分三次向出卖人支付。
+Metadata: {'paragraph_index': 158, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 154
+Type: Paragraph
+Confidence: 0.70
+Text: 分期付款买卖合同的约定违反民法典第六百三十四条第一款的规定，损害买受人利益，买受人主张该约定无效的，人民法院应予支持。
+Metadata: {'paragraph_index': 159, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 155
+Type: Paragraph
+Confidence: 0.70
+Text: 第二十八条  分期付款买卖合同约定出卖人在解除合同时可以扣留已受领价金，出卖人扣留的金额超过标的物使用费以及标的物受损赔偿额，买受人请求返还超过部分的，人民法院应予支持。
+Metadata: {'paragraph_index': 160, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 156
+Type: Paragraph
+Confidence: 0.70
+Text: 当事人对标的物的使用费没有约定的，人民法院可以参照当地同类标的物的租金标准确定。
+Metadata: {'paragraph_index': 161, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 157
+Type: Paragraph
+Confidence: 0.70
+Text: 第二十九条  合同约定的样品质量与文字说明不一致且发生纠纷时当事人不能达成合意，样品封存后外观和内在品质没有发生变化的，人民法院应当以样品为准；外观和内在品质发生变化，或者当事人对是否发生变化有争议而...
+Metadata: {'paragraph_index': 162, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 158
+Type: Paragraph
+Confidence: 0.70
+Text: 第三十条  买卖合同存在下列约定内容之一的，不属于试用买卖。买受人主张属于试用买卖的，人民法院不予支持：
+Metadata: {'paragraph_index': 163, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 159
+Type: Paragraph
+Confidence: 0.70
+Text: （一）约定标的物经过试用或者检验符合一定要求时，买受人应当购买标的物；
+Metadata: {'paragraph_index': 164, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 160
+Type: Paragraph
+Confidence: 0.70
+Text: （二）约定第三人经试验对标的物认可时，买受人应当购买标的物；
+Metadata: {'paragraph_index': 165, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 161
+Type: Paragraph
+Confidence: 0.70
+Text: （三）约定买受人在一定期限内可以调换标的物；
+Metadata: {'paragraph_index': 166, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 162
+Type: Paragraph
+Confidence: 0.70
+Text: （四）约定买受人在一定期限内可以退还标的物。
+Metadata: {'paragraph_index': 167, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 163
+Type: Paragraph
+Confidence: 0.70
+Text: 第三十一条  出卖人履行交付义务后诉请买受人支付价款，买受人以出卖人违约在先为由提出异议的，人民法院应当按照下列情况分别处理：
+Metadata: {'paragraph_index': 168, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 164
+Type: Paragraph
+Confidence: 0.70
+Text: （一）买受人拒绝支付违约金、拒绝赔偿损失或者主张出卖人应当采取减少价款等补救措施的，属于提出抗辩；
+Metadata: {'paragraph_index': 169, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 165
+Type: Paragraph
+Confidence: 0.70
+Text: （二）买受人主张出卖人应支付违约金、赔偿损失或者要求解除合同的，应当提起反诉。
+Metadata: {'paragraph_index': 170, 'detection_method': 'document_native', 'style_name': 'Normal (Web)'}
+
+ID: 166
+Type: Paragraph
+Confidence: 0.70
+Text: 《最高人民法院关于适用<中华人民共和国民法典>合同编通则若干问题的解释》
+Metadata: {'paragraph_index': 171, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 167
+Type: Paragraph
+Confidence: 0.70
+Text: 第二十六条  当事人一方未根据法律规定或者合同约定履行开具发票、提供证明文件等非主要债务，对方请求继续履行该债务并赔偿因怠于履行该债务造成的损失的，人民法院依法予以支持；对方请求解除合同的，人民法院不...
+Metadata: {'paragraph_index': 172, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 168
+Type: Paragraph
+Confidence: 0.70
+Text: 第六十五条  当事人主张约定的违约金过分高于违约造成的损失，请求予以适当减少的，人民法院应当以民法典第五百八十四条规定的损失为基础，兼顾合同主体、交易类型、合同的履行情况、当事人的过错程度、履约背景等...
+Metadata: {'paragraph_index': 173, 'detection_method': 'document_native', 'style_name': 'Plain Text'}
+
+ID: 169
+Type: Paragraph
+Confidence: 0.70
+Text: 约定的违约金超过造成损失的百分之三十的，人民法院一般可以认定为过分高于造成的损失。
+Metadata: {'paragraph_index': 174, 'detection_method': 'document_native', 'style_name': 'Plain Text'}
+
+ID: 170
+Type: Paragraph
+Confidence: 0.70
+Text: 恶意违约的当事人一方请求减少违约金的，人民法院一般不予支持。
+Metadata: {'paragraph_index': 175, 'detection_method': 'document_native', 'style_name': 'Plain Text'}
+
+ID: 171
+Type: Text
+Confidence: 0.70
+Text: 《标准化法》
+Metadata: {'paragraph_index': 176, 'detection_method': 'document_native', 'style_name': 'Plain Text'}
+
+ID: 172
+Type: Paragraph
+Confidence: 0.70
+Text: 第二条  本法所称标准（含标准样品），是指农业、工业、服务业以及社会事业等领域需要统一的技术要求。
+Metadata: {'paragraph_index': 177, 'detection_method': 'document_native', 'style_name': 'Plain Text'}
+
+ID: 173
+Type: Paragraph
+Confidence: 0.70
+Text: 标准包括国家标准、行业标准、地方标准和团体标准、企业标准。国家标准分为强制性标准、推荐性标准，行业标准、地方标准是推荐性标准。
+Metadata: {'paragraph_index': 178, 'detection_method': 'document_native', 'style_name': 'Plain Text'}
+
+ID: 174
+Type: Paragraph
+Confidence: 0.70
+Text: 强制性标准必须执行。国家鼓励采用推荐性标准。
+Metadata: {'paragraph_index': 179, 'detection_method': 'document_native', 'style_name': 'Plain Text'}
+
+ID: 175
+Type: Text
+Confidence: 0.70
+Text: 买卖合同（通用版）
+Metadata: {'paragraph_index': 181, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 176
+Type: Text
+Confidence: 0.70
+Text: 合同编号：
+Metadata: {'paragraph_index': 183, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 177
+Type: Text
+Confidence: 0.70
+Text: 签订地点：
+Metadata: {'paragraph_index': 184, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 178
+Type: Paragraph
+Confidence: 0.70
+Text: 出 卖 人：                          买 受 人：
+Metadata: {'paragraph_index': 186, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 179
+Type: Paragraph
+Confidence: 0.70
+Text: 送达地址：                          送达地址：
+Metadata: {'paragraph_index': 187, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 180
+Type: Paragraph
+Confidence: 0.70
+Text: 法定代表人：                        法定代表人：
+Metadata: {'paragraph_index': 188, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 181
+Type: Paragraph
+Confidence: 0.70
+Text: 电    话：                          电    话：
+Metadata: {'paragraph_index': 189, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 182
+Type: Paragraph
+Confidence: 0.70
+Text: 邮    编：                          邮    编：
+Metadata: {'paragraph_index': 190, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 183
+Type: Paragraph
+Confidence: 0.70
+Text: 开 户 行：                          开 户 行：
+Metadata: {'paragraph_index': 191, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 184
+Type: Paragraph
+Confidence: 0.70
+Text: 账    号：                          账    号：
+Metadata: {'paragraph_index': 192, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 185
+Type: Paragraph
+Confidence: 0.70
+Text: 税    号：                          税    号：
+Metadata: {'paragraph_index': 193, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 186
+Type: Paragraph
+Confidence: 0.70
+Text: 买受人为了    的目的,在平等、自愿的基础上，依据《中华人民共和国民法典》等法律法规，经与出卖人协商一致，就    事宜达成以下条款，双方均需遵照执行。
+Metadata: {'paragraph_index': 195, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 187
+Type: Text
+Confidence: 0.70
+Text: 第一条  合同标的物
+Metadata: {'paragraph_index': 196, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 188
+Type: Text
+Confidence: 0.70
+Text: 1.1明细表见附件。
+Metadata: {'paragraph_index': 197, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 189
+Type: Paragraph
+Confidence: 0.70
+Text: 1.2出卖人保证对所售卖的标的物拥有所有权和充分的处分权，且标的物上并无任何抵押、质押或司法查封等权利负担。对该标的物的出卖是出卖人合法有权的行为。
+Metadata: {'paragraph_index': 198, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 190
+Type: Text
+Confidence: 0.70
+Text: 第二条  合同价款及支付方式
+Metadata: {'paragraph_index': 199, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 191
+Type: Paragraph
+Confidence: 0.70
+Text: 2.1本合同约定价格的增值税率为    %。合同履行期内，如遇国家税率政策调整，双方约定以不含税价格作为基准，该价款不因原料、材料、劳务、能源等市场价格的变动而变动。
+Metadata: {'paragraph_index': 200, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 192
+Type: Paragraph
+Confidence: 0.70
+Text: 2.2合同价款按下列第    项规定进行结算:
+Metadata: {'paragraph_index': 201, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 193
+Type: Paragraph
+Confidence: 0.70
+Text: 一次性付款：出卖人将合同标的物交付至本合同约定地点，货物验收合格后    个工作日内，出卖人向买受人开具税率为    %的全额增值税专用发票后，买受人向出卖人一次性支付货款总额的100%。
+Metadata: {'paragraph_index': 202, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 194
+Type: Paragraph
+Confidence: 0.70
+Text: 分期付款：本合同生效后    个工作日内，买受人向出卖人支付货款金额的    %作为预付款；货物验收合格后    个工作日内，出卖人向买受人开具税率为    %的全额增值税专用发票后，买受人向出卖人支...
+Metadata: {'paragraph_index': 203, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 195
+Type: Paragraph
+Confidence: 0.70
+Text: 其他方式：                                                 。
+Metadata: {'paragraph_index': 204, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 196
+Type: Paragraph
+Confidence: 0.70
+Text: 2.3买受人采用    （银行转账电汇/商业承兑汇票/其他方式）方式向出卖人支付合同价款。
+Metadata: {'paragraph_index': 205, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 197
+Type: Paragraph
+Confidence: 0.70
+Text: 2.4除本合同明确约定的以外，买受人无需就本合同的履行向出卖人支付其他价款或费用。
+Metadata: {'paragraph_index': 206, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 198
+Type: Paragraph
+Confidence: 0.70
+Text: 2.5如出卖人授权任何第三方收款，必须及时向买受人提供书面证明材料和被授权方有效收款信息。
+Metadata: {'paragraph_index': 207, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 199
+Type: Text
+Confidence: 0.70
+Text: 第三条  质量要求
+Metadata: {'paragraph_index': 208, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 200
+Type: Paragraph
+Confidence: 0.70
+Text: 3.1该货物按下列第    项质量标准执行（可选多项）:
+Metadata: {'paragraph_index': 209, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 201
+Type: Paragraph
+Confidence: 0.70
+Text: 国家标准，标准名称及编号为：                               ；
+Metadata: {'paragraph_index': 210, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 202
+Type: Paragraph
+Confidence: 0.70
+Text: 地方标准，标准名称及编号为：                               ；
+Metadata: {'paragraph_index': 211, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 203
+Type: Paragraph
+Confidence: 0.70
+Text: 行业标准，标准名称及编号为：                               ；
+Metadata: {'paragraph_index': 212, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 204
+Type: Paragraph
+Confidence: 0.70
+Text: 企业标准，标准名称及编号为：                               ；
+Metadata: {'paragraph_index': 213, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 205
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人和买受人所签订的《技术协议》对本合同标的物约定的质量要求和技术要求等（详情见附件）；
+Metadata: {'paragraph_index': 214, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 206
+Type: Text
+Confidence: 0.70
+Text: 生产厂家相应技术指标。
+Metadata: {'paragraph_index': 215, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 207
+Type: Paragraph
+Confidence: 0.70
+Text: 3.2若合同约定的多个质量标准不一致时，应以其中最高的质量标准为准。
+Metadata: {'paragraph_index': 216, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 208
+Type: Paragraph
+Confidence: 0.70
+Text: 3.3质量保证期为货物质量验收合格之日的次日起    个月。
+Metadata: {'paragraph_index': 217, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 209
+Type: Paragraph
+Confidence: 0.70
+Text: 3.4货物在质量保证期内出现质量问题，买受人以书面或者其他方式通知出卖人，出卖人在接到买受人通知后，应在    个小时内答复；需派人到现场处理的，应在接到买受人通知后    小时内指派专业人员到现场维...
+Metadata: {'paragraph_index': 218, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 210
+Type: Paragraph
+Confidence: 0.70
+Text: 3.5质量保证期内，如出卖人不能在规定的期限内对货物进行维修，买受人有权选择第三方进行维修，所发生的维修费在质量保证金中扣除，如质量保证金不足以支付维修费用的，超出部分由出卖人全部承担。
+Metadata: {'paragraph_index': 219, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 211
+Type: Paragraph
+Confidence: 0.70
+Text: 3.6质量保证期届满后，出卖人履行了本条款规定的保修义务，且质量保证金有剩余的，剩余部分由买受人支付给出卖人。
+Metadata: {'paragraph_index': 220, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 212
+Type: Paragraph
+Confidence: 0.70
+Text: 3.7经出卖人维修、替换的货物，质量保证期相应顺延。
+Metadata: {'paragraph_index': 221, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 213
+Type: Text
+Confidence: 0.70
+Text: 第四条  交付
+Metadata: {'paragraph_index': 222, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 214
+Type: Paragraph
+Confidence: 0.70
+Text: 4.1出卖人按下列第      项规定时间向买受人交付货物：
+Metadata: {'paragraph_index': 223, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 215
+Type: Paragraph
+Confidence: 0.70
+Text: 合同生效日后       个工作日内交付货物。
+Metadata: {'paragraph_index': 224, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 216
+Type: Paragraph
+Confidence: 0.70
+Text: 于      年      月      日前交付货物。
+Metadata: {'paragraph_index': 225, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 217
+Type: Paragraph
+Confidence: 0.70
+Text: 其他方式：                                                 。
+Metadata: {'paragraph_index': 226, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 218
+Type: Paragraph
+Confidence: 0.70
+Text: 4.2出卖人确需提前或延期交货的，应征得买受人同意，如因此造成买受人增加费用，由出卖人全部承担。
+Metadata: {'paragraph_index': 227, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 219
+Type: Paragraph
+Confidence: 0.70
+Text: 4.3交货地点：                                                   。
+Metadata: {'paragraph_index': 228, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 220
+Type: Paragraph
+Confidence: 0.70
+Text: 4.4货物按下列第    项方式进行运输：
+Metadata: {'paragraph_index': 229, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 221
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人自选运输方式送货到买受人指定地点并负担运费，运送货物至买受人厂区或库房时，应严格遵守买受人厂区（或库房）安全、环保方面的规章制度，否则由此造成的经济损失和相关责任由出卖人全部承担。
+Metadata: {'paragraph_index': 230, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 222
+Type: Text
+Confidence: 0.70
+Text: 买受人自选运输方式自提并负担运费。
+Metadata: {'paragraph_index': 231, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 223
+Type: Paragraph
+Confidence: 0.70
+Text: 其他方式：                                                  。
+Metadata: {'paragraph_index': 232, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 224
+Type: Paragraph
+Confidence: 0.70
+Text: 4.5出卖人交货时应同时提交货物的产品合格证书、质量保证书、使用说明书等随附技术资料，配套随附技术资料的交付与否不影响货物的所有权转移。
+Metadata: {'paragraph_index': 233, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 225
+Type: Paragraph
+Confidence: 0.70
+Text: 4.6出卖人交货数量与约定数量不一致的，或货物外观显而易见与买受人要求不符的，买受人有权无条件拒绝收货，并要求出卖人限期换货、限期修理或限期补齐。
+Metadata: {'paragraph_index': 234, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 226
+Type: Text
+Confidence: 0.70
+Text: 第五条  货物所有权转移及风险转移
+Metadata: {'paragraph_index': 235, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 227
+Type: Paragraph
+Confidence: 0.70
+Text: 货物所有权自交货之日起转移；货物毁损、灭失的风险在货物交货至交货地点之前由出卖人承担，交货至交货地点之后由买受人承担。
+Metadata: {'paragraph_index': 236, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 228
+Type: Text
+Confidence: 0.70
+Text: 第六条  检验验收
+Metadata: {'paragraph_index': 237, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 229
+Type: Paragraph
+Confidence: 0.70
+Text: 6.1买受人签署到货单、确认单等文件，仅视为对货物数量的认可，不视为对货物质量的确认。
+Metadata: {'paragraph_index': 238, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 230
+Type: Paragraph
+Confidence: 0.70
+Text: 6.2出卖人送货至交货地点后，买受人应在    个工作日内组织验收。如有外观质量异议及数量异议，买受人应自接到货物之日起  个工作日内提出异议；如有其它质量异议，买受人应自接到货物之日起  个工作日内...
+Metadata: {'paragraph_index': 239, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 231
+Type: Text
+Confidence: 0.70
+Text: 6.3检验验收标准：    。
+Metadata: {'paragraph_index': 240, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 232
+Type: Paragraph
+Confidence: 0.70
+Text: 6.4出卖人提供的货物不符合检验验收标准的，由出卖人自费负责更换、修理或补充，直至经买受人检验验收合格。在此种情况下，如经买受人验收合格的时间超过本合同约定的交货期的，视为出卖人逾期交付货物。
+Metadata: {'paragraph_index': 241, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 233
+Type: Paragraph
+Confidence: 0.70
+Text: 6.5如果货物按本合同约定的检验验收标准的规定更换、修理或补充后仍未达到或不可能达到本合同约定的检验验收标准的，则视为出卖人不能交付该货物。
+Metadata: {'paragraph_index': 242, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 234
+Type: Text
+Confidence: 0.70
+Text: 第七条  包装条款
+Metadata: {'paragraph_index': 243, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 235
+Type: Paragraph
+Confidence: 0.70
+Text: 7.1出卖人负责免费包装，出卖人应对提供货物按照国家规定标准或有利于保护货物的措施进行包装，由于出卖人包装不善所引起的货物毁损均由出卖人承担,买受人有权拒收包装物毁损货物。
+Metadata: {'paragraph_index': 244, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 236
+Type: Paragraph
+Confidence: 0.70
+Text: 7.2除达到以上要求，买受人有如下包装需求：                       。
+Metadata: {'paragraph_index': 245, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 237
+Type: Paragraph
+Confidence: 0.70
+Text: 7.3出卖人提供的货物包装物按照    项方式处理：
+Metadata: {'paragraph_index': 246, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 238
+Type: Text
+Confidence: 0.70
+Text: 不回收，归买受人所有。
+Metadata: {'paragraph_index': 247, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 239
+Type: Text
+Confidence: 0.70
+Text: 回收，回收费用由出卖人承担。
+Metadata: {'paragraph_index': 248, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 240
+Type: Paragraph
+Confidence: 0.70
+Text: 其他方式：                                                  。
+Metadata: {'paragraph_index': 249, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 241
+Type: Text
+Confidence: 0.70
+Text: 第八条  知识产权
+Metadata: {'paragraph_index': 250, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 242
+Type: Paragraph
+Confidence: 0.70
+Text: 8.1买受人在中华人民共和国境内占有、使用本合同货物或其任何一部分时，接受本合同约定服务或其任何一部分时，免受第三方主张侵犯其知识产权的投诉、索赔、诉讼或仲裁，如有第三方向买受人提起侵犯其知识产权的投...
+Metadata: {'paragraph_index': 251, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 243
+Type: Paragraph
+Confidence: 0.70
+Text: 8.2如买受人需要出卖人出具相关知识产权权属证明或许可证明的，出卖人应及时提供。
+Metadata: {'paragraph_index': 252, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 244
+Type: Text
+Confidence: 0.70
+Text: 第九条  违约责任
+Metadata: {'paragraph_index': 253, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 245
+Type: Text
+Confidence: 0.70
+Text: 9.1买受人违约责任：
+Metadata: {'paragraph_index': 254, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 246
+Type: Paragraph
+Confidence: 0.70
+Text: 买受人逾期付款的，每逾期一天，应按合同金额的    ‰向出卖人支付违约金，同时仍应履行付款义务。
+Metadata: {'paragraph_index': 255, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 247
+Type: Paragraph
+Confidence: 0.70
+Text: 其他约定：                                                  。
+Metadata: {'paragraph_index': 256, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 248
+Type: Text
+Confidence: 0.70
+Text: 9.2出卖人违约责任：
+Metadata: {'paragraph_index': 257, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 249
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人逾期交付货物的，每逾期一天，应按合同金额的    ‰向买受人支付违约金，同时仍应履行交货义务。
+Metadata: {'paragraph_index': 258, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 250
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人不能在    年    月    日前交付货物的，按本合同总价款的    %向买受人支付违约金，且买受人有权单方解除本合同。
+Metadata: {'paragraph_index': 259, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 251
+Type: Paragraph
+Confidence: 0.70
+Text: 若货物正常使用过程中，买受人发现货物验收阶段短期检验无法发现的质量缺陷，出卖人应承担合同价款    %的违约责任；如给买受人生产经营造成损失，还应当承担相应的赔偿责任。
+Metadata: {'paragraph_index': 260, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 252
+Type: Paragraph
+Confidence: 0.70
+Text: 其他约定：                                                  。
+Metadata: {'paragraph_index': 261, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 253
+Type: Paragraph
+Confidence: 0.70
+Text: 9.3本合同关于支付违约金的约定，不免除违约方应当采取其他补救措施和继续履行合同等义务。
+Metadata: {'paragraph_index': 262, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 254
+Type: Paragraph
+Confidence: 0.70
+Text: 9.4违约方，除应向守约方按本合同约定支付违约金外，还应承担守约方因向违约方主张违约责任所支付的必要费用，包括但不限于律师费、诉讼费、仲裁费、公证费、调查取证费等费用。
+Metadata: {'paragraph_index': 263, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 255
+Type: Paragraph
+Confidence: 0.70
+Text: 9.5若约定的违约金不足以赔偿守约方实际损失的，违约方还应赔偿守约方的实际损失。违约方按照本合同约定应向守约方支付的违约金或其他费用，守约方有权从应付款项中直接抵销和扣除。
+Metadata: {'paragraph_index': 264, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 256
+Type: Text
+Confidence: 0.70
+Text: 第十条  不可抗力
+Metadata: {'paragraph_index': 265, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 257
+Type: Paragraph
+Confidence: 0.70
+Text: 10.1由于不可抗力，如火灾、地震、台风、洪水等自然灾害及其它不能预见、不能避免且不能克服的事件，导致不能完全或部分履行合同义务，受不可抗力影响的一方或双方不承担违约责任，但应在不可抗力发生后24小时...
+Metadata: {'paragraph_index': 266, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 258
+Type: Paragraph
+Confidence: 0.70
+Text: 10.2受不可抗力影响的签约一方或双方有义务采取措施，将因不可抗力造成的损失降低到最低程度。
+Metadata: {'paragraph_index': 267, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 259
+Type: Text
+Confidence: 0.70
+Text: 第十一条  合同的生效、变更、解除和终止
+Metadata: {'paragraph_index': 268, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 260
+Type: Paragraph
+Confidence: 0.70
+Text: 11.1合同自双方法定代表人或者授权代表签名    盖章（如为自然人此处则为按手印）之日起生效。
+Metadata: {'paragraph_index': 269, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 261
+Type: Paragraph
+Confidence: 0.70
+Text: 11.2合同有效期：自合同签订之日起至      年      月      日。
+Metadata: {'paragraph_index': 270, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 262
+Type: Paragraph
+Confidence: 0.70
+Text: 11.3本合同经双方协商一致可变更，变更应以书面形式签订补充协议，经合同双方法定代表人或者授权代表签名    盖章（如为自然人此处则为按手印）后，方可生效。本合同的附件及补充协议是本合同组成部分，与本...
+Metadata: {'paragraph_index': 271, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 263
+Type: Paragraph
+Confidence: 0.70
+Text: 11.4买受人、出卖人双方协商一致可以书面形式解除本合同。
+Metadata: {'paragraph_index': 272, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 264
+Type: Text
+Confidence: 0.70
+Text: 11.5约定解除权
+Metadata: {'paragraph_index': 273, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 265
+Type: Paragraph
+Confidence: 0.70
+Text: （1）出卖人有下列情形之一的，买受人有权解除合同且不承担任何违约责任，并有权要求出卖人按照本合同约定承担违约责任：
+Metadata: {'paragraph_index': 274, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 266
+Type: Paragraph
+Confidence: 0.70
+Text: 1）出卖人逾期交付货物超过    个工作日的；
+Metadata: {'paragraph_index': 275, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 267
+Type: Paragraph
+Confidence: 0.70
+Text: 2）出卖人交付的货物不符合合同约定，买受人同意更换或调整，出卖人更换或调整后仍不符合合同约定的；
+Metadata: {'paragraph_index': 276, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 268
+Type: Paragraph
+Confidence: 0.70
+Text: 3）出卖人违反本合同约定的保密条款、知识产权条款、廉洁合作条款的；
+Metadata: {'paragraph_index': 277, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 269
+Type: Paragraph
+Confidence: 0.70
+Text: 4）其他约定：                                                  。
+Metadata: {'paragraph_index': 278, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 270
+Type: Paragraph
+Confidence: 0.70
+Text: （2）买受人有下列情形之一的，出卖人有权解除合同且不承担任何违约责任，并有权要求买受人按照本合同约定承担违约责任：
+Metadata: {'paragraph_index': 279, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 271
+Type: Paragraph
+Confidence: 0.70
+Text: 1）买受人逾期支付合同价款超过    个工作日的；
+Metadata: {'paragraph_index': 280, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 272
+Type: Paragraph
+Confidence: 0.70
+Text: 2）其他约定：                                                  。
+Metadata: {'paragraph_index': 281, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 273
+Type: Paragraph
+Confidence: 0.70
+Text: （3）买受人、出卖人双方行使本合同约定的合同解除权时，应向对方发出书面的合同解除通知，通知到达对方时合同解除。
+Metadata: {'paragraph_index': 282, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 274
+Type: Paragraph
+Confidence: 0.70
+Text: 11.6符合法定解除条件时，买受人、出卖人双方可依法行使法定解除权，法定解除权的行使不免除违约责任的承担。
+Metadata: {'paragraph_index': 283, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 275
+Type: Paragraph
+Confidence: 0.70
+Text: 11.7有下列情形之一的，本合同的权利义务终止：
+Metadata: {'paragraph_index': 284, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 276
+Type: Text
+Confidence: 0.70
+Text: （1）合同已经按照约定履行完结；
+Metadata: {'paragraph_index': 285, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 277
+Type: Text
+Confidence: 0.70
+Text: （2）双方协商解除合同；
+Metadata: {'paragraph_index': 286, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 278
+Type: Text
+Confidence: 0.70
+Text: （3）一方依据法定或约定原因解除合同的。
+Metadata: {'paragraph_index': 287, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 279
+Type: Text
+Confidence: 0.70
+Text: 第十二条  争议解决
+Metadata: {'paragraph_index': 288, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 280
+Type: Paragraph
+Confidence: 0.70
+Text: 12.1本合同在履行过程中发生争议的，可以通过协商解决，协商不成，按以下第    种方式解决，在诉讼或仲裁期间，本合同不涉及争议部分的条款仍须履行。
+Metadata: {'paragraph_index': 289, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 281
+Type: Paragraph
+Confidence: 0.70
+Text: （1）向         （合同签订地/履行地/原告所在地/被告所在地/双方住所地）人民法院起诉。
+Metadata: {'paragraph_index': 290, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 282
+Type: Paragraph
+Confidence: 0.70
+Text: （2）提交       （名称）仲裁委员会，按照申请仲裁时该会现行有效的仲裁规则进行仲裁。仲裁裁决是终局的，对双方均有约束力。
+Metadata: {'paragraph_index': 291, 'detection_method': 'document_native', 'style_name': 'sect2content1'}
+
+ID: 283
+Type: Text
+Confidence: 0.70
+Text: 第十三条  廉洁合作
+Metadata: {'paragraph_index': 292, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 284
+Type: Paragraph
+Confidence: 0.70
+Text: 13.1双方在业务往来中应严格遵守国家法律法规规定、廉洁自律要求，以及双方签订的《廉洁自律协议》（如有见附件）等执行，营造良好的经营环境，维护双方公平、公正合作关系。
+Metadata: {'paragraph_index': 293, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 285
+Type: Text
+Confidence: 0.70
+Text: 第十四条  其他约定
+Metadata: {'paragraph_index': 294, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 286
+Type: Paragraph
+Confidence: 0.70
+Text: 14.1本合同一式    份，买受人执    份，出卖人执    份，除签字处手写内容无效，具有同等法律效力。
+Metadata: {'paragraph_index': 295, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 287
+Type: Paragraph
+Confidence: 0.70
+Text: 14.2保密：本合同的各项条款属于双方经营活动内容, 任何一方未经对方当事人书面同意，不得对外泄露。
+Metadata: {'paragraph_index': 296, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 288
+Type: Paragraph
+Confidence: 0.70
+Text: 14.3合同首部所载明的送达地址系双方在合同履行中的各类通知和争议解决过程中诉讼或仲裁文书的送达地址。
+Metadata: {'paragraph_index': 297, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 289
+Type: Paragraph
+Confidence: 0.70
+Text: 双方保证提供的送达地址信息准确、有效。任何一方变更送达地址信息的，应当在变更后    日内及时书面通知对方，对方实际收到变更通知前的送达仍视为有效送达。如果提供的信息不准确，或送达地址变更后未及时通知...
+Metadata: {'paragraph_index': 298, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 290
+Type: Paragraph
+Confidence: 0.70
+Text: 出卖人：                            买受人：
+Metadata: {'paragraph_index': 301, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 291
+Type: Paragraph
+Confidence: 0.70
+Text: 法定代表人或授权代表：              法定代表人或授权代表：
+Metadata: {'paragraph_index': 302, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 292
+Type: Paragraph
+Confidence: 0.70
+Text: 签订时间：                          签订时间：
+Metadata: {'paragraph_index': 303, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 293
+Type: Text
+Confidence: 0.70
+Text: 附件：
+Metadata: {'paragraph_index': 305, 'detection_method': 'document_native', 'style_name': 'Normal'}
+
+ID: 294
+Type: Table
+Confidence: 1.00
+Text: 标的物名称 | 生产厂商 | 规格/
+型号 | 计量单位 | 数量 | 单价 | 总价（元）
+合计小写：                         不含税金额： | 合计小写：         ...
+Metadata: {'table_index': 0, 'detection_method': 'document_native', 'rows': 5, 'columns': 7}

@@ -1,6 +1,6 @@
 # given a "Section Tree Object" (which extracted from the raw text) find the position of the section title in the raw text
 
-from models.schemas.schemas import Section, Positions
+from models.schemas.schemas import Section
 from typing import List, Tuple
 
 from fuzzysearch import find_near_matches
@@ -52,7 +52,7 @@ def flatten_section_tree_to_tokens(section_tree: Section) -> List[Section]:
         # If no subsections, treat the section itself as the root
         return _flatten_section(section_tree)
 
-def set_section_position_index(section_tree: Section, raw_text: str) -> Section:
+def set_section_position_index(section_tree: Section, raw_text: str) -> str:
     """
     Set the position index of the section title and content in the raw text
     """
@@ -64,7 +64,7 @@ def set_section_position_index(section_tree: Section, raw_text: str) -> Section:
     
     # First pass: set all title positions
     for i, (section, match) in enumerate(zip(sections, matches)):
-        section.title_position = Positions.from_text(match[0], match[1])
+        section.title_position_index = match
     
     # Second pass: set content positions based on hierarchical structure
     def set_content_positions(section: Section, flattened_sections: List[Section]) -> None:
@@ -77,9 +77,9 @@ def set_section_position_index(section_tree: Section, raw_text: str) -> Section:
             
             # Content spans from title end to last subsection's content end
             last_subsection = section.sub_sections[-1]
-            section.content_position = Positions.from_text(
-                section.title_position.text_position.end + 1, 
-                last_subsection.content_position.text_position.end
+            section.content_position_index = (
+                section.title_position_index[1] + 1, 
+                last_subsection.content_position_index[1]
             )
         else:
             # Section has no subsections - find next sibling or next section in hierarchy
@@ -87,15 +87,14 @@ def set_section_position_index(section_tree: Section, raw_text: str) -> Section:
             
             if current_idx < len(flattened_sections) - 1:
                 next_section = flattened_sections[current_idx + 1]
-                section.content_position = Positions.from_text(
-                    section.title_position.text_position.end + 1, 
-                    next_section.title_position.text_position.start - 1
+                section.content_position_index = (
+                    section.title_position_index[1] + 1, 
+                    next_section.title_position_index[0] - 1
                 )
-
             else:
-                # Last section overall (the flattenization ensures this is the last section)
-                section.content_position = Positions.from_text(
-                    section.title_position.text_position.end + 1, 
+                # Last section overall
+                section.content_position_index = (
+                    section.title_position_index[1] + 1, 
                     len(raw_text)
                 )
     
@@ -120,8 +119,8 @@ if __name__ == "__main__":
     section_tree = set_section_position_index(section_tree, raw_text)
 
     for section in flatten_section_tree_to_tokens(section_tree):
-        section.title_parsed = raw_text[section.title_position.text_position.start:section.title_position.text_position.end]
-        section.content_parsed = raw_text[section.content_position.text_position.start:section.content_position.text_position.end]
+        section.title_parsed = raw_text[section.title_position_index[0]:section.title_position_index[1]]
+        section.content_parsed = raw_text[section.content_position_index[0]:section.content_position_index[1]]
 
         # print(section.level, section.title, section.title_parsed, section.content_parsed)
 

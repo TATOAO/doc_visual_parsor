@@ -3,7 +3,7 @@ Enhanced position mapping that works with different document types
 Extends the original tree_like_structure_mapping.py to work with PDF, DOCX, and text documents
 """
 
-from models.utils.schemas import Section, Positions, BoundingBox, DocumentType
+from models.schemas.schemas import Section, Positions, BoundingBox, DocumentType
 from typing import List, Tuple, Union, Dict, Any, Optional
 from fuzzysearch import find_near_matches
 import fitz  # PyMuPDF

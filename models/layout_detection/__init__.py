@@ -3,10 +3,50 @@
 # It is a YOLO-based model that is trained on a dataset of document images.
 # It is used to detect the layout of a document, such as the presence of a table, a list, or a text block.
 
-from .detector import DocLayoutDetector
+# New modular architecture
+from .base_detector import (
+    BaseLayoutDetector,
+    LayoutDetectionResult,
+    LayoutElement,
+    BoundingBox,
+    ElementType
+)
+
+from .cv_detector import CVLayoutDetector
+from .document_detector import DocumentLayoutDetector
+from .detector_factory import (
+    LayoutDetectorFactory,
+    HybridLayoutDetector,
+    DetectorType
+)
+
+# Backward compatibility
+from .cv_detector import DocLayoutDetector  # Alias for CVLayoutDetector
 from .download_model import download_model, list_available_models, MODELS
 
-__all__ = ['DocLayoutDetector', 'download_model', 'list_available_models', 'MODELS']
+__all__ = [
+    # Base classes
+    'BaseLayoutDetector',
+    'LayoutDetectionResult', 
+    'LayoutElement',
+    'BoundingBox',
+    'ElementType',
+    
+    # Detector implementations
+    'CVLayoutDetector',
+    'DocumentLayoutDetector',
+    'HybridLayoutDetector',
+    
+    # Factory and utilities
+    'LayoutDetectorFactory',
+    'DetectorType',
+    
+    # Backward compatibility
+    'DocLayoutDetector',
+    'download_model',
+    'list_available_models', 
+    'MODELS'
+]
 
 
 

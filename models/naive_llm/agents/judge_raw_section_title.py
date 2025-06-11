@@ -1,4 +1,4 @@
-from models.utils.schemas import Section
+from models.schemas.schemas import Section
 from models.utils.llm import get_llm_client
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import JsonOutputParser

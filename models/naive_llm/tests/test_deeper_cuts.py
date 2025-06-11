@@ -1,6 +1,6 @@
 from models.naive_llm.agents.control import cut_deeper_node
 from models.naive_llm.helpers import flatten_section_tree_to_tokens, remove_circular_references
-from models.utils.schemas import Section
+from models.schemas.schemas import Section
 import asyncio
 
 # python -m models.naive_llm.tests.test_deeper_cuts

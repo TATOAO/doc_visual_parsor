@@ -1,4 +1,4 @@
-from models.utils.schemas import Section
+from models.schemas.schemas import Section
 from models.utils.llm import get_llm_client
 from ..helpers import generate_section_tree_from_tokens, flatten_section_tree_to_tokens
 from typing import AsyncGenerator, Tuple
@@ -202,7 +202,6 @@ if __name__ == "__main__":
     text = extract_docx_content(docx_path)
     
     async def main():
-
 
         # streaming version
         chunk_index = 0
