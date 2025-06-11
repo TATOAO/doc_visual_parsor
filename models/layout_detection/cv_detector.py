@@ -22,11 +22,11 @@ except ImportError:
     except ImportError:
         raise ImportError("Please install doclayout-yolo: pip install doclayout-yolo")
 
-from .base_detector import (
-    BaseLayoutDetector, 
+from .base_detector import BaseSectionDetector
+from models.schemas.docx_schemas import (
     LayoutDetectionResult, 
     LayoutElement, 
-    BoundingBox, 
+    BoundingBox,
     ElementType
 )
 from .download_model import download_model, get_model_cache_dir
@@ -47,7 +47,7 @@ DOCLAYOUT_CLASS_MAPPING = {
     9: ElementType.EQUATION
 }
 
-class CVLayoutDetector(BaseLayoutDetector):
+class CVLayoutDetector(BaseSectionDetector):
     """
     Computer Vision-based Document Layout Detector using DocLayout-YOLO.
     

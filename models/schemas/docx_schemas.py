@@ -6,7 +6,7 @@ defined in base_detector.py, offering better validation, serialization,
 and type checking capabilities.
 """
 
-from pydantic import BaseModel, Field, validator, computed_field
+from pydantic import BaseModel, Field, field_validator, computed_field
 from typing import List, Optional, Dict, Any, Tuple, Union
 from enum import Enum
 
@@ -52,7 +52,8 @@ class FontInfo(BaseModel):
     superscript: Optional[bool] = Field(None, description="Whether text is superscript")
     subscript: Optional[bool] = Field(None, description="Whether text is subscript")
     
-    @validator('color', 'highlight', pre=True)
+    @field_validator('color', 'highlight', mode='before')
+    @classmethod
     def validate_color(cls, v):
         """Validate and normalize color values."""
         if v is None:
@@ -82,7 +83,8 @@ class ParagraphFormat(BaseModel):
     page_break_before: Optional[bool] = Field(None, description="Page break before paragraph")
     widow_control: Optional[bool] = Field(None, description="Widow control enabled")
     
-    @validator('line_spacing_rule')
+    @field_validator('line_spacing_rule')
+    @classmethod
     def validate_line_spacing_rule(cls, v):
         """Validate line spacing rule values."""
         if v is None:
@@ -105,11 +107,13 @@ class RunInfo(BaseModel):
     start_index: Optional[int] = Field(None, description="Character start index within element", ge=0)
     end_index: Optional[int] = Field(None, description="Character end index within element", ge=0)
     
-    @validator('end_index')
-    def validate_end_index(cls, v, values):
+    @field_validator('end_index')
+    @classmethod
+    def validate_end_index(cls, v, info):
         """Ensure end_index is greater than start_index."""
-        if v is not None and 'start_index' in values and values['start_index'] is not None:
-            if v <= values['start_index']:
+        if v is not None and hasattr(info, 'data') and 'start_index' in info.data:
+            start_index = info.data.get('start_index')
+            if start_index is not None and v <= start_index:
                 raise ValueError("end_index must be greater than start_index")
         return v
     
@@ -150,7 +154,8 @@ class StyleInfo(BaseModel):
     # Custom properties
     custom_properties: Optional[Dict[str, Any]] = Field(None, description="Custom style properties")
     
-    @validator('style_type')
+    @field_validator('style_type')
+    @classmethod
     def validate_style_type(cls, v):
         """Validate style type values."""
         if v is None:
@@ -192,17 +197,19 @@ class BoundingBox(BaseModel):
     x2: float = Field(..., description="Right coordinate")
     y2: float = Field(..., description="Bottom coordinate")
     
-    @validator('x2')
-    def validate_x2(cls, v, values):
+    @field_validator('x2')
+    @classmethod
+    def validate_x2(cls, v, info):
         """Ensure x2 is greater than x1."""
-        if 'x1' in values and v <= values['x1']:
+        if hasattr(info, 'data') and 'x1' in info.data and v <= info.data['x1']:
             raise ValueError("x2 must be greater than x1")
         return v
     
-    @validator('y2')
-    def validate_y2(cls, v, values):
+    @field_validator('y2')
+    @classmethod
+    def validate_y2(cls, v, info):
         """Ensure y2 is greater than y1."""
-        if 'y1' in values and v <= values['y1']:
+        if hasattr(info, 'data') and 'y1' in info.data and v <= info.data['y1']:
             raise ValueError("y2 must be greater than y1")
         return v
     
@@ -246,7 +253,8 @@ class LayoutElement(BaseModel):
     style: Optional[StyleInfo] = Field(None, description="Style information")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
     
-    @validator('text')
+    @field_validator('text')
+    @classmethod
     def validate_text(cls, v):
         """Validate and clean text content."""
         if v is not None:

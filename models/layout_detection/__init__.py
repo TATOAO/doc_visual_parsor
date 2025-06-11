@@ -6,19 +6,16 @@
 # New modular architecture
 from .base_detector import (
     BaseLayoutDetector,
-    LayoutDetectionResult,
-    LayoutElement,
-    BoundingBox,
-    ElementType
+    BaseSectionDetector
 )
 
 from .cv_detector import CVLayoutDetector
-from .document_detector import DocumentLayoutDetector
-from .detector_factory import (
-    LayoutDetectorFactory,
-    HybridLayoutDetector,
-    DetectorType
-)
+from .document_detector import SectionLayoutDetector
+# from .detector_factory import (
+#     LayoutDetectorFactory,
+#     HybridLayoutDetector,
+#     DetectorType
+# )
 
 # Backward compatibility
 from .cv_detector import DocLayoutDetector  # Alias for CVLayoutDetector

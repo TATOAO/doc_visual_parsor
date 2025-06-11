@@ -18,25 +18,39 @@ import re
 try:
     import docx
     from docx.document import Document
+    from docx.shared import Inches, Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
 except ImportError:
     raise ImportError("Please install python-docx: pip install python-docx")
 
-from .base_detector import (
-    BaseLayoutDetector, 
-    LayoutDetectionResult, 
-    LayoutElement, 
-    BoundingBox, 
-    ElementType,
-    StyleInfo,
-    FontInfo,
-    ParagraphFormat,
-    RunInfo,
-    TextAlignment
+from .base_detector import BaseSectionDetector
+from models.schemas.docx_schemas import (
+    StyleInfo, 
+    FontInfo, 
+    ParagraphFormat, 
+    RunInfo, 
+    TextAlignment,
+    LayoutDetectionResult
 )
+from models.schemas.schemas import Section, Positions, DocumentType
 
 logger = logging.getLogger(__name__)
 
-class DocumentLayoutDetector(BaseLayoutDetector):
+import numpy as np
+from PIL import Image
+from typing import BinaryIO
+
+InputDataType = Union[
+    str,                    # File path as string
+    Path,                   # File path as Path object
+    bytes,                  # Raw file content
+    np.ndarray,            # Image as numpy array
+    Image.Image,           # PIL Image object
+    BinaryIO,              # File-like object with read() method
+    Any                    # For objects with getvalue() method (uploaded files)
+]
+
+class SectionLayoutDetector(BaseSectionDetector):
     """
     Document-native Layout Detector for .docx files.
     
@@ -44,450 +58,374 @@ class DocumentLayoutDetector(BaseLayoutDetector):
     analyzing XML elements, styles, and formatting to identify layout elements
     without converting to images.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.detector = self._initialize_detector()
     
-    def __init__(self, 
-                 confidence_threshold: float = 0.9,  # High confidence since it's rule-based
-                 device: str = "cpu",  # CPU-based processing
-                 extract_text: bool = True,
-                 analyze_styles: bool = True,
-                 **kwargs):
-        """
-        Initialize the document-native layout detector.
-        
-        Args:
-            confidence_threshold: Minimum confidence for detections (rule-based, so high)
-            device: Device to use (always CPU for document processing)
-            extract_text: Whether to extract text content
-            analyze_styles: Whether to analyze document styles
-            **kwargs: Additional parameters
-        """
-        super().__init__(confidence_threshold=confidence_threshold, device="cpu", **kwargs)
-        
-        self.extract_text = extract_text
-        self.analyze_styles = analyze_styles
-        self.document = None
-        self.styles_map = {}
-        
-    def _initialize_detector(self) -> None:
-        """Initialize the detector (minimal setup for document processing)."""
-        logger.info("Document-native layout detector initialized")
+    def _initialize_detector(self):
+        """Initialize the detector (no special initialization needed for docx parsing)."""
+        pass
     
     def _detect_layout(self, 
-                      input_data: Any,
+                      input_data: InputDataType,
                       confidence_threshold: Optional[float] = None,
                       **kwargs) -> LayoutDetectionResult:
         """
-        Core document-native layout detection method.
+        Core detection method - not used for section detection, but required by interface.
         
         Args:
-            input_data: Input document (file path, bytes, or file-like object)
+            input_data: Input data (file path, bytes, etc.)
             confidence_threshold: Override default confidence threshold
             **kwargs: Additional detection parameters
             
         Returns:
             LayoutDetectionResult containing detected elements
         """
-        # Load document
-        doc = self._load_document(input_data)
-        if doc is None:
-            return LayoutDetectionResult([])
-        
-        # Extract layout elements
-        elements = []
-        element_id = 0
-        
-        # Analyze document structure
-        if self.analyze_styles:
-            self._analyze_document_styles(doc)
-        
-        # Process paragraphs
-        for para_idx, paragraph in enumerate(doc.paragraphs):
-            if not paragraph.text.strip():
-                continue
-                
-            element_type, confidence = self._classify_paragraph(paragraph, para_idx)
-            
-            # Create layout element
-            element = LayoutElement(
-                id=element_id,
-                element_type=element_type,
-                confidence=confidence,
-                text=paragraph.text.strip() if self.extract_text else None,
-                style=self._extract_paragraph_style(paragraph),
-                metadata={
-                    'paragraph_index': para_idx,
-                    'detection_method': 'document_native',
-                    'style_name': paragraph.style.name if paragraph.style else 'Normal'
-                }
-            )
-            
-            elements.append(element)
-            element_id += 1
-        
-        # Process tables
-        for table_idx, table in enumerate(doc.tables):
-            element = LayoutElement(
-                id=element_id,
-                element_type=ElementType.TABLE,
-                confidence=1.0,  # High confidence for explicit table elements
-                text=self._extract_table_text(table) if self.extract_text else None,
-                metadata={
-                    'table_index': table_idx,
-                    'detection_method': 'document_native',
-                    'rows': len(table.rows),
-                    'columns': len(table.columns) if table.rows else 0
-                }
-            )
-            
-            elements.append(element)
-            element_id += 1
-        
-        # Process headers and footers
-        header_footer_elements = self._extract_header_footer_elements(doc)
-        for hf_element in header_footer_elements:
-            hf_element.id = element_id
-            elements.append(hf_element)
-            element_id += 1
-        
-        return LayoutDetectionResult(elements)
-    
-    def _load_document(self, input_data: Any) -> Optional[Document]:
-        """Load document from various input formats."""
-        try:
-            # Save uploaded file to temporary location if needed
-            if isinstance(input_data, bytes):
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_file:
-                    tmp_file.write(input_data)
-                    tmp_file_path = tmp_file.name
-                doc = docx.Document(tmp_file_path)
-                os.unlink(tmp_file_path)  # Clean up
-                return doc
-            elif isinstance(input_data, (str, Path)):
-                return docx.Document(str(input_data))
-            elif hasattr(input_data, 'getvalue'):
-                # Handle uploaded file objects
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_file:
-                    tmp_file.write(input_data.getvalue())
-                    tmp_file_path = tmp_file.name
-                doc = docx.Document(tmp_file_path)
-                os.unlink(tmp_file_path)  # Clean up
-                return doc
-            else:
-                logger.error(f"Unsupported input type: {type(input_data)}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Failed to load document: {str(e)}")
-            return None
-    
-    def _analyze_document_styles(self, doc: Document) -> None:
-        """Analyze document styles to improve classification."""
-        self.styles_map = {}
-        
-        try:
-            for style in doc.styles:
-                style_name = style.name.lower()
-                self.styles_map[style_name] = {
-                    'name': style.name,
-                    'type': str(style.type),
-                    'builtin': style.builtin
-                }
-        except Exception as e:
-            logger.warning(f"Could not analyze styles: {str(e)}")
-    
-    def _classify_paragraph(self, paragraph, para_idx: int) -> tuple[ElementType, float]:
-        """Classify paragraph based on style and content."""
-        style_name = paragraph.style.name.lower() if paragraph.style else 'normal'
-        text = paragraph.text.strip().lower()
-        
-        # High confidence classifications based on style
-        if 'heading' in style_name:
-            if 'heading 1' in style_name:
-                return ElementType.TITLE, 1.0
-            else:
-                return ElementType.HEADING, 1.0
-        
-        if 'title' in style_name:
-            return ElementType.TITLE, 1.0
-        
-        if 'caption' in style_name:
-            if 'table' in style_name:
-                return ElementType.TABLE_CAPTION, 1.0
-            else:
-                return ElementType.FIGURE_CAPTION, 1.0
-        
-        if 'header' in style_name:
-            return ElementType.HEADER, 1.0
-        
-        if 'footer' in style_name:
-            return ElementType.FOOTER, 1.0
-        
-        # Content-based classification
-        if para_idx == 0 and len(text) < 100:
-            return ElementType.TITLE, 0.8
-        
-        # Check for references
-        if any(ref_word in text for ref_word in ['references', 'bibliography', 'works cited']):
-            return ElementType.REFERENCE, 0.9
-        
-        # Check for equations (look for mathematical symbols)
-        if re.search(r'[∑∏∫∂∆∇±≤≥≠∞√]|\\[a-zA-Z]+|\$.*\$', text):
-            return ElementType.EQUATION, 0.8
-        
-        # Check for lists
-        if (text.startswith(('•', '-', '*')) or 
-            re.match(r'^\d+[\.\)]\s', text) or
-            re.match(r'^[a-zA-Z][\.\)]\s', text)):
-            return ElementType.LIST, 0.9
-        
-        # Default to text/paragraph
-        if len(text) > 20:
-            return ElementType.PARAGRAPH, 0.7
-        else:
-            return ElementType.TEXT, 0.7
-    
-    def _extract_paragraph_style(self, paragraph) -> StyleInfo:
-        """Extract style information from paragraph."""
-        try:
-            # Basic style information
-            style_name = paragraph.style.name if paragraph.style else None
-            style_type = str(paragraph.style.type) if paragraph.style else None
-            builtin = paragraph.style.builtin if paragraph.style else None
-            
-            # Extract paragraph formatting
-            paragraph_format = None
-            if paragraph.paragraph_format:
-                pf = paragraph.paragraph_format
-                
-                # Convert alignment to our enum
-                alignment = None
-                if pf.alignment:
-                    alignment_str = str(pf.alignment).lower()
-                    if 'left' in alignment_str:
-                        alignment = TextAlignment.LEFT
-                    elif 'center' in alignment_str:
-                        alignment = TextAlignment.CENTER
-                    elif 'right' in alignment_str:
-                        alignment = TextAlignment.RIGHT
-                    elif 'justify' in alignment_str:
-                        alignment = TextAlignment.JUSTIFY
-                    elif 'distribute' in alignment_str:
-                        alignment = TextAlignment.DISTRIBUTE
-                    else:
-                        alignment = TextAlignment.UNKNOWN
-                
-                paragraph_format = ParagraphFormat(
-                    alignment=alignment,
-                    left_indent=pf.left_indent,
-                    right_indent=pf.right_indent,
-                    first_line_indent=pf.first_line_indent,
-                    space_before=pf.space_before,
-                    space_after=pf.space_after,
-                    line_spacing=pf.line_spacing
-                )
-            
-            # Extract run formatting
-            runs = []
-            primary_font = None
-            
-            for i, run in enumerate(paragraph.runs):
-                if not run.text.strip():  # Skip empty runs
-                    continue
-                    
-                font_info = FontInfo()
-                if run.font:
-                    font_info.name = run.font.name
-                    font_info.size = float(run.font.size.pt) if run.font.size else None
-                    font_info.bold = run.font.bold
-                    font_info.italic = run.font.italic
-                    font_info.underline = run.font.underline
-                    # Note: color extraction would require more complex handling
-                
-                run_info = RunInfo(
-                    text=run.text,
-                    font=font_info
-                )
-                runs.append(run_info)
-                
-                # Use first run's font as primary font
-                if i == 0:
-                    primary_font = font_info
-            
-            return StyleInfo(
-                style_name=style_name,
-                style_type=style_type,
-                builtin=builtin,
-                paragraph_format=paragraph_format,
-                runs=runs if runs else None,
-                primary_font=primary_font
-            )
-                
-        except Exception as e:
-            logger.warning(f"Could not extract style info: {str(e)}")
-            return StyleInfo()  # Return empty StyleInfo on error
-    
-    def _extract_table_text(self, table) -> str:
-        """Extract text content from table."""
-        try:
-            text_content = []
-            for row in table.rows:
-                row_text = []
-                for cell in row.cells:
-                    cell_text = cell.text.strip()
-                    if cell_text:
-                        row_text.append(cell_text)
-                if row_text:
-                    text_content.append(' | '.join(row_text))
-            return '\n'.join(text_content)
-        except Exception as e:
-            logger.warning(f"Could not extract table text: {str(e)}")
-            return ""
-    
-    def _extract_header_footer_elements(self, doc: Document) -> List[LayoutElement]:
-        """Extract header and footer elements."""
-        elements = []
-        
-        try:
-            # Extract headers
-            for section in doc.sections:
-                if section.header:
-                    for para in section.header.paragraphs:
-                        if para.text.strip():
-                            element = LayoutElement(
-                                id=0,  # Will be set by caller
-                                element_type=ElementType.HEADER,
-                                confidence=1.0,
-                                text=para.text.strip() if self.extract_text else None,
-                                style=self._extract_paragraph_style(para),
-                                metadata={
-                                    'detection_method': 'document_native',
-                                    'section_type': 'header'
-                                }
-                            )
-                            elements.append(element)
-                
-                # Extract footers
-                if section.footer:
-                    for para in section.footer.paragraphs:
-                        if para.text.strip():
-                            element = LayoutElement(
-                                id=0,  # Will be set by caller
-                                element_type=ElementType.FOOTER,
-                                confidence=1.0,
-                                text=para.text.strip() if self.extract_text else None,
-                                style=self._extract_paragraph_style(para),
-                                metadata={
-                                    'detection_method': 'document_native',
-                                    'section_type': 'footer'
-                                }
-                            )
-                            elements.append(element)
-        except Exception as e:
-            logger.warning(f"Could not extract header/footer elements: {str(e)}")
-        
-        return elements
+        # For section detection, we don't use the layout detection interface
+        # This method is required by the abstract base class but not used
+        from models.schemas.docx_schemas import LayoutDetectionResult
+        return LayoutDetectionResult(elements=[], metadata={"message": "Use generate_section_tree() for section detection"})
     
     def get_supported_formats(self) -> List[str]:
-        """Get list of supported input formats."""
-        return ['.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+        """
+        Get list of supported input formats.
+        
+        Returns:
+            List of supported file extensions
+        """
+        return ['.docx', '.doc']
     
     def get_detector_info(self) -> Dict[str, Any]:
-        """Get information about the document detector."""
+        """
+        Get information about the detector.
+        
+        Returns:
+            Dictionary containing detector information
+        """
         return {
-            'detector_type': 'document_native',
+            'name': 'SectionLayoutDetector',
+            'version': '1.0.0',
+            'description': 'Document-native layout detector for DOCX files using python-docx',
             'supported_formats': self.get_supported_formats(),
-            'confidence_threshold': self.confidence_threshold,
-            'extract_text': self.extract_text,
-            'analyze_styles': self.analyze_styles,
-            'capabilities': [
-                'heading_detection',
-                'table_detection', 
-                'header_footer_detection',
-                'style_analysis',
-                'text_extraction',
-                'list_detection',
-                'equation_detection'
-            ]
+            'detection_method': 'style-based',
+            'requires_conversion': False
         }
     
-    def validate_input(self, input_data: Any) -> bool:
-        """Validate if input data is supported by document detector."""
-        if isinstance(input_data, (str, Path)):
-            path = Path(input_data)
-            return path.exists() and path.suffix.lower() == '.docx'
-        elif isinstance(input_data, bytes):
-            # Check if it's likely a DOCX file (ZIP signature)
-            return input_data.startswith(b'PK')
-        elif hasattr(input_data, 'getvalue'):
-            # Handle uploaded file objects
-            return True
-        else:
-            return False
-    
-    def visualize(self, 
-                  input_data: Any,
-                  result: Optional[LayoutDetectionResult] = None,
-                  save_path: Optional[str] = None,
-                  **kwargs) -> None:
+    def generate_section_tree(self, input_data: InputDataType) -> Section:
         """
-        Visualize detection results as text output.
+        Generate a section tree from the input data.
+
+        Args:
+            input_data: Input data (file path, bytes, etc.)
+
+        Returns:
+            Section: The section tree
+        """
+        try:
+            # Load the document
+            if isinstance(input_data, (str, Path)):
+                doc = Document(input_data)
+            elif hasattr(input_data, 'read'):
+                doc = Document(input_data)
+            elif hasattr(input_data, 'getvalue'):
+                doc = Document(input_data.getvalue())
+            else:
+                raise ValueError(f"Unsupported input data type: {type(input_data)}")
+            
+            # Parse document structure
+            sections_data = self._analyze_document_structure(doc)
+            
+            # Build section tree
+            root_section = self._build_section_tree(sections_data)
+            
+            return root_section
+            
+        except Exception as e:
+            logger.error(f"Error parsing docx file: {str(e)}")
+            # Return empty section on error
+            return Section(
+                title="Document",
+                content="",
+                level=0,
+                title_position=Positions.from_docx(0, 0, 0),
+                content_position=Positions.from_docx(0, 0, 0)
+            )
+    
+    def _analyze_document_structure(self, doc: Document) -> List[Dict[str, Any]]:
+        """
+        Analyze document structure and extract sections based on paragraph styles.
         
         Args:
-            input_data: Input document
-            result: Detection result (if None, will run detection)
-            save_path: Path to save the text output
-            **kwargs: Additional visualization parameters
+            doc: Document object
+            
+        Returns:
+            List of section data dictionaries
         """
-        # Run detection if result not provided
-        if result is None:
-            result = self.detect(input_data)
+        sections_data = []
+        current_char_pos = 0
         
-        # Create text visualization
-        output_lines = []
-        output_lines.append("Document Layout Analysis Results")
-        output_lines.append("=" * 40)
-        output_lines.append("")
-        
-        # Statistics
-        stats = result.get_statistics()
-        output_lines.append(f"Total Elements: {stats['total_elements']}")
-        output_lines.append("Element Types:")
-        for elem_type, count in stats['element_types'].items():
-            output_lines.append(f"  {elem_type}: {count}")
-        output_lines.append("")
-        
-        # Element details
-        output_lines.append("Detected Elements:")
-        output_lines.append("-" * 20)
-        
-        for element in result.get_elements():
-            output_lines.append(f"ID: {element.id}")
-            output_lines.append(f"Type: {element.element_type.value}")
-            output_lines.append(f"Confidence: {element.confidence:.2f}")
+        for para_idx, paragraph in enumerate(doc.paragraphs):
+            text = paragraph.text.strip()
+            if not text:
+                current_char_pos += 1  # Account for empty paragraphs
+                continue
             
-            if element.text:
-                preview_text = element.text[:100] + "..." if len(element.text) > 100 else element.text
-                output_lines.append(f"Text: {preview_text}")
+            # Analyze paragraph style to determine if it's a heading
+            style_info = self._extract_style_info(paragraph)
+            heading_level = self._determine_heading_level(paragraph, style_info)
             
-            if element.metadata:
-                output_lines.append(f"Metadata: {element.metadata}")
+            # Create section data
+            section_data = {
+                'paragraph_index': para_idx,
+                'text': text,
+                'heading_level': heading_level,
+                'style_info': style_info,
+                'char_start': current_char_pos,
+                'char_end': current_char_pos + len(text),
+                'is_heading': heading_level > 0
+            }
             
-            output_lines.append("")
+            sections_data.append(section_data)
+            current_char_pos += len(text) + 1  # +1 for paragraph break
         
-        # Output to file or print
-        output_text = "\n".join(output_lines)
+        return sections_data
+    
+    def _extract_style_info(self, paragraph) -> StyleInfo:
+        """
+        Extract comprehensive style information from a paragraph.
         
-        if save_path:
-            with open(save_path, 'w', encoding='utf-8') as f:
-                f.write(output_text)
-            logger.info(f"Layout analysis saved to: {save_path}")
-        else:
-            print(output_text) 
+        Args:
+            paragraph: Document paragraph
+            
+        Returns:
+            StyleInfo object with formatting details
+        """
+        # Extract paragraph format
+        para_format = None
+        if paragraph.paragraph_format:
+            alignment_map = {
+                WD_ALIGN_PARAGRAPH.LEFT: TextAlignment.LEFT,
+                WD_ALIGN_PARAGRAPH.CENTER: TextAlignment.CENTER,
+                WD_ALIGN_PARAGRAPH.RIGHT: TextAlignment.RIGHT,
+                WD_ALIGN_PARAGRAPH.JUSTIFY: TextAlignment.JUSTIFY,
+                WD_ALIGN_PARAGRAPH.DISTRIBUTE: TextAlignment.DISTRIBUTE
+            }
+            
+            para_format = ParagraphFormat(
+                alignment=alignment_map.get(paragraph.paragraph_format.alignment, TextAlignment.UNKNOWN),
+                left_indent=self._points_to_float(paragraph.paragraph_format.left_indent),
+                right_indent=self._points_to_float(paragraph.paragraph_format.right_indent),
+                first_line_indent=self._points_to_float(paragraph.paragraph_format.first_line_indent),
+                space_before=self._points_to_float(paragraph.paragraph_format.space_before),
+                space_after=self._points_to_float(paragraph.paragraph_format.space_after),
+                keep_together=paragraph.paragraph_format.keep_together,
+                keep_with_next=paragraph.paragraph_format.keep_with_next,
+                page_break_before=paragraph.paragraph_format.page_break_before,
+                widow_control=paragraph.paragraph_format.widow_control
+            )
+        
+        # Extract run information
+        runs = []
+        for run in paragraph.runs:
+            if run.text:
+                # Safely extract font properties
+                font_info = FontInfo(
+                    name=getattr(run.font, 'name', None),
+                    size=self._points_to_float(getattr(run.font, 'size', None)),
+                    bold=self._safe_bool_property(run.font, 'bold'),
+                    italic=self._safe_bool_property(run.font, 'italic'),
+                    underline=self._safe_bool_property(run.font, 'underline')
+                )
+                
+                runs.append(RunInfo(
+                    text=run.text,
+                    font=font_info
+                ))
+        
+        # Extract primary font (from first run or default)
+        primary_font = None
+        if runs:
+            primary_font = runs[0].font
+        
+        return StyleInfo(
+            style_name=paragraph.style.name if paragraph.style else None,
+            style_type='paragraph',
+            paragraph_format=para_format,
+            runs=runs,
+            primary_font=primary_font
+        )
+    
+    def _points_to_float(self, points_value) -> Optional[float]:
+        """Convert docx points value to float."""
+        if points_value is None:
+            return None
+        try:
+            return float(points_value.pt) if hasattr(points_value, 'pt') else float(points_value)
+        except (AttributeError, ValueError):
+            return None
+    
+    def _safe_bool_property(self, font_obj, property_name: str) -> Optional[bool]:
+        """Safely extract boolean font properties."""
+        try:
+            value = getattr(font_obj, property_name, None)
+            if value is None:
+                return None
+            # Handle boolean values directly
+            if isinstance(value, bool):
+                return value
+            # Handle special docx objects that might have boolean interpretation
+            if hasattr(value, '__bool__'):
+                return bool(value)
+            # For underline specifically, check if it's truthy (non-None, non-False)
+            if property_name == 'underline':
+                return value is not None and value is not False
+            return None
+        except Exception:
+            return None
+    
+    def _determine_heading_level(self, paragraph, style_info: StyleInfo) -> int:
+        """
+        Determine if paragraph is a heading and its level.
+        
+        Args:
+            paragraph: Document paragraph
+            style_info: Style information
+            
+        Returns:
+            Heading level (0 for non-headings, 1-9 for headings)
+        """
+        # Check built-in heading styles
+        if paragraph.style and paragraph.style.name:
+            style_name = paragraph.style.name.lower()
+            
+            # Built-in heading styles
+            heading_patterns = [
+                r'heading\s*(\d+)',
+                r'title',
+                r'subtitle'
+            ]
+            
+            for pattern in heading_patterns:
+                match = re.search(pattern, style_name)
+                if match:
+                    if pattern == r'title':
+                        return 1
+                    elif pattern == r'subtitle':
+                        return 2
+                    else:
+                        level = int(match.group(1))
+                        return min(level, 9)  # Cap at level 9
+        
+        # Check font characteristics for potential headings
+        if style_info.primary_font:
+            font = style_info.primary_font
+            
+            # Large font size suggests heading
+            if font.size and font.size >= 14:
+                if font.size >= 18:
+                    return 1
+                elif font.size >= 16:
+                    return 2
+                else:
+                    return 3
+            
+            # Bold text might be a heading
+            if font.bold and len(paragraph.text.strip()) < 100:
+                return 3
+        
+        return 0  # Not a heading
+    
+    def _build_section_tree(self, sections_data: List[Dict[str, Any]]) -> Section:
+        """
+        Build hierarchical section tree from section data.
+        
+        Args:
+            sections_data: List of section data dictionaries
+            
+        Returns:
+            Root section with nested subsections
+        """
+        if not sections_data:
+            return Section(
+                title="Empty Document",
+                content="",
+                level=0,
+                title_position=Positions.from_docx(0, 0, 0),
+                content_position=Positions.from_docx(0, 0, 0)
+            )
+        
+        # Create root section
+        root = Section(
+            title="Document",
+            content="",
+            level=0,
+            title_position=Positions.from_docx(0, 0, 0),
+            content_position=Positions.from_docx(0, 0, 0)
+        )
+        
+        # Stack to track current section hierarchy
+        section_stack = [root]
+        current_content = []
+        
+        for data in sections_data:
+            if data['is_heading']:
+                # Save accumulated content to current section
+                if current_content:
+                    current_section = section_stack[-1]
+                    content_text = '\n'.join(current_content)
+                    current_section.content = content_text
+                    current_section.content_parsed = content_text
+                    current_content = []
+                
+                # Create new section
+                heading_level = data['heading_level']
+                new_section = Section(
+                    title=data['text'],
+                    content="",
+                    level=heading_level,
+                    title_position=Positions.from_docx(
+                        data['paragraph_index'],
+                        data['char_start'],
+                        data['char_end']
+                    ),
+                    content_position=Positions.from_docx(
+                        data['paragraph_index'],
+                        data['char_end'],
+                        data['char_end']
+                    )
+                )
+                new_section.title_parsed = data['text']
+                
+                # Find appropriate parent in stack
+                while len(section_stack) > 1 and section_stack[-1].level >= heading_level:
+                    section_stack.pop()
+                
+                # Add to parent section
+                parent = section_stack[-1]
+                new_section.parent_section = parent
+                parent.sub_sections.append(new_section)
+                section_stack.append(new_section)
+                
+            else:
+                # Accumulate content
+                current_content.append(data['text'])
+        
+        # Save final accumulated content
+        if current_content:
+            current_section = section_stack[-1]
+            content_text = '\n'.join(current_content)
+            current_section.content = content_text
+            current_section.content_parsed = content_text
+        
+        return root
 
 
 # unit test
 # python -m models.layout_detection.document_detector
 if __name__ == "__main__":
-    detector = DocumentLayoutDetector()
-    result = detector.visualize(input_data="tests/test_data/1-1 买卖合同（通用版）.docx", save_path="tests/test_data/1-1 买卖合同（通用版）.txt")
-    print(result)
+    detector = SectionLayoutDetector()
+    result = detector.generate_section_tree(input_data="tests/test_data/1-1 买卖合同（通用版）.docx")
+    from models.naive_llm.helpers.section_token_parsor import remove_circular_references
+    remove_circular_references(result)
+    print(result.model_dump_json(indent=2))
