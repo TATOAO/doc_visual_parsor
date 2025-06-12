@@ -12,15 +12,15 @@ from PIL import Image
 import numpy as np
 from dataclasses import dataclass
 from enum import Enum
-from models.schemas.layout_schemas import LayoutDetectionResult
+from models.schemas.layout_schemas import LayoutExtractionResult
 from models.schemas.schemas import Section
 
 
-class BaseLayoutDetector(ABC):
+class BaseLayoutExtractor(ABC):
     """
-    Abstract base class for document layout detection.
+    Abstract base class for document layout extraction.
     
-    All layout detection implementations should inherit from this class
+    All layout extraction implementations should inherit from this class
     and implement the required abstract methods.
     """
     
@@ -49,7 +49,7 @@ class BaseLayoutDetector(ABC):
     def _detect_layout(self, 
                       input_data: Any,
                       confidence_threshold: Optional[float] = None,
-                      **kwargs) -> LayoutDetectionResult:
+                      **kwargs) -> LayoutExtractionResult:
         """
         Core detection method to be implemented by subclasses.
         
@@ -66,7 +66,7 @@ class BaseLayoutDetector(ABC):
     def detect(self, 
                input_data: Any,
                confidence_threshold: Optional[float] = None,
-               **kwargs) -> LayoutDetectionResult:
+               **kwargs) -> LayoutExtractionResult:
         """
         Public interface for layout detection.
         
@@ -87,7 +87,7 @@ class BaseLayoutDetector(ABC):
     def detect_batch(self, 
                     input_data_list: List[Any],
                     confidence_threshold: Optional[float] = None,
-                    **kwargs) -> List[LayoutDetectionResult]:
+                    **kwargs) -> List[LayoutExtractionResult]:
         """
         Detect layout in multiple inputs.
         
@@ -107,7 +107,7 @@ class BaseLayoutDetector(ABC):
             except Exception as e:
                 # Create empty result for failed detection
                 print(f"Failed to process input {input_data}: {str(e)}")
-                results.append(LayoutDetectionResult([]))
+                results.append(LayoutExtractionResult([]))
         
         return results
     

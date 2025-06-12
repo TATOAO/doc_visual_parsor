@@ -22,9 +22,9 @@ except ImportError:
     except ImportError:
         raise ImportError("Please install doclayout-yolo: pip install doclayout-yolo")
 
-from ..base.base_detector import BaseSectionDetector
+from ..base.base_layout_extractor import BaseSectionDetector
 from models.schemas.layout_schemas import (
-    LayoutDetectionResult, 
+    LayoutExtractionResult, 
     LayoutElement, 
     BoundingBox,
     ElementType
@@ -121,7 +121,7 @@ class CVLayoutDetector(BaseSectionDetector):
                       input_data: Any,
                       confidence_threshold: Optional[float] = None,
                       image_size: Optional[int] = None,
-                      **kwargs) -> LayoutDetectionResult:
+                      **kwargs) -> LayoutExtractionResult:
         """
         Core CV-based layout detection method.
         
@@ -160,7 +160,7 @@ class CVLayoutDetector(BaseSectionDetector):
 
             # Extract results
             if len(results) == 0:
-                return LayoutDetectionResult([])
+                return LayoutExtractionResult([])
             
             result = results[0]
             
@@ -195,7 +195,7 @@ class CVLayoutDetector(BaseSectionDetector):
                     elements.append(element)
                     element_id += 1
             
-            return LayoutDetectionResult(elements)
+            return LayoutExtractionResult(elements)
             
         except Exception as e:
             logger.error(f"CV detection failed: {str(e)}")
@@ -238,7 +238,7 @@ class CVLayoutDetector(BaseSectionDetector):
     
     def visualize(self, 
                   input_data: Any,
-                  result: Optional[LayoutDetectionResult] = None,
+                  result: Optional[LayoutExtractionResult] = None,
                   save_path: Optional[str] = None,
                   line_width: int = 3,
                   font_size: int = 16,

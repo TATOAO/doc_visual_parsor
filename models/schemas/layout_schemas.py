@@ -292,8 +292,8 @@ class LayoutElement(BaseModel):
         extra = "forbid"
 
 
-class LayoutDetectionResult(BaseModel):
-    """Container for layout detection results."""
+class LayoutExtractionResult(BaseModel):
+    """Container for layout extraction results."""
     elements: List[LayoutElement] = Field(..., description="List of detected layout elements")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Result metadata")
     
@@ -331,30 +331,30 @@ class LayoutDetectionResult(BaseModel):
             'median': confidences[n // 2] if n % 2 == 1 else (confidences[n // 2 - 1] + confidences[n // 2]) / 2
         }
     
-    def filter_by_confidence(self, min_confidence: float = 0.5) -> 'LayoutDetectionResult':
+    def filter_by_confidence(self, min_confidence: float = 0.5) -> 'LayoutExtractionResult':
         """Filter results by minimum confidence threshold."""
         filtered_elements = [elem for elem in self.elements if elem.confidence >= min_confidence]
-        return LayoutDetectionResult(
+        return LayoutExtractionResult(
             elements=filtered_elements,
             metadata=self.metadata
         )
     
-    def filter_by_type(self, element_types: List[ElementType]) -> 'LayoutDetectionResult':
+    def filter_by_type(self, element_types: List[ElementType]) -> 'LayoutExtractionResult':
         """Filter results by element types."""
         filtered_elements = [elem for elem in self.elements if elem.element_type in element_types]
-        return LayoutDetectionResult(
+        return LayoutExtractionResult(
             elements=filtered_elements,
             metadata=self.metadata
         )
     
-    def sort_by_reading_order(self) -> 'LayoutDetectionResult':
+    def sort_by_reading_order(self) -> 'LayoutExtractionResult':
         """Sort elements by reading order (top-to-bottom, left-to-right)."""
         if not self.elements or not all(elem.bbox for elem in self.elements):
             return self
         
         # Sort by y-coordinate first (top to bottom), then by x-coordinate (left to right)
         sorted_elements = sorted(self.elements, key=lambda elem: (elem.bbox.y1, elem.bbox.x1))
-        return LayoutDetectionResult(
+        return LayoutExtractionResult(
             elements=sorted_elements,
             metadata=self.metadata
         )
@@ -384,5 +384,5 @@ __all__ = [
     "StyleInfo",
     "BoundingBox",
     "LayoutElement",
-    "LayoutDetectionResult"
+    "LayoutExtractionResult"
 ]

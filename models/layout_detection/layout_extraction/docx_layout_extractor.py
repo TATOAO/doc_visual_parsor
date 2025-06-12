@@ -23,14 +23,14 @@ try:
 except ImportError:
     raise ImportError("Please install python-docx: pip install python-docx")
 
-from ..base.base_detector import BaseSectionDetector
+from ..base.base_layout_extractor import BaseLayoutExtractor
 from models.schemas.layout_schemas import (
     StyleInfo, 
     FontInfo, 
     ParagraphFormat, 
     RunInfo, 
     TextAlignment,
-    LayoutDetectionResult,
+    LayoutExtractionResult,
     LayoutElement,
     BoundingBox,
     ElementType
@@ -53,13 +53,13 @@ InputDataType = Union[
     Any                    # For objects with getvalue() method (uploaded files)
 ]
 
-class DocxLayoutDetector(BaseSectionDetector):
+class DocxLayoutExtrator(BaseLayoutExtractor):
     """
-    Document-native Layout Detector for .docx files.
+    Document-native Style Extractor for .docx files.
     
-    This detector works directly with the document's internal structure,
-    analyzing XML elements, styles, and formatting to identify layout elements
-    without converting to images.
+    This extractor works directly with the document's internal structure,
+    analyzing XML elements, styles, and formatting to extract raw style information
+    without determining layout element types.
     """
 
     def __init__(self, **kwargs):
@@ -73,20 +73,20 @@ class DocxLayoutDetector(BaseSectionDetector):
     def _detect_layout(self, 
                       input_data: InputDataType,
                       confidence_threshold: Optional[float] = None,
-                      **kwargs) -> LayoutDetectionResult:
+                      **kwargs) -> LayoutExtractionResult:
         """
-        Core detection method - analyzes document structure to detect layout elements.
+        Core extraction method - analyzes document structure to extract raw style information.
         
         Args:
             input_data: Input data (file path, bytes, etc.)
-            confidence_threshold: Override default confidence threshold
-            **kwargs: Additional detection parameters
+            confidence_threshold: Not used in raw extraction
+            **kwargs: Additional extraction parameters
             
         Returns:
-            LayoutDetectionResult containing detected elements
+            LayoutExtractionResult containing raw style elements
         """
         try:
-            # Load the document using the same logic as generate_section_tree
+            # Load the document
             if isinstance(input_data, (str, Path)):
                 doc = Document(input_data)
             elif hasattr(input_data, 'read'):
@@ -96,78 +96,79 @@ class DocxLayoutDetector(BaseSectionDetector):
             else:
                 raise ValueError(f"Unsupported input data type: {type(input_data)}")
             
-            # Analyze document structure
-            sections_data = self._analyze_document_structure(doc)
-            
-            # Convert sections data to layout elements
-            elements = self._create_layout_elements(sections_data, confidence_threshold)
+            # Extract raw document structure
+            raw_elements = self._extract_raw_document_structure(doc)
             
             # Create metadata
             metadata = {
-                'detection_method': 'document_native',
-                'total_paragraphs': len(sections_data),
+                'extraction_method': 'document_native',
+                'total_paragraphs': len(raw_elements),
                 'document_type': 'docx'
             }
             
-            return LayoutDetectionResult(elements=elements, metadata=metadata)
+            return LayoutExtractionResult(elements=raw_elements, metadata=metadata)
             
         except Exception as e:
-            logger.error(f"Error in document layout detection: {str(e)}")
+            logger.error(f"Error in document style extraction: {str(e)}")
             # Return empty result on error
-            return LayoutDetectionResult(elements=[], metadata={"error": str(e)})
+            return LayoutExtractionResult(elements=[], metadata={"error": str(e)})
     
-    def _create_layout_elements(self, sections_data: List[Dict[str, Any]], 
-                               confidence_threshold: Optional[float] = None) -> List['LayoutElement']:
+    def _extract_raw_document_structure(self, doc: Document) -> List['LayoutElement']:
         """
-        Convert sections data to layout elements.
+        Extract raw document structure with style information only.
         
         Args:
-            sections_data: List of section data dictionaries from document analysis
-            confidence_threshold: Minimum confidence threshold to apply
+            doc: Document object
             
         Returns:
-            List of LayoutElement objects
+            List of LayoutElement objects with raw style information
         """
         elements = []
         element_id = 0
+        char_position = 0
+        paragraph_count = 0
         
-        # Set default confidence threshold
-        min_confidence = confidence_threshold or 0.8
-        
-        for data in sections_data:
-            # Determine element type based on heading level and style
-            element_type = self._map_to_element_type(data)
-            
-            # Calculate confidence based on style characteristics
-            confidence = self._calculate_confidence(data)
-            
-            # Skip elements below confidence threshold
-            if confidence < min_confidence:
+        # Process paragraphs first
+        for paragraph_index, paragraph in enumerate(doc.paragraphs):
+            # Skip empty paragraphs
+            if not paragraph.text.strip():
                 continue
             
-            # Create bounding box (approximate, since docx doesn't have pixel coordinates)
-            # We use paragraph index and character positions as approximations
+            # Extract comprehensive style information
+            style_info = self._extract_style_info(paragraph)
+            
+            # Calculate text positions
+            text = paragraph.text
+            char_start = char_position
+            char_end = char_position + len(text)
+            char_position = char_end + 1  # +1 for paragraph break
+            
+            # Determine if this is a heading based on style only (no classification)
+            heading_level = self._extract_heading_level_from_style(paragraph, style_info)
+            
+            # Create approximate bounding box (docx doesn't have pixel coordinates)
             bbox = BoundingBox(
                 x1=0.0,  # Left margin
-                y1=float(data['paragraph_index'] * 20),  # Approximate line height
+                y1=float(paragraph_index * 20),  # Approximate line height
                 x2=500.0,  # Approximate page width
-                y2=float(data['paragraph_index'] * 20 + 15)  # Approximate element height
+                y2=float(paragraph_index * 20 + 15)  # Approximate element height
             )
             
-            # Create metadata
+            # Create metadata with raw information only
             metadata = {
-                'paragraph_index': data['paragraph_index'],
-                'char_start': data['char_start'],
-                'char_end': data['char_end'],
-                'heading_level': data['heading_level'],
-                'is_heading': data['is_heading'],
-                'style_name': data['style_info'].style_name if data['style_info'] else None,
-                'detection_method': 'document_native'
+                'paragraph_index': paragraph_index,
+                'char_start': char_start,
+                'char_end': char_end,
+                'heading_level': heading_level,
+                'is_heading': heading_level > 0,
+                'style_name': style_info.style_name if style_info else None,
+                'extraction_method': 'document_native',
+                'raw_extraction': True
             }
             
             # Add font information if available
-            if data['style_info'] and data['style_info'].primary_font:
-                font = data['style_info'].primary_font
+            if style_info and style_info.primary_font:
+                font = style_info.primary_font
                 metadata.update({
                     'font_name': font.name,
                     'font_size': font.size,
@@ -176,91 +177,98 @@ class DocxLayoutDetector(BaseSectionDetector):
                     'font_underline': font.underline
                 })
             
-            # Create layout element
+            # Create layout element with raw information only
+            # Note: We set element_type to TEXT as default, classification will happen later
             element = LayoutElement(
                 id=element_id,
-                element_type=element_type,
-                confidence=confidence,
+                element_type=ElementType.TEXT,  # Default type, classification happens later
+                confidence=1.0,  # Raw extraction has full confidence in style info
                 bbox=bbox,
-                text=data['text'],
-                style=data['style_info'],
+                text=text,
+                style=style_info,
                 metadata=metadata
             )
             
             elements.append(element)
             element_id += 1
+            paragraph_count += 1
+        
+        # Process tables
+        for table_index, table in enumerate(doc.tables):
+            # Extract table content and structure
+            table_text, table_metadata = self._extract_table_content(table, table_index)
+            
+            if table_text:  # Only add non-empty tables
+                # Create approximate bounding box for table
+                bbox = BoundingBox(
+                    x1=0.0,
+                    y1=float((paragraph_count + table_index) * 20),
+                    x2=500.0,
+                    y2=float((paragraph_count + table_index) * 20 + 50)  # Tables are typically taller
+                )
+                
+                # Create table metadata
+                metadata = {
+                    'table_index': table_index,
+                    'char_start': char_position,
+                    'char_end': char_position + len(table_text),
+                    'extraction_method': 'document_native',
+                    'raw_extraction': True,
+                    'element_type_override': 'Table',  # Indicate this should be classified as table
+                    **table_metadata
+                }
+                
+                # Create table element
+                element = LayoutElement(
+                    id=element_id,
+                    element_type=ElementType.TABLE,  # Mark as table
+                    confidence=1.0,
+                    bbox=bbox,
+                    text=table_text,
+                    style=None,  # Tables don't have the same style structure as paragraphs
+                    metadata=metadata
+                )
+                
+                elements.append(element)
+                element_id += 1
+                char_position += len(table_text) + 1
         
         return elements
     
-    def _map_to_element_type(self, data: Dict[str, Any]) -> 'ElementType':
+    def _extract_heading_level_from_style(self, paragraph, style_info: StyleInfo) -> int:
         """
-        Map section data to appropriate ElementType.
+        Extract heading level information from paragraph style (raw style info only).
         
         Args:
-            data: Section data dictionary
+            paragraph: Document paragraph
+            style_info: Style information
             
         Returns:
-            Appropriate ElementType
+            Heading level (0 for non-headings, 1-9 for headings) based on style only
         """
-        if data['is_heading']:
-            if data['heading_level'] == 1:
-                return ElementType.TITLE
-            else:
-                return ElementType.HEADING
-        else:
-            # Check if it might be other types based on content/style
-            text = data['text'].lower()
+        # Check built-in heading styles
+        if paragraph.style and paragraph.style.name:
+            style_name = paragraph.style.name.lower()
             
-            # Simple heuristics for detecting other element types
-            if 'table' in text or 'figure' in text:
-                if 'table' in text:
-                    return ElementType.TABLE_CAPTION
-                else:
-                    return ElementType.FIGURE_CAPTION
-            elif len(data['text']) > 500:  # Long text is likely a paragraph
-                return ElementType.PARAGRAPH
-            else:
-                return ElementType.TEXT
-    
-    def _calculate_confidence(self, data: Dict[str, Any]) -> float:
-        """
-        Calculate confidence score for an element based on its characteristics.
-        
-        Args:
-            data: Section data dictionary
+            # Built-in heading styles
+            heading_patterns = [
+                r'heading\s*(\d+)',
+                r'title',
+                r'subtitle'
+            ]
             
-        Returns:
-            Confidence score between 0.0 and 1.0
-        """
-        confidence = 0.5  # Base confidence
+            for pattern in heading_patterns:
+                match = re.search(pattern, style_name)
+                if match:
+                    if pattern == r'title':
+                        return 1
+                    elif pattern == r'subtitle':
+                        return 2
+                    else:
+                        level = int(match.group(1))
+                        return min(level, 9)  # Cap at level 9
         
-        # Higher confidence for headings with clear style indicators
-        if data['is_heading']:
-            confidence += 0.3
-            
-            # Even higher confidence for built-in heading styles
-            if data['style_info'] and data['style_info'].style_name:
-                style_name = data['style_info'].style_name.lower()
-                if 'heading' in style_name or 'title' in style_name:
-                    confidence += 0.2
-        
-        # Higher confidence for elements with clear formatting
-        if data['style_info'] and data['style_info'].primary_font:
-            font = data['style_info'].primary_font
-            
-            # Bold text gets higher confidence
-            if font.bold:
-                confidence += 0.1
-            
-            # Large font size gets higher confidence
-            if font.size and font.size >= 14:
-                confidence += 0.1
-        
-        # Text length also affects confidence
-        if len(data['text']) > 20:  # Reasonable text length
-            confidence += 0.1
-        
-        return min(confidence, 1.0)  # Cap at 1.0
+        return 0  # Not a heading based on style
     
     def get_supported_formats(self) -> List[str]:
         """
@@ -273,20 +281,20 @@ class DocxLayoutDetector(BaseSectionDetector):
     
     def get_detector_info(self) -> Dict[str, Any]:
         """
-        Get information about the detector.
+        Get information about the extractor.
         
         Returns:
-            Dictionary containing detector information
+            Dictionary containing extractor information
         """
         return {
-            'name': 'SectionLayoutDetector',
+            'name': 'DocxStyleExtractor',
             'version': '1.0.0',
-            'description': 'Document-native layout detector for DOCX files using python-docx',
+            'description': 'Document-native style extractor for DOCX files using python-docx',
             'supported_formats': self.get_supported_formats(),
-            'detection_method': 'style-based',
-            'requires_conversion': False
+            'extraction_method': 'style-based',
+            'requires_conversion': False,
+            'raw_extraction_only': True
         }
-    
     
     def _extract_style_info(self, paragraph) -> StyleInfo:
         """
@@ -381,58 +389,6 @@ class DocxLayoutDetector(BaseSectionDetector):
         except Exception:
             return None
     
-    def _determine_heading_level(self, paragraph, style_info: StyleInfo) -> int:
-        """
-        Determine if paragraph is a heading and its level.
-        
-        Args:
-            paragraph: Document paragraph
-            style_info: Style information
-            
-        Returns:
-            Heading level (0 for non-headings, 1-9 for headings)
-        """
-        # Check built-in heading styles
-        if paragraph.style and paragraph.style.name:
-            style_name = paragraph.style.name.lower()
-            
-            # Built-in heading styles
-            heading_patterns = [
-                r'heading\s*(\d+)',
-                r'title',
-                r'subtitle'
-            ]
-            
-            for pattern in heading_patterns:
-                match = re.search(pattern, style_name)
-                if match:
-                    if pattern == r'title':
-                        return 1
-                    elif pattern == r'subtitle':
-                        return 2
-                    else:
-                        level = int(match.group(1))
-                        return min(level, 9)  # Cap at level 9
-        
-        # Check font characteristics for potential headings
-        if style_info.primary_font:
-            font = style_info.primary_font
-            
-            # Large font size suggests heading
-            if font.size and font.size >= 14:
-                if font.size >= 18:
-                    return 1
-                elif font.size >= 16:
-                    return 2
-                else:
-                    return 3
-            
-            # Bold text might be a heading
-            if font.bold and len(paragraph.text.strip()) < 100:
-                return 3
-        
-        return 0  # Not a heading
-    
     def _build_section_tree(self, sections_data: List[Dict[str, Any]]) -> Section:
         """
         Build hierarchical section tree from section data.
@@ -517,16 +473,60 @@ class DocxLayoutDetector(BaseSectionDetector):
         
         return root
 
+    def _extract_table_content(self, table, table_index: int) -> tuple[str, dict]:
+        """
+        Extract content and metadata from a table.
+        
+        Args:
+            table: Document table object
+            table_index: Index of the table in the document
+            
+        Returns:
+            Tuple of (table_text, table_metadata)
+        """
+        rows_data = []
+        total_cells = 0
+        
+        for row_index, row in enumerate(table.rows):
+            row_data = []
+            for cell_index, cell in enumerate(row.cells):
+                cell_text = cell.text.strip()
+                row_data.append(cell_text)
+                total_cells += 1
+            rows_data.append(row_data)
+        
+        # Convert table to text representation
+        if rows_data:
+            # Create a simple text representation of the table
+            table_lines = []
+            for row in rows_data:
+                # Join cells with tab separator for basic table format
+                table_lines.append('\t'.join(row))
+            table_text = '\n'.join(table_lines)
+        else:
+            table_text = ""
+        
+        # Create table metadata
+        table_metadata = {
+            'table_rows': len(rows_data),
+            'table_cols': len(rows_data[0]) if rows_data else 0,
+            'total_cells': total_cells,
+            'table_structure': rows_data  # Include the actual table structure
+        }
+        
+        return table_text, table_metadata
+
 
 # unit test
 # python -m models.layout_detection.document_detector
 if __name__ == "__main__":
-    detector = SectionLayoutDetector()
+    detector = DocxLayoutExtrator()
     result = detector._detect_layout(input_data="tests/test_data/1-1 买卖合同（通用版）.docx")
     import json 
-    json.dump(result.model_dump(), open("layout_detection_result.json", "w"), indent=2, ensure_ascii=False)
 
-    # result = detector.generate_section_tree(input_data="tests/test_data/1-1 买卖合同（通用版）.docx")
-    # from models.naive_llm.helpers.section_token_parsor import remove_circular_references
-    # remove_circular_references(result)
-    # print(result.model_dump_json(indent=2))
+    # remove all runs
+    for element in result.elements:
+        if element.style and element.style.runs:
+            element.style.runs = [] 
+
+    json.dump(result.model_dump(), open("layout_detection_result_no_runs.json", "w"), indent=2, ensure_ascii=False)
