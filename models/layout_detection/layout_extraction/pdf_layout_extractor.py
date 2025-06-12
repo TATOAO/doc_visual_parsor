@@ -52,38 +52,23 @@ InputDataType = Union[
 
 class PdfLayoutExtractor(BaseLayoutExtractor):
     """
-    Document-native Style Extractor for PDF files with CV-guided fragment merging.
+    Document-native Style Extractor for PDF files with spatial fragment merging.
     
     This extractor works directly with the PDF document's internal structure,
     analyzing text blocks, spans, and formatting to extract raw style information
-    and merging fragmented text elements using both spatial analysis and CV guidance.
+    and merging fragmented text elements using spatial and font analysis.
     """
 
     def __init__(self, 
-                 merge_fragments: bool = True, 
-                 use_cv_guidance: bool = True,
-                 cv_confidence_threshold: float = 0.3,
+                 merge_fragments: bool = True,
                  **kwargs):
         super().__init__(**kwargs)
         self.merge_fragments = merge_fragments
-        self.use_cv_guidance = use_cv_guidance
-        self.cv_confidence_threshold = cv_confidence_threshold
-        self.cv_detector = None
         self.detector = self._initialize_detector()
     
     def _initialize_detector(self):
-        """Initialize the detector and CV guidance if enabled."""
-        if self.use_cv_guidance:
-            try:
-                from ..visual_detection.cv_detector import CVLayoutDetector
-                self.cv_detector = CVLayoutDetector(
-                    confidence_threshold=self.cv_confidence_threshold
-                )
-                logger.info("CV-guided fragment merging enabled")
-            except Exception as e:
-                logger.warning(f"Could not initialize CV detector: {e}")
-                logger.warning("Falling back to spatial-only merging")
-                self.use_cv_guidance = False
+        """Initialize the detector."""
+        logger.info("PDF-native layout extractor initialized")
         return None
     
     def _detect_layout(self, 
@@ -104,9 +89,6 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
             # Load the PDF document
             doc = self._load_pdf_document(input_data)
             
-            # Store document for CV guidance (if enabled)
-            self._current_pdf_doc = doc
-            
             # Get page count before processing
             page_count = doc.page_count
             
@@ -120,27 +102,22 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
                 merged_elements = raw_elements
             
             # Clean up
-            self._current_pdf_doc = None
             doc.close()
             
             # Create metadata
             metadata = {
-                'extraction_method': 'pdf_native_with_cv_guidance' if self.use_cv_guidance else 'pdf_native_with_merging',
+                'extraction_method': 'pdf_native_with_merging' if self.merge_fragments else 'pdf_native_raw',
                 'total_elements': len(merged_elements),
                 'original_elements': len(raw_elements),
                 'document_type': 'pdf',
                 'page_count': page_count,
-                'fragments_merged': self.merge_fragments,
-                'cv_guidance_enabled': self.use_cv_guidance
+                'fragments_merged': self.merge_fragments
             }
             
             return LayoutExtractionResult(elements=merged_elements, metadata=metadata)
             
         except Exception as e:
             logger.error(f"Error in PDF style extraction: {str(e)}")
-            # Clean up on error
-            if hasattr(self, '_current_pdf_doc'):
-                self._current_pdf_doc = None
             # Return empty result on error
             return LayoutExtractionResult(elements=[], metadata={"error": str(e)})
     
@@ -266,8 +243,7 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
 
     def _merge_fragmented_elements(self, elements: List[LayoutElement]) -> List[LayoutElement]:
         """
-        Merge fragmented text elements into logical units using both spatial analysis
-        and CV guidance for better merging decisions.
+        Merge fragmented text elements into logical units using spatial analysis.
         
         Args:
             elements: List of raw text elements
@@ -278,716 +254,7 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
         if not elements:
             return elements
         
-        logger.info(f"Starting CV-guided fragment merging for {len(elements)} elements...")
-        
-        # Group elements by page for processing
-        pages = {}
-        for element in elements:
-            page_num = element.metadata.get('page_number', 1)
-            if page_num not in pages:
-                pages[page_num] = []
-            pages[page_num].append(element)
-        
-        merged_elements = []
-        element_id = 0
-        
-        for page_num, page_elements in pages.items():
-            logger.info(f"Merging fragments for page {page_num}: {len(page_elements)} elements")
-            
-            # Get CV guidance for this page if available
-            cv_guidance = None
-            if self.use_cv_guidance and self.cv_detector:
-                cv_guidance = self._get_cv_guidance_for_page(page_num, page_elements)
-            
-            # Merge fragments within each page using CV guidance
-            page_merged = self._merge_page_fragments_with_cv(page_elements, cv_guidance)
-            
-            # Reassign IDs
-            for element in page_merged:
-                element.id = element_id
-                element_id += 1
-            
-            merged_elements.extend(page_merged)
-            
-            logger.info(f"Page {page_num}: {len(page_elements)} -> {len(page_merged)} elements after CV-guided merging")
-        
-        logger.info(f"CV-guided fragment merging complete: {len(elements)} -> {len(merged_elements)} elements")
-        return merged_elements
-
-    def _get_cv_guidance_for_page(self, page_num: int, elements: List[LayoutElement]) -> Optional[Dict]:
-        """
-        Get CV guidance for merging decisions on a specific page.
-        
-        Args:
-            page_num: Page number (1-indexed)
-            elements: Elements on this page
-            
-        Returns:
-            CV guidance information or None if not available
-        """
-        try:
-            # Convert PDF page to image for CV analysis
-            page_image = self._pdf_page_to_image(page_num)
-            if page_image is None:
-                return None
-            
-            # Run CV detection on the page
-            cv_result = self.cv_detector._detect_layout(page_image)
-            
-            # Create guidance mapping
-            guidance = {
-                'cv_elements': cv_result.elements,
-                'element_regions': self._map_elements_to_cv_regions(elements, cv_result.elements),
-                'merge_zones': self._identify_merge_zones(cv_result.elements),
-                'reading_order': self._get_cv_reading_order(cv_result.elements)
-            }
-            
-            logger.debug(f"CV guidance for page {page_num}: {len(cv_result.elements)} CV regions detected")
-            return guidance
-            
-        except Exception as e:
-            logger.warning(f"Could not get CV guidance for page {page_num}: {e}")
-            return None
-
-    def _pdf_page_to_image(self, page_num: int) -> Optional[np.ndarray]:
-        """
-        Convert a PDF page to image for CV analysis.
-        
-        Args:
-            page_num: Page number (1-indexed)
-            
-        Returns:
-            Page image as numpy array or None if failed
-        """
-        try:
-            # We need access to the PDF document - store it during detection
-            if hasattr(self, '_current_pdf_doc') and self._current_pdf_doc:
-                page = self._current_pdf_doc[page_num - 1]  # Convert to 0-indexed
-                
-                # Render page as image
-                mat = fitz.Matrix(2.0, 2.0)  # 2x zoom for better quality
-                pix = page.get_pixmap(matrix=mat)
-                img_data = pix.tobytes("png")
-                
-                # Convert to numpy array
-                from PIL import Image
-                import io
-                img = Image.open(io.BytesIO(img_data))
-                return np.array(img)
-            else:
-                logger.warning("PDF document not available for image conversion")
-                return None
-        except Exception as e:
-            logger.warning(f"Could not convert page {page_num} to image: {e}")
-            return None
-
-    def _map_elements_to_cv_regions(self, 
-                                   text_elements: List[LayoutElement], 
-                                   cv_elements: List[LayoutElement]) -> Dict:
-        """
-        Map text elements to CV-detected regions.
-        
-        Args:
-            text_elements: Text elements from PDF extraction
-            cv_elements: Elements detected by CV
-            
-        Returns:
-            Mapping of text elements to CV regions
-        """
-        mapping = {}
-        
-        for text_elem in text_elements:
-            if not text_elem.bbox:
-                continue
-                
-            # Find overlapping CV regions
-            overlapping_regions = []
-            for cv_elem in cv_elements:
-                if not cv_elem.bbox:
-                    continue
-                    
-                overlap = self._calculate_bbox_overlap(text_elem.bbox, cv_elem.bbox)
-                if overlap > 0.1:  # At least 10% overlap
-                    overlapping_regions.append({
-                        'cv_element': cv_elem,
-                        'overlap': overlap,
-                        'element_type': cv_elem.element_type
-                    })
-            
-            # Sort by overlap and take the best match
-            if overlapping_regions:
-                overlapping_regions.sort(key=lambda x: x['overlap'], reverse=True)
-                mapping[text_elem.id] = overlapping_regions[0]
-        
-        return mapping
-
-    def _identify_merge_zones(self, cv_elements: List[LayoutElement]) -> List[Dict]:
-        """
-        Identify zones where text fragments should be merged based on CV detection.
-        
-        Args:
-            cv_elements: CV-detected elements
-            
-        Returns:
-            List of merge zones with their properties
-        """
-        merge_zones = []
-        
-        for cv_elem in cv_elements:
-            if cv_elem.element_type in [ElementType.TEXT, ElementType.PARAGRAPH, 
-                                       ElementType.TITLE, ElementType.HEADING]:
-                merge_zones.append({
-                    'bbox': cv_elem.bbox,
-                    'element_type': cv_elem.element_type,
-                    'confidence': cv_elem.confidence,
-                    'merge_priority': self._get_merge_priority(cv_elem.element_type)
-                })
-        
-        return merge_zones
-
-    def _get_merge_priority(self, element_type: ElementType) -> int:
-        """
-        Get merge priority for different element types.
-        
-        Args:
-            element_type: Type of element
-            
-        Returns:
-            Priority score (higher = more likely to merge)
-        """
-        priorities = {
-            ElementType.PARAGRAPH: 10,
-            ElementType.TEXT: 9,
-            ElementType.TITLE: 8,
-            ElementType.HEADING: 8,
-            ElementType.LIST: 7,
-            ElementType.FIGURE_CAPTION: 6,
-            ElementType.TABLE_CAPTION: 6
-        }
-        return priorities.get(element_type, 5)
-
-    def _get_cv_reading_order(self, cv_elements: List[LayoutElement]) -> List[int]:
-        """
-        Get reading order based on CV detection.
-        
-        Args:
-            cv_elements: CV-detected elements
-            
-        Returns:
-            List of element IDs in reading order
-        """
-        # Sort by position (top to bottom, left to right)
-        sorted_elements = sorted(cv_elements, 
-                               key=lambda e: (e.bbox.y1 if e.bbox else 0, 
-                                            e.bbox.x1 if e.bbox else 0))
-        return [elem.id for elem in sorted_elements]
-
-    def _calculate_bbox_overlap(self, bbox1: BoundingBox, bbox2: BoundingBox) -> float:
-        """
-        Calculate overlap ratio between two bounding boxes.
-        
-        Args:
-            bbox1: First bounding box
-            bbox2: Second bounding box
-            
-        Returns:
-            Overlap ratio (0.0 to 1.0)
-        """
-        # Calculate intersection
-        x1 = max(bbox1.x1, bbox2.x1)
-        y1 = max(bbox1.y1, bbox2.y1)
-        x2 = min(bbox1.x2, bbox2.x2)
-        y2 = min(bbox1.y2, bbox2.y2)
-        
-        if x2 <= x1 or y2 <= y1:
-            return 0.0
-        
-        intersection = (x2 - x1) * (y2 - y1)
-        area1 = (bbox1.x2 - bbox1.x1) * (bbox1.y2 - bbox1.y1)
-        area2 = (bbox2.x2 - bbox2.x1) * (bbox2.y2 - bbox2.y1)
-        
-        union = area1 + area2 - intersection
-        return intersection / union if union > 0 else 0.0
-
-    def _merge_page_fragments_with_cv(self, 
-                                     elements: List[LayoutElement], 
-                                     cv_guidance: Optional[Dict]) -> List[LayoutElement]:
-        """
-        Merge fragments within a single page using CV guidance.
-        
-        Args:
-            elements: List of elements from a single page
-            cv_guidance: CV guidance information
-            
-        Returns:
-            List of merged elements
-        """
-        if len(elements) <= 1:
-            return elements
-        
-        # If no CV guidance available, fall back to spatial merging
-        if not cv_guidance:
-            return self._merge_page_fragments(elements)
-        
-        # Sort elements by reading order (enhanced with CV guidance)
-        sorted_elements = self._sort_elements_with_cv_guidance(elements, cv_guidance)
-        
-        merged = []
-        i = 0
-        
-        while i < len(sorted_elements):
-            current = sorted_elements[i]
-            merge_candidates = [current]
-            
-            # Look for elements to merge with current element using CV guidance
-            j = i + 1
-            while j < len(sorted_elements):
-                candidate = sorted_elements[j]
-                
-                if self._should_merge_elements_with_cv(current, candidate, cv_guidance):
-                    merge_candidates.append(candidate)
-                    # Update current to be the merged representation for next comparisons
-                    current = self._create_merged_element(merge_candidates)
-                    sorted_elements.pop(j)  # Remove from list since it's being merged
-                    continue
-                
-                # If we can't merge with this candidate, check if we should stop looking
-                if not self._could_potentially_merge_with_cv(current, candidate, cv_guidance):
-                    break
-                
-                j += 1
-            
-            # Create final merged element
-            if len(merge_candidates) > 1:
-                merged_element = self._create_merged_element(merge_candidates)
-                merged_element.metadata['merged_from_count'] = len(merge_candidates)
-                merged_element.metadata['merge_method'] = 'cv_guided'
-                merged.append(merged_element)
-            else:
-                current.metadata['merge_method'] = 'no_merge'
-                merged.append(current)
-            
-            i += 1
-        
-        return merged
-
-    def _sort_elements_with_cv_guidance(self, 
-                                       elements: List[LayoutElement], 
-                                       cv_guidance: Dict) -> List[LayoutElement]:
-        """
-        Sort elements using CV guidance for better reading order.
-        
-        Args:
-            elements: Elements to sort
-            cv_guidance: CV guidance information
-            
-        Returns:
-            Sorted elements
-        """
-        # Get CV reading order if available
-        cv_reading_order = cv_guidance.get('reading_order', [])
-        element_regions = cv_guidance.get('element_regions', {})
-        
-        def sort_key(element):
-            # Try to use CV guidance first
-            if element.id in element_regions:
-                cv_elem = element_regions[element.id]['cv_element']
-                if cv_elem.id in cv_reading_order:
-                    return (cv_reading_order.index(cv_elem.id), element.bbox.y1, element.bbox.x1)
-            
-            # Fall back to spatial sorting
-            return (999999, element.bbox.y1, element.bbox.x1)
-        
-        return sorted(elements, key=sort_key)
-
-    def _should_merge_elements_with_cv(self, 
-                                      elem1: LayoutElement, 
-                                      elem2: LayoutElement, 
-                                      cv_guidance: Dict) -> bool:
-        """
-        Determine if two elements should be merged using CV guidance.
-        
-        Args:
-            elem1: First element
-            elem2: Second element
-            cv_guidance: CV guidance information
-            
-        Returns:
-            True if elements should be merged
-        """
-        # First check basic spatial criteria
-        if not self._should_merge_elements(elem1, elem2):
-            return False
-        
-        # Enhanced checks with CV guidance
-        element_regions = cv_guidance.get('element_regions', {})
-        merge_zones = cv_guidance.get('merge_zones', [])
-        
-        # Check if both elements are in the same CV-detected region
-        elem1_region = element_regions.get(elem1.id)
-        elem2_region = element_regions.get(elem2.id)
-        
-        if elem1_region and elem2_region:
-            # If both elements map to the same CV region, they should likely be merged
-            if elem1_region['cv_element'].id == elem2_region['cv_element'].id:
-                # Additional check: ensure they're the same type of content
-                cv_element_type = elem1_region['element_type']
-                if cv_element_type in [ElementType.TEXT, ElementType.PARAGRAPH, 
-                                     ElementType.TITLE, ElementType.HEADING]:
-                    return True
-        
-        # Check if elements are within a high-priority merge zone
-        for zone in merge_zones:
-            if (self._element_in_zone(elem1, zone) and 
-                self._element_in_zone(elem2, zone) and
-                zone['merge_priority'] >= 8):
-                return True
-        
-        return False
-
-    def _could_potentially_merge_with_cv(self, 
-                                        elem1: LayoutElement, 
-                                        elem2: LayoutElement, 
-                                        cv_guidance: Dict) -> bool:
-        """
-        Quick check if elements could potentially be merged using CV guidance.
-        
-        Args:
-            elem1: First element
-            elem2: Second element
-            cv_guidance: CV guidance information
-            
-        Returns:
-            True if elements could potentially be merged
-        """
-        # Basic spatial check first
-        if not self._could_potentially_merge(elem1, elem2):
-            return False
-        
-        # CV-enhanced check
-        element_regions = cv_guidance.get('element_regions', {})
-        
-        # If elements are in different CV regions of incompatible types, don't merge
-        elem1_region = element_regions.get(elem1.id)
-        elem2_region = element_regions.get(elem2.id)
-        
-        if elem1_region and elem2_region:
-            type1 = elem1_region['element_type']
-            type2 = elem2_region['element_type']
-            
-            # Don't merge across incompatible types
-            incompatible_pairs = [
-                (ElementType.TITLE, ElementType.TEXT),
-                (ElementType.HEADING, ElementType.TEXT),
-                (ElementType.TABLE, ElementType.TEXT),
-                (ElementType.FIGURE, ElementType.TEXT)
-            ]
-            
-            for t1, t2 in incompatible_pairs:
-                if (type1 == t1 and type2 == t2) or (type1 == t2 and type2 == t1):
-                    return False
-        
-        return True
-
-    def _element_in_zone(self, element: LayoutElement, zone: Dict) -> bool:
-        """
-        Check if an element is within a merge zone.
-        
-        Args:
-            element: Element to check
-            zone: Merge zone definition
-            
-        Returns:
-            True if element is in the zone
-        """
-        if not element.bbox or not zone.get('bbox'):
-            return False
-        
-        return self._calculate_bbox_overlap(element.bbox, zone['bbox']) > 0.5
-
-    def _extract_pdf_style_info(self, span: Dict[str, Any], block: Dict[str, Any], line: Dict[str, Any]) -> StyleInfo:
-        """
-        Extract comprehensive style information from a PDF span.
-        
-        Args:
-            span: PyMuPDF span dictionary
-            block: PyMuPDF block dictionary
-            line: PyMuPDF line dictionary
-            
-        Returns:
-            StyleInfo object with formatting details
-        """
-        # Extract font information
-        font_info = FontInfo(
-            name=span.get("font", "Unknown"),
-            size=span.get("size", 0.0),
-            bold=self._is_font_bold(span),
-            italic=self._is_font_italic(span),
-            underline=self._is_font_underlined(span),
-            color=self._extract_font_color(span)
-        )
-        
-        # Create paragraph format (approximate from line/block info)
-        para_format = ParagraphFormat(
-            alignment=self._determine_text_alignment(line, block),
-            space_before=None,  # Not easily available in PDF spans
-            space_after=None,   # Not easily available in PDF spans
-        )
-        
-        # Create run information
-        runs = [RunInfo(
-            text=span["text"],
-            font=font_info
-        )]
-        
-        # Extract style name (approximate from font characteristics)
-        style_name = self._generate_style_name(span, font_info)
-        
-        return StyleInfo(
-            style_name=style_name,
-            style_type='text_span',
-            paragraph_format=para_format,
-            runs=runs,
-            primary_font=font_info
-        )
-    
-    def _is_font_bold(self, span: Dict[str, Any]) -> bool:
-        """Check if font is bold based on flags or font name."""
-        flags = span.get("flags", 0)
-        # Check bold flag (bit 4)
-        if flags & 16:  # 2^4 = 16
-            return True
-        
-        # Check font name for bold indicators
-        font_name = span.get("font", "").lower()
-        return any(indicator in font_name for indicator in ["bold", "black", "heavy"])
-    
-    def _is_font_italic(self, span: Dict[str, Any]) -> bool:
-        """Check if font is italic based on flags or font name."""
-        flags = span.get("flags", 0)
-        # Check italic flag (bit 1)
-        if flags & 2:  # 2^1 = 2
-            return True
-        
-        # Check font name for italic indicators
-        font_name = span.get("font", "").lower()
-        return any(indicator in font_name for indicator in ["italic", "oblique"])
-    
-    def _is_font_underlined(self, span: Dict[str, Any]) -> bool:
-        """Check if font is underlined based on flags or font name."""
-        flags = span.get("flags", 0)
-        # Check underline flag (bit 0)
-        if flags & 1:  # Underline flag
-            return True
-        
-        # Check font name for underline indicators
-        font_name = span.get("font", "").lower()
-        return "underline" in font_name
-    
-    def _has_font_flag(self, span: Dict[str, Any], flag_bit: int) -> bool:
-        """Check if a specific font flag is set."""
-        flags = span.get("flags", 0)
-        return bool(flags & (1 << flag_bit))
-    
-    def _extract_font_color(self, span: Dict[str, Any]) -> Optional[str]:
-        """Extract font color from span."""
-        color = span.get("color")
-        if color is not None:
-            # Convert color integer to hex
-            return f"#{color:06x}"
-        return None
-    
-    def _determine_text_alignment(self, line: Dict[str, Any], block: Dict[str, Any]) -> TextAlignment:
-        """Determine text alignment from line and block information."""
-        # Get line and block bounding boxes
-        line_bbox = line.get("bbox", [0, 0, 0, 0])
-        block_bbox = block.get("bbox", [0, 0, 0, 0])
-        
-        if not line_bbox or not block_bbox:
-            return TextAlignment.LEFT
-        
-        # Calculate relative positions
-        line_left = line_bbox[0]
-        line_right = line_bbox[2]
-        line_width = line_right - line_left
-        
-        block_left = block_bbox[0]
-        block_right = block_bbox[2]
-        block_width = block_right - block_left
-        
-        # Calculate margins
-        left_margin = line_left - block_left
-        right_margin = block_right - line_right
-        
-        # Determine alignment based on margins and positioning
-        margin_tolerance = 5.0  # pixels
-        
-        # Check for center alignment
-        if abs(left_margin - right_margin) <= margin_tolerance:
-            return TextAlignment.CENTER
-        
-        # Check for right alignment  
-        if right_margin <= margin_tolerance and left_margin > margin_tolerance * 2:
-            return TextAlignment.RIGHT
-        
-        # Check for justified text (line takes up most of the block width)
-        if line_width / block_width > 0.9:
-            return TextAlignment.JUSTIFY
-        
-        # Default to left alignment
-        return TextAlignment.LEFT
-    
-    def _generate_style_name(self, span: Dict[str, Any], font_info: FontInfo) -> str:
-        """Generate a descriptive style name based on font characteristics."""
-        parts = []
-        
-        if font_info.name:
-            parts.append(font_info.name)
-        
-        if font_info.size:
-            parts.append(f"{font_info.size}pt")
-        
-        if font_info.bold:
-            parts.append("Bold")
-        
-        if font_info.italic:
-            parts.append("Italic")
-        
-        return "-".join(parts) if parts else "Unknown"
-    
-    def _find_nearby_underlines(self, span: Dict[str, Any], drawings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Find underline drawings near a text span.
-        
-        Args:
-            span: PyMuPDF span dictionary
-            drawings: List of drawing objects from page
-            
-        Returns:
-            List of nearby underline information
-        """
-        span_bbox = span.get("bbox", [0, 0, 0, 0])
-        nearby_underlines = []
-        
-        # Define search area around the span
-        search_margin = 10.0
-        
-        for i, drawing in enumerate(drawings):
-            if drawing.get('type') == 's':  # Stroke drawing
-                items = drawing.get('items', [])
-                for item in items:
-                    if len(item) >= 3 and item[0] == 'l':  # Line
-                        start_x, start_y = item[1].x, item[1].y
-                        end_x, end_y = item[2].x, item[2].y
-                        
-                        # Check if it's near our span (horizontally aligned underline)
-                        if (span_bbox[1] - search_margin <= start_y <= span_bbox[3] + search_margin and
-                            span_bbox[0] - search_margin <= start_x <= span_bbox[2] + 50):
-                            
-                            # Calculate approximate underscores
-                            underline_length = end_x - start_x
-                            num_underscores = max(int(underline_length / 8), 6)
-                            
-                            nearby_underlines.append({
-                                'drawing_index': i,
-                                'start': [start_x, start_y],
-                                'end': [end_x, end_y],
-                                'width': drawing.get('width', 0),
-                                'length': underline_length,
-                                'estimated_underscores': num_underscores,
-                                'is_horizontal': abs(start_y - end_y) < 2.0
-                            })
-        
-        return nearby_underlines
-
-    def _extract_heading_level_from_pdf_style(self, span: Dict[str, Any], style_info: StyleInfo) -> int:
-        """
-        Extract heading level information from PDF span style (raw style info only).
-        
-        Args:
-            span: PyMuPDF span dictionary
-            style_info: Style information
-            
-        Returns:
-            Heading level (0 for non-headings, 1-9 for headings) based on font characteristics
-        """
-        if not style_info.primary_font:
-            return 0
-        
-        font = style_info.primary_font
-        font_size = font.size or 0
-        
-        # Heuristic based on font size and style
-        # These thresholds might need adjustment based on specific documents
-        if font_size >= 18:
-            return 1
-        elif font_size >= 16:
-            return 2
-        elif font_size >= 14:
-            return 3
-        elif font.bold and font_size >= 12:
-            return 4
-        
-        return 0  # Not a heading based on style
-    
-    def get_supported_formats(self) -> List[str]:
-        """
-        Get list of supported input formats.
-        
-        Returns:
-            List of supported file extensions
-        """
-        return ['.pdf']
-    
-    def get_detector_info(self) -> Dict[str, Any]:
-        """
-        Get information about the extractor.
-        
-        Returns:
-            Dictionary containing extractor information
-        """
-        features = [
-            'spatial_proximity_merging',
-            'font_similarity_analysis', 
-            'reading_order_detection',
-            'logical_sequence_validation',
-            'hyphenation_handling'
-        ]
-        
-        if self.use_cv_guidance:
-            features.extend([
-                'cv_guided_merging',
-                'visual_layout_analysis',
-                'element_type_awareness',
-                'merge_zone_detection',
-                'cv_reading_order'
-            ])
-        
-        return {
-            'name': 'PdfLayoutExtractorWithCVGuidance',
-            'version': '3.0.0',
-            'description': 'Document-native PDF extractor with CV-guided fragment merging using spatial, font, and visual analysis',
-            'supported_formats': self.get_supported_formats(),
-            'extraction_method': 'pdf-native-with-cv-guidance' if self.use_cv_guidance else 'pdf-native-with-merging',
-            'requires_conversion': False,
-            'fragment_merging': self.merge_fragments,
-            'cv_guidance_enabled': self.use_cv_guidance,
-            'cv_confidence_threshold': self.cv_confidence_threshold,
-            'features': features
-        }
-
-    def _merge_page_fragments(self, elements: List[LayoutElement]) -> List[LayoutElement]:
-        """
-        Merge fragments within a single page using spatial analysis only.
-        
-        Args:
-            elements: List of elements from a single page
-            
-        Returns:
-            List of merged elements
-        """
-        if len(elements) <= 1:
-            return elements
+        logger.info(f"Starting spatial fragment merging for {len(elements)} elements...")
         
         # Sort elements by reading order (top to bottom, left to right)
         sorted_elements = sorted(elements, key=lambda e: (e.bbox.y1, e.bbox.x1))
@@ -1029,6 +296,7 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
             
             i += 1
         
+        logger.info(f"Spatial fragment merging complete: {len(elements)} -> {len(merged)} elements")
         return merged
 
     def _should_merge_elements(self, elem1: LayoutElement, elem2: LayoutElement) -> bool:
@@ -1283,12 +551,273 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
             metadata=merged_metadata
         )
 
+    def _extract_pdf_style_info(self, span: Dict[str, Any], block: Dict[str, Any], line: Dict[str, Any]) -> StyleInfo:
+        """
+        Extract comprehensive style information from a PDF span.
+        
+        Args:
+            span: PyMuPDF span dictionary
+            block: PyMuPDF block dictionary
+            line: PyMuPDF line dictionary
+            
+        Returns:
+            StyleInfo object with formatting details
+        """
+        # Extract font information
+        font_info = FontInfo(
+            name=span.get("font", "Unknown"),
+            size=span.get("size", 0.0),
+            bold=self._is_font_bold(span),
+            italic=self._is_font_italic(span),
+            underline=self._is_font_underlined(span),
+            color=self._extract_font_color(span)
+        )
+        
+        # Create paragraph format (approximate from line/block info)
+        para_format = ParagraphFormat(
+            alignment=self._determine_text_alignment(line, block),
+            space_before=None,  # Not easily available in PDF spans
+            space_after=None,   # Not easily available in PDF spans
+        )
+        
+        # Create run information
+        runs = [RunInfo(
+            text=span["text"],
+            font=font_info
+        )]
+        
+        # Extract style name (approximate from font characteristics)
+        style_name = self._generate_style_name(span, font_info)
+        
+        return StyleInfo(
+            style_name=style_name,
+            style_type='text_span',
+            paragraph_format=para_format,
+            runs=runs,
+            primary_font=font_info
+        )
+    
+    def _is_font_bold(self, span: Dict[str, Any]) -> bool:
+        """Check if font is bold based on flags or font name."""
+        flags = span.get("flags", 0)
+        # Check bold flag (bit 4)
+        if flags & 16:  # 2^4 = 16
+            return True
+        
+        # Check font name for bold indicators
+        font_name = span.get("font", "").lower()
+        return any(indicator in font_name for indicator in ["bold", "black", "heavy"])
+    
+    def _is_font_italic(self, span: Dict[str, Any]) -> bool:
+        """Check if font is italic based on flags or font name."""
+        flags = span.get("flags", 0)
+        # Check italic flag (bit 1)
+        if flags & 2:  # 2^1 = 2
+            return True
+        
+        # Check font name for italic indicators
+        font_name = span.get("font", "").lower()
+        return any(indicator in font_name for indicator in ["italic", "oblique"])
+    
+    def _is_font_underlined(self, span: Dict[str, Any]) -> bool:
+        """Check if font is underlined based on flags or font name."""
+        flags = span.get("flags", 0)
+        # Check underline flag (bit 0)
+        if flags & 1:  # Underline flag
+            return True
+        
+        # Check font name for underline indicators
+        font_name = span.get("font", "").lower()
+        return "underline" in font_name
+    
+    def _has_font_flag(self, span: Dict[str, Any], flag_bit: int) -> bool:
+        """Check if a specific font flag is set."""
+        flags = span.get("flags", 0)
+        return bool(flags & (1 << flag_bit))
+    
+    def _extract_font_color(self, span: Dict[str, Any]) -> Optional[str]:
+        """Extract font color from span."""
+        color = span.get("color")
+        if color is not None:
+            # Convert color integer to hex
+            return f"#{color:06x}"
+        return None
+    
+    def _determine_text_alignment(self, line: Dict[str, Any], block: Dict[str, Any]) -> TextAlignment:
+        """Determine text alignment from line and block information."""
+        # Get line and block bounding boxes
+        line_bbox = line.get("bbox", [0, 0, 0, 0])
+        block_bbox = block.get("bbox", [0, 0, 0, 0])
+        
+        if not line_bbox or not block_bbox:
+            return TextAlignment.LEFT
+        
+        # Calculate relative positions
+        line_left = line_bbox[0]
+        line_right = line_bbox[2]
+        line_width = line_right - line_left
+        
+        block_left = block_bbox[0]
+        block_right = block_bbox[2]
+        block_width = block_right - block_left
+        
+        # Calculate margins
+        left_margin = line_left - block_left
+        right_margin = block_right - line_right
+        
+        # Determine alignment based on margins and positioning
+        margin_tolerance = 5.0  # pixels
+        
+        # Check for center alignment
+        if abs(left_margin - right_margin) <= margin_tolerance:
+            return TextAlignment.CENTER
+        
+        # Check for right alignment  
+        if right_margin <= margin_tolerance and left_margin > margin_tolerance * 2:
+            return TextAlignment.RIGHT
+        
+        # Check for justified text (line takes up most of the block width)
+        if line_width / block_width > 0.9:
+            return TextAlignment.JUSTIFY
+        
+        # Default to left alignment
+        return TextAlignment.LEFT
+    
+    def _generate_style_name(self, span: Dict[str, Any], font_info: FontInfo) -> str:
+        """Generate a descriptive style name based on font characteristics."""
+        parts = []
+        
+        if font_info.name:
+            parts.append(font_info.name)
+        
+        if font_info.size:
+            parts.append(f"{font_info.size}pt")
+        
+        if font_info.bold:
+            parts.append("Bold")
+        
+        if font_info.italic:
+            parts.append("Italic")
+        
+        return "-".join(parts) if parts else "Unknown"
+    
+    def _find_nearby_underlines(self, span: Dict[str, Any], drawings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Find underline drawings near a text span.
+        
+        Args:
+            span: PyMuPDF span dictionary
+            drawings: List of drawing objects from page
+            
+        Returns:
+            List of nearby underline information
+        """
+        span_bbox = span.get("bbox", [0, 0, 0, 0])
+        nearby_underlines = []
+        
+        # Define search area around the span
+        search_margin = 10.0
+        
+        for i, drawing in enumerate(drawings):
+            if drawing.get('type') == 's':  # Stroke drawing
+                items = drawing.get('items', [])
+                for item in items:
+                    if len(item) >= 3 and item[0] == 'l':  # Line
+                        start_x, start_y = item[1].x, item[1].y
+                        end_x, end_y = item[2].x, item[2].y
+                        
+                        # Check if it's near our span (horizontally aligned underline)
+                        if (span_bbox[1] - search_margin <= start_y <= span_bbox[3] + search_margin and
+                            span_bbox[0] - search_margin <= start_x <= span_bbox[2] + 50):
+                            
+                            # Calculate approximate underscores
+                            underline_length = end_x - start_x
+                            num_underscores = max(int(underline_length / 8), 6)
+                            
+                            nearby_underlines.append({
+                                'drawing_index': i,
+                                'start': [start_x, start_y],
+                                'end': [end_x, end_y],
+                                'width': drawing.get('width', 0),
+                                'length': underline_length,
+                                'estimated_underscores': num_underscores,
+                                'is_horizontal': abs(start_y - end_y) < 2.0
+                            })
+        
+        return nearby_underlines
+
+    def _extract_heading_level_from_pdf_style(self, span: Dict[str, Any], style_info: StyleInfo) -> int:
+        """
+        Extract heading level information from PDF span style (raw style info only).
+        
+        Args:
+            span: PyMuPDF span dictionary
+            style_info: Style information
+            
+        Returns:
+            Heading level (0 for non-headings, 1-9 for headings) based on font characteristics
+        """
+        if not style_info.primary_font:
+            return 0
+        
+        font = style_info.primary_font
+        font_size = font.size or 0
+        
+        # Heuristic based on font size and style
+        # These thresholds might need adjustment based on specific documents
+        if font_size >= 18:
+            return 1
+        elif font_size >= 16:
+            return 2
+        elif font_size >= 14:
+            return 3
+        elif font.bold and font_size >= 12:
+            return 4
+        
+        return 0  # Not a heading based on style
+    
+    def get_supported_formats(self) -> List[str]:
+        """
+        Get list of supported input formats.
+        
+        Returns:
+            List of supported file extensions
+        """
+        return ['.pdf']
+    
+    def get_detector_info(self) -> Dict[str, Any]:
+        """
+        Get information about the extractor.
+        
+        Returns:
+            Dictionary containing extractor information
+        """
+        features = [
+            'spatial_proximity_merging',
+            'font_similarity_analysis', 
+            'reading_order_detection',
+            'logical_sequence_validation',
+            'hyphenation_handling'
+        ]
+        
+        return {
+            'name': 'PdfLayoutExtractorWithCVGuidance',
+            'version': '3.0.0',
+            'description': 'Document-native PDF extractor with CV-guided fragment merging using spatial, font, and visual analysis',
+            'supported_formats': self.get_supported_formats(),
+            'extraction_method': 'pdf-native-with-merging' if self.merge_fragments else 'pdf-native-raw',
+            'requires_conversion': False,
+            'fragment_merging': self.merge_fragments,
+            'cv_guidance_enabled': False,
+            'cv_confidence_threshold': 0.3,
+            'features': features
+        }
+
 
 # unit test
 # python -m models.layout_detection.layout_extraction.pdf_layout_extractor
 if __name__ == "__main__":
-    extractor = PdfLayoutExtractor(merge_fragments=True, use_cv_guidance=True)
-    extractor._initialize_detector()
+    extractor = PdfLayoutExtractor(merge_fragments=True)
     result = extractor._detect_layout(input_data="tests/test_data/1-1 买卖合同（通用版）.pdf")
     import json 
     

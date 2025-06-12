@@ -2,16 +2,22 @@
 Computer Vision-based Document Layout Detection Module
 
 This module provides a CV-based implementation of document layout detection using
-the DocLayout-YOLO model. It inherits from the BaseLayoutDetector.
+the DocLayout-YOLO model. It supports both single images and multi-page PDFs.
 """
 
 import logging
 import cv2
 import numpy as np
+import os
 from pathlib import Path
 from typing import Union, List, Dict, Tuple, Optional, Any
 from PIL import Image
 import torch
+
+try:
+    import fitz  # PyMuPDF for PDF support
+except ImportError:
+    fitz = None
 
 try:
     from doclayout_yolo import YOLOv10
@@ -51,16 +57,17 @@ class CVLayoutDetector(BaseLayoutExtractor):
     """
     Computer Vision-based Document Layout Detector using DocLayout-YOLO.
     
-    This class provides CV-based layout detection for document images.
-    It inherits from BaseLayoutDetector and implements the required abstract methods.
+    This class provides CV-based layout detection for both single images and multi-page PDFs.
+    It inherits from BaseLayoutExtractor and implements the required abstract methods.
     """
     
     def __init__(self, 
                  model_name: str = "docstructbench",
-                 model_path: Optional[str] = "/Users/tatoaoliang/Downloads/Work/doc_visual_parsor/models/layout_detection/visual_detection/model_parameters",
+                 model_path: Optional[str] = os.path.join(os.getcwd(), "models/layout_detection/visual_detection/model_parameters/docstructbench_doclayout_yolo_docstructbench_imgsz1024.pt"),
                  device: str = "auto",
                  confidence_threshold: float = 0.25,
                  image_size: int = 1024,
+                 pdf_dpi: int = 200,  # DPI for PDF to image conversion
                  **kwargs):
         """
         Initialize the CV-based layout detector.
@@ -71,13 +78,19 @@ class CVLayoutDetector(BaseLayoutExtractor):
             device: Device to use ('auto', 'cpu', 'cuda', 'cuda:0', etc.)
             confidence_threshold: Minimum confidence for detections
             image_size: Input image size for the model
+            pdf_dpi: DPI resolution for PDF to image conversion
             **kwargs: Additional parameters
         """
         super().__init__(confidence_threshold=confidence_threshold, device=device, **kwargs)
         
         self.model_name = model_name
         self.image_size = image_size
+        self.pdf_dpi = pdf_dpi
         self.model = None
+        
+        # Check PDF support
+        if fitz is None:
+            logger.warning("PyMuPDF not available. PDF support disabled.")
         
         # Determine model path
         if model_path:
@@ -126,13 +139,13 @@ class CVLayoutDetector(BaseLayoutExtractor):
         Core CV-based layout detection method.
         
         Args:
-            input_data: Input image (file path, numpy array, or PIL Image)
+            input_data: Input data (image file path, numpy array, PIL Image, or PDF file path)
             confidence_threshold: Override default confidence threshold
             image_size: Override default image size
             **kwargs: Additional detection parameters
             
         Returns:
-            LayoutDetectionResult containing detected elements
+            LayoutExtractionResult containing detected elements
         """
         if self.model is None:
             raise RuntimeError("Model not loaded. Initialization failed.")
@@ -141,6 +154,131 @@ class CVLayoutDetector(BaseLayoutExtractor):
         conf_thresh = confidence_threshold or self.confidence_threshold
         img_size = image_size or self.image_size
         
+        # Handle different input types
+        if self._is_pdf_input(input_data):
+            return self._detect_layout_pdf(input_data, conf_thresh, img_size, **kwargs)
+        else:
+            return self._detect_layout_image(input_data, conf_thresh, img_size, **kwargs)
+    
+    def _is_pdf_input(self, input_data: Any) -> bool:
+        """Check if input is a PDF file."""
+        if isinstance(input_data, (str, Path)):
+            return str(input_data).lower().endswith('.pdf')
+        return False
+    
+    def _detect_layout_pdf(self, 
+                          pdf_input: Any,
+                          confidence_threshold: float,
+                          image_size: int,
+                          **kwargs) -> LayoutExtractionResult:
+        """
+        Detect layout for PDF files by converting each page to image.
+        
+        Args:
+            pdf_input: PDF file path
+            confidence_threshold: Confidence threshold
+            image_size: Image size for detection
+            **kwargs: Additional parameters
+            
+        Returns:
+            LayoutExtractionResult with elements from all pages
+        """
+        if fitz is None:
+            raise RuntimeError("PyMuPDF not available. Cannot process PDF files.")
+        
+        try:
+            # Load PDF document
+            doc = fitz.open(str(pdf_input))
+            all_elements = []
+            element_id = 0
+            
+            for page_num in range(doc.page_count):
+                logger.info(f"Processing PDF page {page_num + 1}/{doc.page_count}")
+                
+                # Convert page to image
+                page_image = self._pdf_page_to_image(doc, page_num)
+                if page_image is None:
+                    logger.warning(f"Could not convert page {page_num + 1} to image")
+                    continue
+                
+                # Detect layout on the page image
+                page_result = self._detect_layout_image(page_image, confidence_threshold, image_size, **kwargs)
+                
+                # Add page information to elements
+                for element in page_result.elements:
+                    element.id = element_id
+                    element.metadata = element.metadata or {}
+                    element.metadata['page_number'] = page_num + 1
+                    element.metadata['source_type'] = 'pdf_page'
+                    all_elements.append(element)
+                    element_id += 1
+            
+            doc.close()
+            
+            # Create metadata
+            metadata = {
+                'detection_method': 'cv_yolo_pdf',
+                'total_elements': len(all_elements),
+                'document_type': 'pdf',
+                'page_count': doc.page_count,
+                'pdf_dpi': self.pdf_dpi
+            }
+            
+            return LayoutExtractionResult(elements=all_elements, metadata=metadata)
+            
+        except Exception as e:
+            logger.error(f"PDF CV detection failed: {str(e)}")
+            raise
+    
+    def _pdf_page_to_image(self, doc: fitz.Document, page_num: int) -> Optional[np.ndarray]:
+        """
+        Convert a PDF page to image for CV analysis.
+        
+        Args:
+            doc: PyMuPDF Document object
+            page_num: Page number (0-indexed)
+            
+        Returns:
+            Page image as numpy array or None if failed
+        """
+        try:
+            page = doc[page_num]
+            
+            # Calculate zoom factor based on desired DPI
+            # Default PDF DPI is 72, so zoom = desired_dpi / 72
+            zoom = self.pdf_dpi / 72.0
+            mat = fitz.Matrix(zoom, zoom)
+            
+            # Render page as image
+            pix = page.get_pixmap(matrix=mat)
+            img_data = pix.tobytes("png")
+            
+            # Convert to numpy array
+            import io
+            img = Image.open(io.BytesIO(img_data))
+            return np.array(img)
+            
+        except Exception as e:
+            logger.warning(f"Could not convert page {page_num + 1} to image: {e}")
+            return None
+    
+    def _detect_layout_image(self, 
+                           input_data: Any,
+                           confidence_threshold: float,
+                           image_size: int,
+                           **kwargs) -> LayoutExtractionResult:
+        """
+        Core CV-based layout detection method for single images.
+        
+        Args:
+            input_data: Input image (file path, numpy array, or PIL Image)
+            confidence_threshold: Confidence threshold
+            image_size: Image size for detection
+            **kwargs: Additional detection parameters
+            
+        Returns:
+            LayoutExtractionResult containing detected elements
+        """
         # Convert image to proper format
         if isinstance(input_data, (str, Path)):
             image_path = str(input_data)
@@ -152,8 +290,8 @@ class CVLayoutDetector(BaseLayoutExtractor):
             # Perform prediction
             results = self.model.predict(
                 image_path,
-                imgsz=img_size,
-                conf=conf_thresh,
+                imgsz=image_size,
+                conf=confidence_threshold,
                 device=self.device,
                 verbose=False
             )
@@ -188,25 +326,80 @@ class CVLayoutDetector(BaseLayoutExtractor):
                         bbox=bbox,
                         metadata={
                             'model_class_id': int(cls_id),
-                            'detection_method': 'cv_yolo'
+                            'detection_method': 'cv_yolo',
+                            'source_type': 'single_image'
                         }
                     )
                     
                     elements.append(element)
                     element_id += 1
             
-            return LayoutExtractionResult(elements)
+            return LayoutExtractionResult(elements=elements)
             
         except Exception as e:
             logger.error(f"CV detection failed: {str(e)}")
             raise
     
+    def detect_pdf_page(self, 
+                       pdf_path: Union[str, Path], 
+                       page_num: int,
+                       **kwargs) -> LayoutExtractionResult:
+        """
+        Detect layout for a specific PDF page.
+        
+        Args:
+            pdf_path: Path to PDF file
+            page_num: Page number (1-indexed)
+            **kwargs: Additional detection parameters
+            
+        Returns:
+            LayoutExtractionResult for the specified page
+        """
+        if fitz is None:
+            raise RuntimeError("PyMuPDF not available. Cannot process PDF files.")
+        
+        try:
+            doc = fitz.open(str(pdf_path))
+            
+            if page_num < 1 or page_num > doc.page_count:
+                raise ValueError(f"Page number {page_num} out of range (1-{doc.page_count})")
+            
+            # Convert page to image (convert to 0-indexed)
+            page_image = self._pdf_page_to_image(doc, page_num - 1)
+            doc.close()
+            
+            if page_image is None:
+                raise RuntimeError(f"Could not convert page {page_num} to image")
+            
+            # Detect layout
+            result = self._detect_layout_image(page_image, 
+                                             self.confidence_threshold, 
+                                             self.image_size, 
+                                             **kwargs)
+            
+            # Add page information
+            for element in result.elements:
+                element.metadata = element.metadata or {}
+                element.metadata['page_number'] = page_num
+                element.metadata['source_type'] = 'pdf_page'
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"PDF page detection failed: {str(e)}")
+            raise
+    
     def get_supported_formats(self) -> List[str]:
         """Get list of supported input formats."""
-        return [
+        formats = [
             '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif',
             'PIL.Image', 'numpy.ndarray', 'file_path'
         ]
+        
+        if fitz is not None:
+            formats.append('.pdf')
+        
+        return formats
     
     def get_detector_info(self) -> Dict[str, Any]:
         """Get information about the CV detector."""
@@ -217,6 +410,8 @@ class CVLayoutDetector(BaseLayoutExtractor):
             'device': self.device,
             'confidence_threshold': self.confidence_threshold,
             'image_size': self.image_size,
+            'pdf_dpi': self.pdf_dpi,
+            'pdf_support': fitz is not None,
             'supported_formats': self.get_supported_formats(),
             'class_mapping': {k: v.value for k, v in DOCLAYOUT_CLASS_MAPPING.items()}
         }
@@ -228,7 +423,14 @@ class CVLayoutDetector(BaseLayoutExtractor):
             path = Path(input_data)
             if not path.exists():
                 return False
-            return path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']
+            
+            # Check supported formats
+            ext = path.suffix.lower()
+            if ext == '.pdf':
+                return fitz is not None
+            else:
+                return ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']
+                
         elif isinstance(input_data, Image.Image):
             return True
         elif isinstance(input_data, np.ndarray):
@@ -318,7 +520,7 @@ class CVLayoutDetector(BaseLayoutExtractor):
                        cv2.FONT_HERSHEY_SIMPLEX, 
                        font_size / 20, (255, 255, 255), 2)
         
-        # Save if requested
+        # Save if requ!.gitignoreested
         if save_path:
             img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             cv2.imwrite(save_path, img_bgr)
@@ -331,5 +533,21 @@ class CVLayoutDetector(BaseLayoutExtractor):
 if __name__ == "__main__":
     detector = CVLayoutDetector()
     detector._initialize_detector()
-    # result = detector.detect("models/layout_detection/visual_detection/test_images/test_image.jpg")
+
+    pdf_path = "tests/test_data/1-1 买卖合同（通用版）.pdf"
+    test_image = "tests/test_data/1-1 买卖合同（通用版）.pdf"
+    import fitz
+
+    doc = fitz.open(pdf_path)
+    page = doc.load_page(3)
+    pix = page.get_pixmap()
+    pix.save("tests/test_data/test_image.png")
+    result = detector._detect_layout(input_data="tests/test_data/test_image.png")
+    import json
+    json.dump(result.model_dump(), open("test_image_result_cv.json", "w"), indent=2, ensure_ascii=False)
+    # result = detector.detect(test_image)
     # print(result)
+
+
+    from ..utils.visualiza_layout_elements import visualize_pdf_layout
+    visualize_pdf_layout(pdf_path, result, "tests/test_data/test_image_cv.pdf")

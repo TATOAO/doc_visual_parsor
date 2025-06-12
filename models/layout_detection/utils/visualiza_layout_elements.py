@@ -420,11 +420,11 @@ if __name__ == "__main__":
     
     if Path(test_pdf).exists():
         # Extract without merging
-        extractor_no_merge = PdfLayoutExtractor(merge_fragments=False)
+        extractor_no_merge = PdfLayoutExtractor(merge_fragments=True, use_cv_guidance=False)
         result_before = extractor_no_merge._detect_layout(test_pdf)
         
         # Extract with merging
-        extractor_with_merge = PdfLayoutExtractor(merge_fragments=True)
+        extractor_with_merge = PdfLayoutExtractor(merge_fragments=True, use_cv_guidance=True)
         result_after = extractor_with_merge._detect_layout(test_pdf)
         
         # Create comparison visualization

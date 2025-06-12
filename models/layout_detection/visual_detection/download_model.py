@@ -92,7 +92,7 @@ def list_available_models(cache_dir: str = None):
         print(f"  {name}: {config['description']} [{status}]")
 
 
-# python -m models.layout_detection.download_model --model docstructbench --force --dest ./models/layout_detection/model_parameters
+# python -m models.layout_detection.visual_detection.download_model --model docstructbench --force --dest ./models/layout_detection/visual_detection/model_parameters
 if __name__ == "__main__":
     import argparse
     
