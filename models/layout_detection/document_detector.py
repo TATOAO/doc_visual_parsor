@@ -30,7 +30,10 @@ from models.schemas.docx_schemas import (
     ParagraphFormat, 
     RunInfo, 
     TextAlignment,
-    LayoutDetectionResult
+    LayoutDetectionResult,
+    LayoutElement,
+    BoundingBox,
+    ElementType
 )
 from models.schemas.schemas import Section, Positions, DocumentType
 
@@ -72,7 +75,7 @@ class SectionLayoutDetector(BaseSectionDetector):
                       confidence_threshold: Optional[float] = None,
                       **kwargs) -> LayoutDetectionResult:
         """
-        Core detection method - not used for section detection, but required by interface.
+        Core detection method - analyzes document structure to detect layout elements.
         
         Args:
             input_data: Input data (file path, bytes, etc.)
@@ -82,10 +85,182 @@ class SectionLayoutDetector(BaseSectionDetector):
         Returns:
             LayoutDetectionResult containing detected elements
         """
-        # For section detection, we don't use the layout detection interface
-        # This method is required by the abstract base class but not used
-        from models.schemas.docx_schemas import LayoutDetectionResult
-        return LayoutDetectionResult(elements=[], metadata={"message": "Use generate_section_tree() for section detection"})
+        try:
+            # Load the document using the same logic as generate_section_tree
+            if isinstance(input_data, (str, Path)):
+                doc = Document(input_data)
+            elif hasattr(input_data, 'read'):
+                doc = Document(input_data)
+            elif hasattr(input_data, 'getvalue'):
+                doc = Document(input_data.getvalue())
+            else:
+                raise ValueError(f"Unsupported input data type: {type(input_data)}")
+            
+            # Analyze document structure
+            sections_data = self._analyze_document_structure(doc)
+            
+            # Convert sections data to layout elements
+            elements = self._create_layout_elements(sections_data, confidence_threshold)
+            
+            # Create metadata
+            metadata = {
+                'detection_method': 'document_native',
+                'total_paragraphs': len(sections_data),
+                'document_type': 'docx'
+            }
+            
+            return LayoutDetectionResult(elements=elements, metadata=metadata)
+            
+        except Exception as e:
+            logger.error(f"Error in document layout detection: {str(e)}")
+            # Return empty result on error
+            return LayoutDetectionResult(elements=[], metadata={"error": str(e)})
+    
+    def _create_layout_elements(self, sections_data: List[Dict[str, Any]], 
+                               confidence_threshold: Optional[float] = None) -> List['LayoutElement']:
+        """
+        Convert sections data to layout elements.
+        
+        Args:
+            sections_data: List of section data dictionaries from document analysis
+            confidence_threshold: Minimum confidence threshold to apply
+            
+        Returns:
+            List of LayoutElement objects
+        """
+        elements = []
+        element_id = 0
+        
+        # Set default confidence threshold
+        min_confidence = confidence_threshold or 0.8
+        
+        for data in sections_data:
+            # Determine element type based on heading level and style
+            element_type = self._map_to_element_type(data)
+            
+            # Calculate confidence based on style characteristics
+            confidence = self._calculate_confidence(data)
+            
+            # Skip elements below confidence threshold
+            if confidence < min_confidence:
+                continue
+            
+            # Create bounding box (approximate, since docx doesn't have pixel coordinates)
+            # We use paragraph index and character positions as approximations
+            bbox = BoundingBox(
+                x1=0.0,  # Left margin
+                y1=float(data['paragraph_index'] * 20),  # Approximate line height
+                x2=500.0,  # Approximate page width
+                y2=float(data['paragraph_index'] * 20 + 15)  # Approximate element height
+            )
+            
+            # Create metadata
+            metadata = {
+                'paragraph_index': data['paragraph_index'],
+                'char_start': data['char_start'],
+                'char_end': data['char_end'],
+                'heading_level': data['heading_level'],
+                'is_heading': data['is_heading'],
+                'style_name': data['style_info'].style_name if data['style_info'] else None,
+                'detection_method': 'document_native'
+            }
+            
+            # Add font information if available
+            if data['style_info'] and data['style_info'].primary_font:
+                font = data['style_info'].primary_font
+                metadata.update({
+                    'font_name': font.name,
+                    'font_size': font.size,
+                    'font_bold': font.bold,
+                    'font_italic': font.italic,
+                    'font_underline': font.underline
+                })
+            
+            # Create layout element
+            element = LayoutElement(
+                id=element_id,
+                element_type=element_type,
+                confidence=confidence,
+                bbox=bbox,
+                text=data['text'],
+                style=data['style_info'],
+                metadata=metadata
+            )
+            
+            elements.append(element)
+            element_id += 1
+        
+        return elements
+    
+    def _map_to_element_type(self, data: Dict[str, Any]) -> 'ElementType':
+        """
+        Map section data to appropriate ElementType.
+        
+        Args:
+            data: Section data dictionary
+            
+        Returns:
+            Appropriate ElementType
+        """
+        if data['is_heading']:
+            if data['heading_level'] == 1:
+                return ElementType.TITLE
+            else:
+                return ElementType.HEADING
+        else:
+            # Check if it might be other types based on content/style
+            text = data['text'].lower()
+            
+            # Simple heuristics for detecting other element types
+            if 'table' in text or 'figure' in text:
+                if 'table' in text:
+                    return ElementType.TABLE_CAPTION
+                else:
+                    return ElementType.FIGURE_CAPTION
+            elif len(data['text']) > 500:  # Long text is likely a paragraph
+                return ElementType.PARAGRAPH
+            else:
+                return ElementType.TEXT
+    
+    def _calculate_confidence(self, data: Dict[str, Any]) -> float:
+        """
+        Calculate confidence score for an element based on its characteristics.
+        
+        Args:
+            data: Section data dictionary
+            
+        Returns:
+            Confidence score between 0.0 and 1.0
+        """
+        confidence = 0.5  # Base confidence
+        
+        # Higher confidence for headings with clear style indicators
+        if data['is_heading']:
+            confidence += 0.3
+            
+            # Even higher confidence for built-in heading styles
+            if data['style_info'] and data['style_info'].style_name:
+                style_name = data['style_info'].style_name.lower()
+                if 'heading' in style_name or 'title' in style_name:
+                    confidence += 0.2
+        
+        # Higher confidence for elements with clear formatting
+        if data['style_info'] and data['style_info'].primary_font:
+            font = data['style_info'].primary_font
+            
+            # Bold text gets higher confidence
+            if font.bold:
+                confidence += 0.1
+            
+            # Large font size gets higher confidence
+            if font.size and font.size >= 14:
+                confidence += 0.1
+        
+        # Text length also affects confidence
+        if len(data['text']) > 20:  # Reasonable text length
+            confidence += 0.1
+        
+        return min(confidence, 1.0)  # Cap at 1.0
     
     def get_supported_formats(self) -> List[str]:
         """
