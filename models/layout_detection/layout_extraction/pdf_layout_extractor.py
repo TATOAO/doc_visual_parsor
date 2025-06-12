@@ -52,21 +52,39 @@ InputDataType = Union[
 
 class PdfLayoutExtractor(BaseLayoutExtractor):
     """
-    Document-native Style Extractor for PDF files.
+    Document-native Style Extractor for PDF files with CV-guided fragment merging.
     
     This extractor works directly with the PDF document's internal structure,
     analyzing text blocks, spans, and formatting to extract raw style information
-    and merging fragmented text elements into logical units.
+    and merging fragmented text elements using both spatial analysis and CV guidance.
     """
 
-    def __init__(self, merge_fragments: bool = True, **kwargs):
+    def __init__(self, 
+                 merge_fragments: bool = True, 
+                 use_cv_guidance: bool = True,
+                 cv_confidence_threshold: float = 0.3,
+                 **kwargs):
         super().__init__(**kwargs)
         self.merge_fragments = merge_fragments
+        self.use_cv_guidance = use_cv_guidance
+        self.cv_confidence_threshold = cv_confidence_threshold
+        self.cv_detector = None
         self.detector = self._initialize_detector()
     
     def _initialize_detector(self):
-        """Initialize the detector (no special initialization needed for PDF parsing)."""
-        pass
+        """Initialize the detector and CV guidance if enabled."""
+        if self.use_cv_guidance:
+            try:
+                from ..visual_detection.cv_detector import CVLayoutDetector
+                self.cv_detector = CVLayoutDetector(
+                    confidence_threshold=self.cv_confidence_threshold
+                )
+                logger.info("CV-guided fragment merging enabled")
+            except Exception as e:
+                logger.warning(f"Could not initialize CV detector: {e}")
+                logger.warning("Falling back to spatial-only merging")
+                self.use_cv_guidance = False
+        return None
     
     def _detect_layout(self, 
                       input_data: InputDataType,
@@ -86,14 +104,14 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
             # Load the PDF document
             doc = self._load_pdf_document(input_data)
             
-            # Get page count before closing
+            # Store document for CV guidance (if enabled)
+            self._current_pdf_doc = doc
+            
+            # Get page count before processing
             page_count = doc.page_count
             
             # Extract raw document structure from all pages
             raw_elements = self._extract_raw_pdf_structure(doc)
-            
-            # Close the document
-            doc.close()
             
             # Merge fragmented elements if enabled
             if self.merge_fragments and raw_elements:
@@ -101,20 +119,28 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
             else:
                 merged_elements = raw_elements
             
+            # Clean up
+            self._current_pdf_doc = None
+            doc.close()
+            
             # Create metadata
             metadata = {
-                'extraction_method': 'pdf_native_with_merging',
+                'extraction_method': 'pdf_native_with_cv_guidance' if self.use_cv_guidance else 'pdf_native_with_merging',
                 'total_elements': len(merged_elements),
                 'original_elements': len(raw_elements),
                 'document_type': 'pdf',
                 'page_count': page_count,
-                'fragments_merged': self.merge_fragments
+                'fragments_merged': self.merge_fragments,
+                'cv_guidance_enabled': self.use_cv_guidance
             }
             
             return LayoutExtractionResult(elements=merged_elements, metadata=metadata)
             
         except Exception as e:
             logger.error(f"Error in PDF style extraction: {str(e)}")
+            # Clean up on error
+            if hasattr(self, '_current_pdf_doc'):
+                self._current_pdf_doc = None
             # Return empty result on error
             return LayoutExtractionResult(elements=[], metadata={"error": str(e)})
     
@@ -240,8 +266,8 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
 
     def _merge_fragmented_elements(self, elements: List[LayoutElement]) -> List[LayoutElement]:
         """
-        Merge fragmented text elements into logical units based on proximity,
-        font similarity, and reading order.
+        Merge fragmented text elements into logical units using both spatial analysis
+        and CV guidance for better merging decisions.
         
         Args:
             elements: List of raw text elements
@@ -252,7 +278,7 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
         if not elements:
             return elements
         
-        logger.info(f"Starting fragment merging for {len(elements)} elements...")
+        logger.info(f"Starting CV-guided fragment merging for {len(elements)} elements...")
         
         # Group elements by page for processing
         pages = {}
@@ -268,8 +294,13 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
         for page_num, page_elements in pages.items():
             logger.info(f"Merging fragments for page {page_num}: {len(page_elements)} elements")
             
-            # Merge fragments within each page
-            page_merged = self._merge_page_fragments(page_elements)
+            # Get CV guidance for this page if available
+            cv_guidance = None
+            if self.use_cv_guidance and self.cv_detector:
+                cv_guidance = self._get_cv_guidance_for_page(page_num, page_elements)
+            
+            # Merge fragments within each page using CV guidance
+            page_merged = self._merge_page_fragments_with_cv(page_elements, cv_guidance)
             
             # Reassign IDs
             for element in page_merged:
@@ -278,17 +309,215 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
             
             merged_elements.extend(page_merged)
             
-            logger.info(f"Page {page_num}: {len(page_elements)} -> {len(page_merged)} elements after merging")
+            logger.info(f"Page {page_num}: {len(page_elements)} -> {len(page_merged)} elements after CV-guided merging")
         
-        logger.info(f"Fragment merging complete: {len(elements)} -> {len(merged_elements)} elements")
+        logger.info(f"CV-guided fragment merging complete: {len(elements)} -> {len(merged_elements)} elements")
         return merged_elements
 
-    def _merge_page_fragments(self, elements: List[LayoutElement]) -> List[LayoutElement]:
+    def _get_cv_guidance_for_page(self, page_num: int, elements: List[LayoutElement]) -> Optional[Dict]:
         """
-        Merge fragments within a single page.
+        Get CV guidance for merging decisions on a specific page.
+        
+        Args:
+            page_num: Page number (1-indexed)
+            elements: Elements on this page
+            
+        Returns:
+            CV guidance information or None if not available
+        """
+        try:
+            # Convert PDF page to image for CV analysis
+            page_image = self._pdf_page_to_image(page_num)
+            if page_image is None:
+                return None
+            
+            # Run CV detection on the page
+            cv_result = self.cv_detector._detect_layout(page_image)
+            
+            # Create guidance mapping
+            guidance = {
+                'cv_elements': cv_result.elements,
+                'element_regions': self._map_elements_to_cv_regions(elements, cv_result.elements),
+                'merge_zones': self._identify_merge_zones(cv_result.elements),
+                'reading_order': self._get_cv_reading_order(cv_result.elements)
+            }
+            
+            logger.debug(f"CV guidance for page {page_num}: {len(cv_result.elements)} CV regions detected")
+            return guidance
+            
+        except Exception as e:
+            logger.warning(f"Could not get CV guidance for page {page_num}: {e}")
+            return None
+
+    def _pdf_page_to_image(self, page_num: int) -> Optional[np.ndarray]:
+        """
+        Convert a PDF page to image for CV analysis.
+        
+        Args:
+            page_num: Page number (1-indexed)
+            
+        Returns:
+            Page image as numpy array or None if failed
+        """
+        try:
+            # We need access to the PDF document - store it during detection
+            if hasattr(self, '_current_pdf_doc') and self._current_pdf_doc:
+                page = self._current_pdf_doc[page_num - 1]  # Convert to 0-indexed
+                
+                # Render page as image
+                mat = fitz.Matrix(2.0, 2.0)  # 2x zoom for better quality
+                pix = page.get_pixmap(matrix=mat)
+                img_data = pix.tobytes("png")
+                
+                # Convert to numpy array
+                from PIL import Image
+                import io
+                img = Image.open(io.BytesIO(img_data))
+                return np.array(img)
+            else:
+                logger.warning("PDF document not available for image conversion")
+                return None
+        except Exception as e:
+            logger.warning(f"Could not convert page {page_num} to image: {e}")
+            return None
+
+    def _map_elements_to_cv_regions(self, 
+                                   text_elements: List[LayoutElement], 
+                                   cv_elements: List[LayoutElement]) -> Dict:
+        """
+        Map text elements to CV-detected regions.
+        
+        Args:
+            text_elements: Text elements from PDF extraction
+            cv_elements: Elements detected by CV
+            
+        Returns:
+            Mapping of text elements to CV regions
+        """
+        mapping = {}
+        
+        for text_elem in text_elements:
+            if not text_elem.bbox:
+                continue
+                
+            # Find overlapping CV regions
+            overlapping_regions = []
+            for cv_elem in cv_elements:
+                if not cv_elem.bbox:
+                    continue
+                    
+                overlap = self._calculate_bbox_overlap(text_elem.bbox, cv_elem.bbox)
+                if overlap > 0.1:  # At least 10% overlap
+                    overlapping_regions.append({
+                        'cv_element': cv_elem,
+                        'overlap': overlap,
+                        'element_type': cv_elem.element_type
+                    })
+            
+            # Sort by overlap and take the best match
+            if overlapping_regions:
+                overlapping_regions.sort(key=lambda x: x['overlap'], reverse=True)
+                mapping[text_elem.id] = overlapping_regions[0]
+        
+        return mapping
+
+    def _identify_merge_zones(self, cv_elements: List[LayoutElement]) -> List[Dict]:
+        """
+        Identify zones where text fragments should be merged based on CV detection.
+        
+        Args:
+            cv_elements: CV-detected elements
+            
+        Returns:
+            List of merge zones with their properties
+        """
+        merge_zones = []
+        
+        for cv_elem in cv_elements:
+            if cv_elem.element_type in [ElementType.TEXT, ElementType.PARAGRAPH, 
+                                       ElementType.TITLE, ElementType.HEADING]:
+                merge_zones.append({
+                    'bbox': cv_elem.bbox,
+                    'element_type': cv_elem.element_type,
+                    'confidence': cv_elem.confidence,
+                    'merge_priority': self._get_merge_priority(cv_elem.element_type)
+                })
+        
+        return merge_zones
+
+    def _get_merge_priority(self, element_type: ElementType) -> int:
+        """
+        Get merge priority for different element types.
+        
+        Args:
+            element_type: Type of element
+            
+        Returns:
+            Priority score (higher = more likely to merge)
+        """
+        priorities = {
+            ElementType.PARAGRAPH: 10,
+            ElementType.TEXT: 9,
+            ElementType.TITLE: 8,
+            ElementType.HEADING: 8,
+            ElementType.LIST: 7,
+            ElementType.FIGURE_CAPTION: 6,
+            ElementType.TABLE_CAPTION: 6
+        }
+        return priorities.get(element_type, 5)
+
+    def _get_cv_reading_order(self, cv_elements: List[LayoutElement]) -> List[int]:
+        """
+        Get reading order based on CV detection.
+        
+        Args:
+            cv_elements: CV-detected elements
+            
+        Returns:
+            List of element IDs in reading order
+        """
+        # Sort by position (top to bottom, left to right)
+        sorted_elements = sorted(cv_elements, 
+                               key=lambda e: (e.bbox.y1 if e.bbox else 0, 
+                                            e.bbox.x1 if e.bbox else 0))
+        return [elem.id for elem in sorted_elements]
+
+    def _calculate_bbox_overlap(self, bbox1: BoundingBox, bbox2: BoundingBox) -> float:
+        """
+        Calculate overlap ratio between two bounding boxes.
+        
+        Args:
+            bbox1: First bounding box
+            bbox2: Second bounding box
+            
+        Returns:
+            Overlap ratio (0.0 to 1.0)
+        """
+        # Calculate intersection
+        x1 = max(bbox1.x1, bbox2.x1)
+        y1 = max(bbox1.y1, bbox2.y1)
+        x2 = min(bbox1.x2, bbox2.x2)
+        y2 = min(bbox1.y2, bbox2.y2)
+        
+        if x2 <= x1 or y2 <= y1:
+            return 0.0
+        
+        intersection = (x2 - x1) * (y2 - y1)
+        area1 = (bbox1.x2 - bbox1.x1) * (bbox1.y2 - bbox1.y1)
+        area2 = (bbox2.x2 - bbox2.x1) * (bbox2.y2 - bbox2.y1)
+        
+        union = area1 + area2 - intersection
+        return intersection / union if union > 0 else 0.0
+
+    def _merge_page_fragments_with_cv(self, 
+                                     elements: List[LayoutElement], 
+                                     cv_guidance: Optional[Dict]) -> List[LayoutElement]:
+        """
+        Merge fragments within a single page using CV guidance.
         
         Args:
             elements: List of elements from a single page
+            cv_guidance: CV guidance information
             
         Returns:
             List of merged elements
@@ -296,8 +525,12 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
         if len(elements) <= 1:
             return elements
         
-        # Sort elements by reading order (top to bottom, left to right)
-        sorted_elements = sorted(elements, key=lambda e: (e.bbox.y1, e.bbox.x1))
+        # If no CV guidance available, fall back to spatial merging
+        if not cv_guidance:
+            return self._merge_page_fragments(elements)
+        
+        # Sort elements by reading order (enhanced with CV guidance)
+        sorted_elements = self._sort_elements_with_cv_guidance(elements, cv_guidance)
         
         merged = []
         i = 0
@@ -306,12 +539,12 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
             current = sorted_elements[i]
             merge_candidates = [current]
             
-            # Look for elements to merge with current element
+            # Look for elements to merge with current element using CV guidance
             j = i + 1
             while j < len(sorted_elements):
                 candidate = sorted_elements[j]
                 
-                if self._should_merge_elements(current, candidate):
+                if self._should_merge_elements_with_cv(current, candidate, cv_guidance):
                     merge_candidates.append(candidate)
                     # Update current to be the merged representation for next comparisons
                     current = self._create_merged_element(merge_candidates)
@@ -319,8 +552,7 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
                     continue
                 
                 # If we can't merge with this candidate, check if we should stop looking
-                # (e.g., if we've moved too far down or right)
-                if not self._could_potentially_merge(current, candidate):
+                if not self._could_potentially_merge_with_cv(current, candidate, cv_guidance):
                     break
                 
                 j += 1
@@ -329,275 +561,150 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
             if len(merge_candidates) > 1:
                 merged_element = self._create_merged_element(merge_candidates)
                 merged_element.metadata['merged_from_count'] = len(merge_candidates)
+                merged_element.metadata['merge_method'] = 'cv_guided'
                 merged.append(merged_element)
             else:
+                current.metadata['merge_method'] = 'no_merge'
                 merged.append(current)
             
             i += 1
         
         return merged
 
-    def _should_merge_elements(self, elem1: LayoutElement, elem2: LayoutElement) -> bool:
+    def _sort_elements_with_cv_guidance(self, 
+                                       elements: List[LayoutElement], 
+                                       cv_guidance: Dict) -> List[LayoutElement]:
         """
-        Determine if two elements should be merged based on multiple criteria.
+        Sort elements using CV guidance for better reading order.
+        
+        Args:
+            elements: Elements to sort
+            cv_guidance: CV guidance information
+            
+        Returns:
+            Sorted elements
+        """
+        # Get CV reading order if available
+        cv_reading_order = cv_guidance.get('reading_order', [])
+        element_regions = cv_guidance.get('element_regions', {})
+        
+        def sort_key(element):
+            # Try to use CV guidance first
+            if element.id in element_regions:
+                cv_elem = element_regions[element.id]['cv_element']
+                if cv_elem.id in cv_reading_order:
+                    return (cv_reading_order.index(cv_elem.id), element.bbox.y1, element.bbox.x1)
+            
+            # Fall back to spatial sorting
+            return (999999, element.bbox.y1, element.bbox.x1)
+        
+        return sorted(elements, key=sort_key)
+
+    def _should_merge_elements_with_cv(self, 
+                                      elem1: LayoutElement, 
+                                      elem2: LayoutElement, 
+                                      cv_guidance: Dict) -> bool:
+        """
+        Determine if two elements should be merged using CV guidance.
         
         Args:
             elem1: First element
             elem2: Second element
+            cv_guidance: CV guidance information
             
         Returns:
             True if elements should be merged
         """
-        # Check if they're on the same page
-        if elem1.metadata.get('page_number') != elem2.metadata.get('page_number'):
+        # First check basic spatial criteria
+        if not self._should_merge_elements(elem1, elem2):
             return False
         
-        # Check font similarity
-        if not self._fonts_similar(elem1, elem2):
-            return False
+        # Enhanced checks with CV guidance
+        element_regions = cv_guidance.get('element_regions', {})
+        merge_zones = cv_guidance.get('merge_zones', [])
         
-        # Check spatial proximity
-        if not self._spatially_close(elem1, elem2):
-            return False
+        # Check if both elements are in the same CV-detected region
+        elem1_region = element_regions.get(elem1.id)
+        elem2_region = element_regions.get(elem2.id)
         
-        # Check if they form a logical sequence
-        if not self._forms_logical_sequence(elem1, elem2):
-            return False
+        if elem1_region and elem2_region:
+            # If both elements map to the same CV region, they should likely be merged
+            if elem1_region['cv_element'].id == elem2_region['cv_element'].id:
+                # Additional check: ensure they're the same type of content
+                cv_element_type = elem1_region['element_type']
+                if cv_element_type in [ElementType.TEXT, ElementType.PARAGRAPH, 
+                                     ElementType.TITLE, ElementType.HEADING]:
+                    return True
         
-        return True
-
-    def _fonts_similar(self, elem1: LayoutElement, elem2: LayoutElement) -> bool:
-        """
-        Check if two elements have similar font characteristics.
-        
-        Args:
-            elem1: First element
-            elem2: Second element
-            
-        Returns:
-            True if fonts are similar enough to merge
-        """
-        # Get font information
-        font1 = elem1.style.primary_font if elem1.style else None
-        font2 = elem2.style.primary_font if elem2.style else None
-        
-        if not font1 or not font2:
-            return True  # If we can't determine fonts, allow merging
-        
-        # Check font name similarity
-        if font1.name and font2.name:
-            if font1.name != font2.name:
-                # Allow slight variations in font names (e.g., TimesNewRoman vs Times-Roman)
-                name1_clean = re.sub(r'[^a-zA-Z]', '', font1.name.lower())
-                name2_clean = re.sub(r'[^a-zA-Z]', '', font2.name.lower())
-                if name1_clean != name2_clean:
-                    return False
-        
-        # Check font size similarity (allow 10% variation)
-        if font1.size and font2.size:
-            size_ratio = max(font1.size, font2.size) / min(font1.size, font2.size)
-            if size_ratio > 1.1:
-                return False
-        
-        # Check font style consistency
-        if font1.bold != font2.bold or font1.italic != font2.italic:
-            return False
-        
-        return True
-
-    def _spatially_close(self, elem1: LayoutElement, elem2: LayoutElement) -> bool:
-        """
-        Check if two elements are spatially close enough to be merged.
-        
-        Args:
-            elem1: First element
-            elem2: Second element
-            
-        Returns:
-            True if elements are spatially close
-        """
-        bbox1, bbox2 = elem1.bbox, elem2.bbox
-        
-        # Calculate distances
-        horizontal_gap = min(abs(bbox1.x2 - bbox2.x1), abs(bbox2.x2 - bbox1.x1))
-        vertical_gap = min(abs(bbox1.y2 - bbox2.y1), abs(bbox2.y2 - bbox1.y1))
-        
-        # Calculate overlap
-        x_overlap = max(0, min(bbox1.x2, bbox2.x2) - max(bbox1.x1, bbox2.x1))
-        y_overlap = max(0, min(bbox1.y2, bbox2.y2) - max(bbox1.y1, bbox2.y1))
-        
-        # Get average font size for distance thresholds
-        font_size = self._get_avg_font_size(elem1, elem2)
-        
-        # Check if elements are on the same line (similar y-coordinates)
-        same_line_threshold = font_size * 0.3
-        on_same_line = abs(bbox1.y1 - bbox2.y1) <= same_line_threshold
-        
-        if on_same_line:
-            # For same-line elements, check horizontal proximity
-            max_horizontal_gap = font_size * 0.5  # Allow gap up to half font size
-            return horizontal_gap <= max_horizontal_gap
-        
-        # Check if elements are in vertical sequence (same column)
-        x_center1 = (bbox1.x1 + bbox1.x2) / 2
-        x_center2 = (bbox2.x1 + bbox2.x2) / 2
-        same_column_threshold = font_size * 0.7
-        
-        if abs(x_center1 - x_center2) <= same_column_threshold:
-            # For same-column elements, check vertical proximity
-            max_vertical_gap = font_size * 1.5  # Allow larger gap for line spacing
-            return vertical_gap <= max_vertical_gap
+        # Check if elements are within a high-priority merge zone
+        for zone in merge_zones:
+            if (self._element_in_zone(elem1, zone) and 
+                self._element_in_zone(elem2, zone) and
+                zone['merge_priority'] >= 8):
+                return True
         
         return False
 
-    def _forms_logical_sequence(self, elem1: LayoutElement, elem2: LayoutElement) -> bool:
+    def _could_potentially_merge_with_cv(self, 
+                                        elem1: LayoutElement, 
+                                        elem2: LayoutElement, 
+                                        cv_guidance: Dict) -> bool:
         """
-        Check if two elements form a logical text sequence.
+        Quick check if elements could potentially be merged using CV guidance.
         
         Args:
             elem1: First element
             elem2: Second element
-            
-        Returns:
-            True if elements form a logical sequence
-        """
-        text1 = elem1.text.strip()
-        text2 = elem2.text.strip()
-        
-        if not text1 or not text2:
-            return True  # Allow merging of empty elements
-        
-        # Check for word fragments (hyphenation)
-        if text1.endswith('-') and not text2[0].isupper():
-            return True
-        
-        # Check for sentence continuation
-        if not text1.endswith(('.', '!', '?', ':', ';')):
-            # First element doesn't end with sentence terminator
-            if not text2[0].isupper():
-                # Second element doesn't start with capital
-                return True
-            
-            # Allow merging if second element starts with lowercase
-            if text2[0].islower():
-                return True
-        
-        # Check for number/list continuation
-        if re.match(r'^\d+\.?\s*', text1) or re.match(r'^[a-zA-Z]\.?\s*', text1):
-            return False  # Don't merge list items
-        
-        # Allow merging of short fragments (likely split words)
-        if len(text1) < 3 or len(text2) < 3:
-            return True
-        
-        return False
-
-    def _could_potentially_merge(self, elem1: LayoutElement, elem2: LayoutElement) -> bool:
-        """
-        Quick check if elements could potentially be merged (used to optimize search).
-        
-        Args:
-            elem1: First element
-            elem2: Second element
+            cv_guidance: CV guidance information
             
         Returns:
             True if elements could potentially be merged
         """
-        bbox1, bbox2 = elem1.bbox, elem2.bbox
-        font_size = self._get_avg_font_size(elem1, elem2)
+        # Basic spatial check first
+        if not self._could_potentially_merge(elem1, elem2):
+            return False
         
-        # If elements are too far apart, stop looking
-        max_distance = font_size * 5  # Generous threshold for potential merging
+        # CV-enhanced check
+        element_regions = cv_guidance.get('element_regions', {})
         
-        vertical_distance = abs(bbox1.y1 - bbox2.y1)
-        horizontal_distance = abs(bbox1.x1 - bbox2.x1)
+        # If elements are in different CV regions of incompatible types, don't merge
+        elem1_region = element_regions.get(elem1.id)
+        elem2_region = element_regions.get(elem2.id)
         
-        return vertical_distance <= max_distance and horizontal_distance <= max_distance
+        if elem1_region and elem2_region:
+            type1 = elem1_region['element_type']
+            type2 = elem2_region['element_type']
+            
+            # Don't merge across incompatible types
+            incompatible_pairs = [
+                (ElementType.TITLE, ElementType.TEXT),
+                (ElementType.HEADING, ElementType.TEXT),
+                (ElementType.TABLE, ElementType.TEXT),
+                (ElementType.FIGURE, ElementType.TEXT)
+            ]
+            
+            for t1, t2 in incompatible_pairs:
+                if (type1 == t1 and type2 == t2) or (type1 == t2 and type2 == t1):
+                    return False
+        
+        return True
 
-    def _get_avg_font_size(self, elem1: LayoutElement, elem2: LayoutElement) -> float:
+    def _element_in_zone(self, element: LayoutElement, zone: Dict) -> bool:
         """
-        Get average font size between two elements.
+        Check if an element is within a merge zone.
         
         Args:
-            elem1: First element
-            elem2: Second element
+            element: Element to check
+            zone: Merge zone definition
             
         Returns:
-            Average font size or default if not available
+            True if element is in the zone
         """
-        size1 = elem1.style.primary_font.size if elem1.style and elem1.style.primary_font else 12.0
-        size2 = elem2.style.primary_font.size if elem2.style and elem2.style.primary_font else 12.0
+        if not element.bbox or not zone.get('bbox'):
+            return False
         
-        return (size1 + size2) / 2
+        return self._calculate_bbox_overlap(element.bbox, zone['bbox']) > 0.5
 
-    def _create_merged_element(self, elements: List[LayoutElement]) -> LayoutElement:
-        """
-        Create a merged element from a list of elements.
-        
-        Args:
-            elements: List of elements to merge
-            
-        Returns:
-            New merged element
-        """
-        if len(elements) == 1:
-            return elements[0]
-        
-        # Sort elements by position for proper text ordering
-        sorted_elements = sorted(elements, key=lambda e: (e.bbox.y1, e.bbox.x1))
-        
-        # Merge text content
-        merged_text_parts = []
-        for i, elem in enumerate(sorted_elements):
-            text = elem.text.strip()
-            if text:
-                # Handle hyphenation
-                if i > 0 and sorted_elements[i-1].text.strip().endswith('-'):
-                    # Remove hyphen and don't add space
-                    if merged_text_parts:
-                        merged_text_parts[-1] = merged_text_parts[-1].rstrip('-')
-                    merged_text_parts.append(text)
-                else:
-                    # Add space if needed
-                    if merged_text_parts and not merged_text_parts[-1].endswith(' '):
-                        merged_text_parts.append(' ')
-                    merged_text_parts.append(text)
-        
-        merged_text = ''.join(merged_text_parts).strip()
-        
-        # Create merged bounding box
-        min_x1 = min(e.bbox.x1 for e in elements)
-        min_y1 = min(e.bbox.y1 for e in elements)
-        max_x2 = max(e.bbox.x2 for e in elements)
-        max_y2 = max(e.bbox.y2 for e in elements)
-        
-        merged_bbox = BoundingBox(x1=min_x1, y1=min_y1, x2=max_x2, y2=max_y2)
-        
-        # Use style from the first element (they should be similar)
-        merged_style = sorted_elements[0].style
-        
-        # Merge metadata
-        merged_metadata = sorted_elements[0].metadata.copy()
-        merged_metadata.update({
-            'merged_elements': len(elements),
-            'original_texts': [e.text for e in elements],
-            'merge_method': 'spatial_font_similarity'
-        })
-        
-        # Determine element type (use most common or first)
-        element_types = [e.element_type for e in elements]
-        merged_type = max(set(element_types), key=element_types.count)
-        
-        return LayoutElement(
-            id=sorted_elements[0].id,  # Will be reassigned later
-            element_type=merged_type,
-            confidence=min(e.confidence for e in elements),
-            bbox=merged_bbox,
-            text=merged_text,
-            style=merged_style,
-            metadata=merged_metadata
-        )
-    
     def _extract_pdf_style_info(self, span: Dict[str, Any], block: Dict[str, Any], line: Dict[str, Any]) -> StyleInfo:
         """
         Extract comprehensive style information from a PDF span.
@@ -839,37 +946,350 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
         Returns:
             Dictionary containing extractor information
         """
+        features = [
+            'spatial_proximity_merging',
+            'font_similarity_analysis', 
+            'reading_order_detection',
+            'logical_sequence_validation',
+            'hyphenation_handling'
+        ]
+        
+        if self.use_cv_guidance:
+            features.extend([
+                'cv_guided_merging',
+                'visual_layout_analysis',
+                'element_type_awareness',
+                'merge_zone_detection',
+                'cv_reading_order'
+            ])
+        
         return {
-            'name': 'PdfLayoutExtractorWithMerging',
-            'version': '2.0.0',
-            'description': 'Document-native PDF extractor with fragment merging using spatial and font analysis',
+            'name': 'PdfLayoutExtractorWithCVGuidance',
+            'version': '3.0.0',
+            'description': 'Document-native PDF extractor with CV-guided fragment merging using spatial, font, and visual analysis',
             'supported_formats': self.get_supported_formats(),
-            'extraction_method': 'pdf-native-with-merging',
+            'extraction_method': 'pdf-native-with-cv-guidance' if self.use_cv_guidance else 'pdf-native-with-merging',
             'requires_conversion': False,
             'fragment_merging': self.merge_fragments,
-            'features': [
-                'spatial_proximity_merging',
-                'font_similarity_analysis', 
-                'reading_order_detection',
-                'logical_sequence_validation',
-                'hyphenation_handling'
-            ]
+            'cv_guidance_enabled': self.use_cv_guidance,
+            'cv_confidence_threshold': self.cv_confidence_threshold,
+            'features': features
         }
+
+    def _merge_page_fragments(self, elements: List[LayoutElement]) -> List[LayoutElement]:
+        """
+        Merge fragments within a single page using spatial analysis only.
+        
+        Args:
+            elements: List of elements from a single page
+            
+        Returns:
+            List of merged elements
+        """
+        if len(elements) <= 1:
+            return elements
+        
+        # Sort elements by reading order (top to bottom, left to right)
+        sorted_elements = sorted(elements, key=lambda e: (e.bbox.y1, e.bbox.x1))
+        
+        merged = []
+        i = 0
+        
+        while i < len(sorted_elements):
+            current = sorted_elements[i]
+            merge_candidates = [current]
+            
+            # Look for elements to merge with current element
+            j = i + 1
+            while j < len(sorted_elements):
+                candidate = sorted_elements[j]
+                
+                if self._should_merge_elements(current, candidate):
+                    merge_candidates.append(candidate)
+                    # Update current to be the merged representation for next comparisons
+                    current = self._create_merged_element(merge_candidates)
+                    sorted_elements.pop(j)  # Remove from list since it's being merged
+                    continue
+                
+                # If we can't merge with this candidate, check if we should stop looking
+                if not self._could_potentially_merge(current, candidate):
+                    break
+                
+                j += 1
+            
+            # Create final merged element
+            if len(merge_candidates) > 1:
+                merged_element = self._create_merged_element(merge_candidates)
+                merged_element.metadata['merged_from_count'] = len(merge_candidates)
+                merged_element.metadata['merge_method'] = 'spatial_only'
+                merged.append(merged_element)
+            else:
+                current.metadata['merge_method'] = 'no_merge'
+                merged.append(current)
+            
+            i += 1
+        
+        return merged
+
+    def _should_merge_elements(self, elem1: LayoutElement, elem2: LayoutElement) -> bool:
+        """
+        Determine if two elements should be merged based on spatial criteria.
+        
+        Args:
+            elem1: First element
+            elem2: Second element
+            
+        Returns:
+            True if elements should be merged
+        """
+        # Check if they're on the same page
+        if elem1.metadata.get('page_number') != elem2.metadata.get('page_number'):
+            return False
+        
+        # Check font similarity
+        if not self._fonts_similar(elem1, elem2):
+            return False
+        
+        # Check spatial proximity
+        if not self._spatially_close(elem1, elem2):
+            return False
+        
+        # Check if they form a logical sequence
+        if not self._forms_logical_sequence(elem1, elem2):
+            return False
+        
+        return True
+
+    def _fonts_similar(self, elem1: LayoutElement, elem2: LayoutElement) -> bool:
+        """
+        Check if two elements have similar font characteristics.
+        
+        Args:
+            elem1: First element
+            elem2: Second element
+            
+        Returns:
+            True if fonts are similar enough to merge
+        """
+        # Get font information
+        font1 = elem1.style.primary_font if elem1.style else None
+        font2 = elem2.style.primary_font if elem2.style else None
+        
+        if not font1 or not font2:
+            return True  # If we can't determine fonts, allow merging
+        
+        # Check font name similarity
+        if font1.name and font2.name:
+            if font1.name != font2.name:
+                # Allow slight variations in font names
+                name1_clean = re.sub(r'[^a-zA-Z]', '', font1.name.lower())
+                name2_clean = re.sub(r'[^a-zA-Z]', '', font2.name.lower())
+                if name1_clean != name2_clean:
+                    return False
+        
+        # Check font size similarity (allow 10% variation)
+        if font1.size and font2.size:
+            size_ratio = max(font1.size, font2.size) / min(font1.size, font2.size)
+            if size_ratio > 1.1:
+                return False
+        
+        # Check font style consistency
+        if font1.bold != font2.bold or font1.italic != font2.italic:
+            return False
+        
+        return True
+
+    def _spatially_close(self, elem1: LayoutElement, elem2: LayoutElement) -> bool:
+        """
+        Check if two elements are spatially close enough to be merged.
+        
+        Args:
+            elem1: First element
+            elem2: Second element
+            
+        Returns:
+            True if elements are spatially close
+        """
+        bbox1, bbox2 = elem1.bbox, elem2.bbox
+        
+        # Calculate distances
+        horizontal_gap = min(abs(bbox1.x2 - bbox2.x1), abs(bbox2.x2 - bbox1.x1))
+        vertical_gap = min(abs(bbox1.y2 - bbox2.y1), abs(bbox2.y2 - bbox1.y1))
+        
+        # Get average font size for distance thresholds
+        font_size = self._get_avg_font_size(elem1, elem2)
+        
+        # Check if elements are on the same line
+        same_line_threshold = font_size * 0.3
+        on_same_line = abs(bbox1.y1 - bbox2.y1) <= same_line_threshold
+        
+        if on_same_line:
+            # For same-line elements, check horizontal proximity
+            max_horizontal_gap = font_size * 0.5
+            return horizontal_gap <= max_horizontal_gap
+        
+        # Check if elements are in vertical sequence (same column)
+        x_center1 = (bbox1.x1 + bbox1.x2) / 2
+        x_center2 = (bbox2.x1 + bbox2.x2) / 2
+        same_column_threshold = font_size * 0.7
+        
+        if abs(x_center1 - x_center2) <= same_column_threshold:
+            # For same-column elements, check vertical proximity
+            max_vertical_gap = font_size * 1.5
+            return vertical_gap <= max_vertical_gap
+        
+        return False
+
+    def _forms_logical_sequence(self, elem1: LayoutElement, elem2: LayoutElement) -> bool:
+        """
+        Check if two elements form a logical text sequence.
+        
+        Args:
+            elem1: First element
+            elem2: Second element
+            
+        Returns:
+            True if elements form a logical sequence
+        """
+        text1 = elem1.text.strip()
+        text2 = elem2.text.strip()
+        
+        if not text1 or not text2:
+            return True  # Allow merging of empty elements
+        
+        # Check for word fragments (hyphenation)
+        if text1.endswith('-') and not text2[0].isupper():
+            return True
+        
+        # Check for sentence continuation
+        if not text1.endswith(('.', '!', '?', ':', ';')):
+            if not text2[0].isupper():
+                return True
+            if text2[0].islower():
+                return True
+        
+        # Check for number/list continuation
+        if re.match(r'^\d+\.?\s*', text1) or re.match(r'^[a-zA-Z]\.?\s*', text1):
+            return False  # Don't merge list items
+        
+        # Allow merging of short fragments
+        if len(text1) < 3 or len(text2) < 3:
+            return True
+        
+        return False
+
+    def _could_potentially_merge(self, elem1: LayoutElement, elem2: LayoutElement) -> bool:
+        """
+        Quick check if elements could potentially be merged.
+        
+        Args:
+            elem1: First element
+            elem2: Second element
+            
+        Returns:
+            True if elements could potentially be merged
+        """
+        bbox1, bbox2 = elem1.bbox, elem2.bbox
+        font_size = self._get_avg_font_size(elem1, elem2)
+        
+        # If elements are too far apart, stop looking
+        max_distance = font_size * 5
+        
+        vertical_distance = abs(bbox1.y1 - bbox2.y1)
+        horizontal_distance = abs(bbox1.x1 - bbox2.x1)
+        
+        return vertical_distance <= max_distance and horizontal_distance <= max_distance
+
+    def _get_avg_font_size(self, elem1: LayoutElement, elem2: LayoutElement) -> float:
+        """
+        Get average font size between two elements.
+        
+        Args:
+            elem1: First element
+            elem2: Second element
+            
+        Returns:
+            Average font size or default if not available
+        """
+        size1 = elem1.style.primary_font.size if elem1.style and elem1.style.primary_font else 12.0
+        size2 = elem2.style.primary_font.size if elem2.style and elem2.style.primary_font else 12.0
+        
+        return (size1 + size2) / 2
+
+    def _create_merged_element(self, elements: List[LayoutElement]) -> LayoutElement:
+        """
+        Create a merged element from a list of elements.
+        
+        Args:
+            elements: List of elements to merge
+            
+        Returns:
+            New merged element
+        """
+        if len(elements) == 1:
+            return elements[0]
+        
+        # Sort elements by position for proper text ordering
+        sorted_elements = sorted(elements, key=lambda e: (e.bbox.y1, e.bbox.x1))
+        
+        # Merge text content
+        merged_text_parts = []
+        for i, elem in enumerate(sorted_elements):
+            text = elem.text.strip()
+            if text:
+                # Handle hyphenation
+                if i > 0 and sorted_elements[i-1].text.strip().endswith('-'):
+                    if merged_text_parts:
+                        merged_text_parts[-1] = merged_text_parts[-1].rstrip('-')
+                    merged_text_parts.append(text)
+                else:
+                    # Add space if needed
+                    if merged_text_parts and not merged_text_parts[-1].endswith(' '):
+                        merged_text_parts.append(' ')
+                    merged_text_parts.append(text)
+        
+        merged_text = ''.join(merged_text_parts).strip()
+        
+        # Create merged bounding box
+        min_x1 = min(e.bbox.x1 for e in elements)
+        min_y1 = min(e.bbox.y1 for e in elements)
+        max_x2 = max(e.bbox.x2 for e in elements)
+        max_y2 = max(e.bbox.y2 for e in elements)
+        
+        merged_bbox = BoundingBox(x1=min_x1, y1=min_y1, x2=max_x2, y2=max_y2)
+        
+        # Use style from the first element
+        merged_style = sorted_elements[0].style
+        
+        # Merge metadata
+        merged_metadata = sorted_elements[0].metadata.copy()
+        merged_metadata.update({
+            'merged_elements': len(elements),
+            'original_texts': [e.text for e in elements],
+            'merge_method': merged_metadata.get('merge_method', 'spatial_font_similarity')
+        })
+        
+        # Determine element type
+        element_types = [e.element_type for e in elements]
+        merged_type = max(set(element_types), key=element_types.count)
+        
+        return LayoutElement(
+            id=sorted_elements[0].id,
+            element_type=merged_type,
+            confidence=min(e.confidence for e in elements),
+            bbox=merged_bbox,
+            text=merged_text,
+            style=merged_style,
+            metadata=merged_metadata
+        )
 
 
 # unit test
 # python -m models.layout_detection.layout_extraction.pdf_layout_extractor
 if __name__ == "__main__":
-    extractor = PdfLayoutExtractor(merge_fragments=True)
+    extractor = PdfLayoutExtractor(merge_fragments=True, use_cv_guidance=True)
+    extractor._initialize_detector()
     result = extractor._detect_layout(input_data="tests/test_data/1-1 买卖合同（通用版）.pdf")
     import json 
     
-    # # Remove runs to reduce output size
-    # for element in result.elements:
-    #     if element.style and element.style.runs:
-    #         element.style.runs = []
-    
-    json.dump(result.model_dump(), open("pdf_merged_extraction_result_merged.json", "w"), indent=2, ensure_ascii=False)
-    print(f"Extracted {len(result.elements)} merged elements from PDF")
-    print(f"Original elements: {result.metadata.get('original_elements', 'unknown')}")
-    print(f"Merged elements: {result.metadata.get('total_elements', 'unknown')}")
+    json.dump(result.model_dump(), open("pdf_merged_extraction_result_merged_cv.json", "w"), indent=2, ensure_ascii=False)

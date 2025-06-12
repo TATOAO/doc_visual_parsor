@@ -22,7 +22,7 @@ except ImportError:
     except ImportError:
         raise ImportError("Please install doclayout-yolo: pip install doclayout-yolo")
 
-from ..base.base_layout_extractor import BaseSectionDetector
+from ..base.base_layout_extractor import BaseLayoutExtractor
 from models.schemas.layout_schemas import (
     LayoutExtractionResult, 
     LayoutElement, 
@@ -47,7 +47,7 @@ DOCLAYOUT_CLASS_MAPPING = {
     9: ElementType.EQUATION
 }
 
-class CVLayoutDetector(BaseSectionDetector):
+class CVLayoutDetector(BaseLayoutExtractor):
     """
     Computer Vision-based Document Layout Detector using DocLayout-YOLO.
     
@@ -57,7 +57,7 @@ class CVLayoutDetector(BaseSectionDetector):
     
     def __init__(self, 
                  model_name: str = "docstructbench",
-                 model_path: Optional[str] = None,
+                 model_path: Optional[str] = "/Users/tatoaoliang/Downloads/Work/doc_visual_parsor/models/layout_detection/visual_detection/model_parameters",
                  device: str = "auto",
                  confidence_threshold: float = 0.25,
                  image_size: int = 1024,
@@ -99,7 +99,7 @@ class CVLayoutDetector(BaseSectionDetector):
             
             # Load model
             logger.info(f"Loading model from: {self.model_path}")
-            self.model = YOLOv10(self.model_path)
+            self.model = YOLOv10(self.model_path, task="detect")
             logger.info("CV-based layout detector initialized successfully")
             
         except Exception as e:
@@ -326,5 +326,10 @@ class CVLayoutDetector(BaseSectionDetector):
         
         return img
 
-# Backward compatibility alias
-DocLayoutDetector = CVLayoutDetector 
+
+# python -m models.layout_detection.visual_detection.cv_detector
+if __name__ == "__main__":
+    detector = CVLayoutDetector()
+    detector._initialize_detector()
+    # result = detector.detect("models/layout_detection/visual_detection/test_images/test_image.jpg")
+    # print(result)
