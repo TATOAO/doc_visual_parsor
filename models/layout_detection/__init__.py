@@ -4,13 +4,13 @@
 # It is used to detect the layout of a document, such as the presence of a table, a list, or a text block.
 
 # New modular architecture
-from .base_detector import (
+from .base.base_detector import (
     BaseLayoutDetector,
     BaseSectionDetector
 )
 
-from .cv_detector import CVLayoutDetector
-from .document_detector import SectionLayoutDetector
+from .visual_detection.cv_detector import CVLayoutDetector
+from .style_detection.docx_detector import SectionLayoutDetector
 # from .detector_factory import (
 #     LayoutDetectorFactory,
 #     HybridLayoutDetector,
@@ -18,8 +18,8 @@ from .document_detector import SectionLayoutDetector
 # )
 
 # Backward compatibility
-from .cv_detector import DocLayoutDetector  # Alias for CVLayoutDetector
-from .download_model import download_model, list_available_models, MODELS
+from .visual_detection.cv_detector import DocLayoutDetector  # Alias for CVLayoutDetector
+from .visual_detection.download_model import download_model, list_available_models, MODELS
 
 __all__ = [
     # Base classes

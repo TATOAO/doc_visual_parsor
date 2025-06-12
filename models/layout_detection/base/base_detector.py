@@ -12,7 +12,7 @@ from PIL import Image
 import numpy as np
 from dataclasses import dataclass
 from enum import Enum
-from models.schemas.docx_schemas import LayoutDetectionResult
+from models.schemas.layout_schemas import LayoutDetectionResult
 from models.schemas.schemas import Section
 
 
@@ -111,71 +111,4 @@ class BaseLayoutDetector(ABC):
         
         return results
     
-    @abstractmethod
-    def get_supported_formats(self) -> List[str]:
-        """
-        Get list of supported input formats.
-        
-        Returns:
-            List of supported file extensions or format descriptions
-        """
-        pass
     
-    @abstractmethod
-    def get_detector_info(self) -> Dict[str, Any]:
-        """
-        Get information about the detector.
-        
-        Returns:
-            Dictionary containing detector information
-        """
-        pass
-    
-    def validate_input(self, input_data: Any) -> bool:
-        """
-        Validate if input data is supported by this detector.
-        
-        Args:
-            input_data: Input data to validate
-            
-        Returns:
-            True if input is supported, False otherwise
-        """
-        # Default implementation - subclasses can override
-        return True
-    
-    def visualize(self, 
-                  input_data: Any,
-                  result: Optional[LayoutDetectionResult] = None,
-                  save_path: Optional[str] = None,
-                  **kwargs) -> Optional[np.ndarray]:
-        """
-        Visualize detection results (optional implementation).
-        
-        Args:
-            input_data: Original input data
-            result: Detection result (if None, will run detection)
-            save_path: Path to save visualization
-            **kwargs: Additional visualization parameters
-            
-        Returns:
-            Visualized image as numpy array (if applicable)
-        """
-        # Default implementation - subclasses can override
-        print("Visualization not implemented for this detector type")
-        return None 
-
-
-class BaseSectionDetector(BaseLayoutDetector, ABC):
-    """
-    Abstract base class for section detection.
-    """
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def generate_section_tree(self, input_data: Any) ->Section:
-        """
-        Generate a section tree from the input data.
-        """
-        pass

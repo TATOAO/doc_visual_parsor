@@ -17,14 +17,14 @@ import re
 
 try:
     import docx
-    from docx.document import Document
+    from docx import Document
     from docx.shared import Inches, Pt
     from docx.enum.text import WD_ALIGN_PARAGRAPH
 except ImportError:
     raise ImportError("Please install python-docx: pip install python-docx")
 
-from .base_detector import BaseSectionDetector
-from models.schemas.docx_schemas import (
+from ..base.base_detector import BaseSectionDetector
+from models.schemas.layout_schemas import (
     StyleInfo, 
     FontInfo, 
     ParagraphFormat, 
@@ -53,7 +53,7 @@ InputDataType = Union[
     Any                    # For objects with getvalue() method (uploaded files)
 ]
 
-class SectionLayoutDetector(BaseSectionDetector):
+class DocxLayoutDetector(BaseSectionDetector):
     """
     Document-native Layout Detector for .docx files.
     
@@ -287,84 +287,6 @@ class SectionLayoutDetector(BaseSectionDetector):
             'requires_conversion': False
         }
     
-    def generate_section_tree(self, input_data: InputDataType) -> Section:
-        """
-        Generate a section tree from the input data.
-
-        Args:
-            input_data: Input data (file path, bytes, etc.)
-
-        Returns:
-            Section: The section tree
-        """
-        try:
-            # Load the document
-            if isinstance(input_data, (str, Path)):
-                doc = Document(input_data)
-            elif hasattr(input_data, 'read'):
-                doc = Document(input_data)
-            elif hasattr(input_data, 'getvalue'):
-                doc = Document(input_data.getvalue())
-            else:
-                raise ValueError(f"Unsupported input data type: {type(input_data)}")
-            
-            # Parse document structure
-            sections_data = self._analyze_document_structure(doc)
-            
-            # Build section tree
-            root_section = self._build_section_tree(sections_data)
-            
-            return root_section
-            
-        except Exception as e:
-            logger.error(f"Error parsing docx file: {str(e)}")
-            # Return empty section on error
-            return Section(
-                title="Document",
-                content="",
-                level=0,
-                title_position=Positions.from_docx(0, 0, 0),
-                content_position=Positions.from_docx(0, 0, 0)
-            )
-    
-    def _analyze_document_structure(self, doc: Document) -> List[Dict[str, Any]]:
-        """
-        Analyze document structure and extract sections based on paragraph styles.
-        
-        Args:
-            doc: Document object
-            
-        Returns:
-            List of section data dictionaries
-        """
-        sections_data = []
-        current_char_pos = 0
-        
-        for para_idx, paragraph in enumerate(doc.paragraphs):
-            text = paragraph.text.strip()
-            if not text:
-                current_char_pos += 1  # Account for empty paragraphs
-                continue
-            
-            # Analyze paragraph style to determine if it's a heading
-            style_info = self._extract_style_info(paragraph)
-            heading_level = self._determine_heading_level(paragraph, style_info)
-            
-            # Create section data
-            section_data = {
-                'paragraph_index': para_idx,
-                'text': text,
-                'heading_level': heading_level,
-                'style_info': style_info,
-                'char_start': current_char_pos,
-                'char_end': current_char_pos + len(text),
-                'is_heading': heading_level > 0
-            }
-            
-            sections_data.append(section_data)
-            current_char_pos += len(text) + 1  # +1 for paragraph break
-        
-        return sections_data
     
     def _extract_style_info(self, paragraph) -> StyleInfo:
         """
@@ -600,7 +522,11 @@ class SectionLayoutDetector(BaseSectionDetector):
 # python -m models.layout_detection.document_detector
 if __name__ == "__main__":
     detector = SectionLayoutDetector()
-    result = detector.generate_section_tree(input_data="tests/test_data/1-1 买卖合同（通用版）.docx")
-    from models.naive_llm.helpers.section_token_parsor import remove_circular_references
-    remove_circular_references(result)
-    print(result.model_dump_json(indent=2))
+    result = detector._detect_layout(input_data="tests/test_data/1-1 买卖合同（通用版）.docx")
+    import json 
+    json.dump(result.model_dump(), open("layout_detection_result.json", "w"), indent=2, ensure_ascii=False)
+
+    # result = detector.generate_section_tree(input_data="tests/test_data/1-1 买卖合同（通用版）.docx")
+    # from models.naive_llm.helpers.section_token_parsor import remove_circular_references
+    # remove_circular_references(result)
+    # print(result.model_dump_json(indent=2))

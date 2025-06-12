@@ -22,8 +22,8 @@ except ImportError:
     except ImportError:
         raise ImportError("Please install doclayout-yolo: pip install doclayout-yolo")
 
-from .base_detector import BaseSectionDetector
-from models.schemas.docx_schemas import (
+from ..base.base_detector import BaseSectionDetector
+from models.schemas.layout_schemas import (
     LayoutDetectionResult, 
     LayoutElement, 
     BoundingBox,

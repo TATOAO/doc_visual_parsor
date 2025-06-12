@@ -1,1 +1,2 @@
-model_parameters/*
+visual_detection/model_parameters/*
+!.gitignore
