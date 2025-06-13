@@ -821,4 +821,6 @@ if __name__ == "__main__":
     result = extractor._detect_layout(input_data="tests/test_data/1-1 买卖合同（通用版）.pdf")
     import json 
     
-    json.dump(result.model_dump(), open("pdf_merged_extraction_result_merged_cv.json", "w"), indent=2, ensure_ascii=False)
+    json.dump(result.model_dump(), open("pure_pdf_extraction_result.json", "w"), indent=2, ensure_ascii=False)
+    from models.layout_detection.utils.visualiza_layout_elements import visualize_pdf_layout
+    visualize_pdf_layout("tests/test_data/1-1 买卖合同（通用版）.pdf", result, "pure_pdf_extraction_result.pdf")

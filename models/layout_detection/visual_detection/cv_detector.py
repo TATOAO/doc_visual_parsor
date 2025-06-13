@@ -36,6 +36,7 @@ from models.schemas.layout_schemas import (
     ElementType
 )
 from .download_model import download_model, get_model_cache_dir
+from ..utils.layout_processing import sort_elements_by_position, filter_redundant_boxes
 
 logger = logging.getLogger(__name__)
 
@@ -269,58 +270,6 @@ class CVLayoutDetector(BaseLayoutExtractor):
             logger.error(f"PDF CV detection failed: {str(e)}")
             raise
     
-    def _filter_redundant_boxes(self, elements: List[LayoutElement], overlap_threshold: float = 0.9) -> List[LayoutElement]:
-        """
-        Filter out redundant boxes that have significant overlap.
-        
-        Args:
-            elements: List of layout elements
-            overlap_threshold: Threshold for considering boxes redundant (0.0 to 1.0)
-            
-        Returns:
-            Filtered list of elements with redundant boxes removed
-        """
-        def calculate_area_overlap(box1: BoundingBox, box2: BoundingBox) -> float:
-            """Calculate area overlap ratio between two boxes."""
-            # Calculate intersection area
-            x1 = max(box1.x1, box2.x1)
-            y1 = max(box1.y1, box2.y1)
-            x2 = min(box1.x2, box2.x2)
-            y2 = min(box1.y2, box2.y2)
-            
-            if x2 <= x1 or y2 <= y1:
-                return 0.0
-                
-            intersection_area = (x2 - x1) * (y2 - y1)
-            
-            # Calculate area of smaller box
-            box1_area = (box1.x2 - box1.x1) * (box1.y2 - box1.y1)
-            box2_area = (box2.x2 - box2.x1) * (box2.y2 - box2.y1)
-            smaller_area = min(box1_area, box2_area)
-            
-            return intersection_area / smaller_area if smaller_area > 0 else 0.0
-        
-        # Sort elements by area (larger to smaller)
-        sorted_elements = sorted(
-            elements,
-            key=lambda e: (e.bbox.x2 - e.bbox.x1) * (e.bbox.y2 - e.bbox.y1),
-            reverse=True
-        )
-        
-        filtered_elements = []
-        for element in sorted_elements:
-            # Check if this element overlaps significantly with any already accepted element
-            is_redundant = False
-            for accepted in filtered_elements:
-                if calculate_area_overlap(element.bbox, accepted.bbox) > overlap_threshold:
-                    is_redundant = True
-                    break
-            
-            if not is_redundant:
-                filtered_elements.append(element)
-        
-        return filtered_elements
-
     def _detect_layout_image(self, 
                            input_data: Any,
                            confidence_threshold: float,
@@ -394,7 +343,10 @@ class CVLayoutDetector(BaseLayoutExtractor):
                     element_id += 1
             
             # Filter out redundant boxes
-            elements = self._filter_redundant_boxes(elements)
+            elements = filter_redundant_boxes(elements)
+            
+            # Sort elements in natural reading order
+            elements = sort_elements_by_position(elements)
             
             return LayoutExtractionResult(elements=elements)
             

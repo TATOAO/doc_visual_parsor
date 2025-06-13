@@ -147,13 +147,13 @@ class PdfLayoutVisualizer:
     
     def _group_elements_by_page(self, elements: List[LayoutElement]) -> Dict[int, List[LayoutElement]]:
         """
-        Group layout elements by page number and sort them from top-left to bottom-right.
+        Group layout elements by page number.
         
         Args:
             elements: List of layout elements
             
         Returns:
-            Dictionary mapping page numbers to sorted element lists
+            Dictionary mapping page numbers to element lists
         """
         page_elements = {}
         for element in elements:
@@ -162,32 +162,7 @@ class PdfLayoutVisualizer:
                 page_elements[page_num] = []
             page_elements[page_num].append(element)
         
-        # Sort elements within each page
-        for page_num in page_elements:
-            page_elements[page_num] = self._sort_elements_top_left_to_bottom_right(page_elements[page_num])
-        
         return page_elements
-    
-    def _sort_elements_top_left_to_bottom_right(self, elements: List[LayoutElement]) -> List[LayoutElement]:
-        """
-        Sort elements from top-left to bottom-right using a reading order algorithm.
-        
-        Args:
-            elements: List of elements to sort
-            
-        Returns:
-            Sorted list of elements
-        """
-        def get_sort_key(element: LayoutElement) -> Tuple[float, float]:
-            # Get the top-left point of the element
-            bbox = element.bbox
-            # Use y-coordinate as primary key (top to bottom)
-            # Use x-coordinate as secondary key (left to right)
-            # Add a small tolerance for elements that are roughly on the same line
-            y_tolerance = 10  # pixels
-            return (round(bbox.y1 / y_tolerance) * y_tolerance, bbox.x1)
-        
-        return sorted(elements, key=get_sort_key)
     
     def _draw_elements_on_page(self, 
                               page: fitz.Page, 
