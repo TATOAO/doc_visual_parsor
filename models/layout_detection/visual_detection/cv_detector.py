@@ -67,7 +67,7 @@ class CVLayoutDetector(BaseLayoutExtractor):
                  device: str = "auto",
                  confidence_threshold: float = 0.25,
                  image_size: int = 1024,
-                 pdf_dpi: int = 200,  # DPI for PDF to image conversion
+                 pdf_dpi: int = 150,  # Reduced default DPI for better scaling
                  **kwargs):
         """
         Initialize the CV-based layout detector.
@@ -166,6 +166,38 @@ class CVLayoutDetector(BaseLayoutExtractor):
             return str(input_data).lower().endswith('.pdf')
         return False
     
+    def _pdf_page_to_image(self, doc: fitz.Document, page_num: int) -> Tuple[Optional[np.ndarray], float]:
+        """
+        Convert a PDF page to image for CV analysis.
+        
+        Args:
+            doc: PyMuPDF Document object
+            page_num: Page number (0-indexed)
+            
+        Returns:
+            Tuple of (page image as numpy array, scale factor) or (None, 1.0) if failed
+        """
+        try:
+            page = doc[page_num]
+            
+            # Calculate zoom factor based on desired DPI
+            # Default PDF DPI is 72, so zoom = desired_dpi / 72
+            zoom = self.pdf_dpi / 72.0
+            mat = fitz.Matrix(zoom, zoom)
+            
+            # Render page as image
+            pix = page.get_pixmap(matrix=mat)
+            img_data = pix.tobytes("png")
+            
+            # Convert to numpy array
+            import io
+            img = Image.open(io.BytesIO(img_data))
+            return np.array(img), 1.0 / zoom  # Return image and inverse scale factor
+            
+        except Exception as e:
+            logger.warning(f"Could not convert page {page_num + 1} to image: {e}")
+            return None, 1.0
+    
     def _detect_layout_pdf(self, 
                           pdf_input: Any,
                           confidence_threshold: float,
@@ -196,7 +228,7 @@ class CVLayoutDetector(BaseLayoutExtractor):
                 logger.info(f"Processing PDF page {page_num + 1}/{doc.page_count}")
                 
                 # Convert page to image
-                page_image = self._pdf_page_to_image(doc, page_num)
+                page_image, scale_factor = self._pdf_page_to_image(doc, page_num)
                 if page_image is None:
                     logger.warning(f"Could not convert page {page_num + 1} to image")
                     continue
@@ -204,16 +236,21 @@ class CVLayoutDetector(BaseLayoutExtractor):
                 # Detect layout on the page image
                 page_result = self._detect_layout_image(page_image, confidence_threshold, image_size, **kwargs)
                 
-                # Add page information to elements
+                # Scale coordinates back to PDF space
                 for element in page_result.elements:
+                    if element.bbox:
+                        element.bbox.x1 *= scale_factor
+                        element.bbox.y1 *= scale_factor
+                        element.bbox.x2 *= scale_factor
+                        element.bbox.y2 *= scale_factor
+                    
                     element.id = element_id
                     element.metadata = element.metadata or {}
                     element.metadata['page_number'] = page_num + 1
                     element.metadata['source_type'] = 'pdf_page'
+                    element.metadata['scale_factor'] = scale_factor
                     all_elements.append(element)
                     element_id += 1
-            
-            doc.close()
             
             # Create metadata
             metadata = {
@@ -224,43 +261,13 @@ class CVLayoutDetector(BaseLayoutExtractor):
                 'pdf_dpi': self.pdf_dpi
             }
             
+            doc.close()
+            
             return LayoutExtractionResult(elements=all_elements, metadata=metadata)
             
         except Exception as e:
             logger.error(f"PDF CV detection failed: {str(e)}")
             raise
-    
-    def _pdf_page_to_image(self, doc: fitz.Document, page_num: int) -> Optional[np.ndarray]:
-        """
-        Convert a PDF page to image for CV analysis.
-        
-        Args:
-            doc: PyMuPDF Document object
-            page_num: Page number (0-indexed)
-            
-        Returns:
-            Page image as numpy array or None if failed
-        """
-        try:
-            page = doc[page_num]
-            
-            # Calculate zoom factor based on desired DPI
-            # Default PDF DPI is 72, so zoom = desired_dpi / 72
-            zoom = self.pdf_dpi / 72.0
-            mat = fitz.Matrix(zoom, zoom)
-            
-            # Render page as image
-            pix = page.get_pixmap(matrix=mat)
-            img_data = pix.tobytes("png")
-            
-            # Convert to numpy array
-            import io
-            img = Image.open(io.BytesIO(img_data))
-            return np.array(img)
-            
-        except Exception as e:
-            logger.warning(f"Could not convert page {page_num + 1} to image: {e}")
-            return None
     
     def _detect_layout_image(self, 
                            input_data: Any,
@@ -535,19 +542,13 @@ if __name__ == "__main__":
     detector._initialize_detector()
 
     pdf_path = "tests/test_data/1-1 买卖合同（通用版）.pdf"
-    test_image = "tests/test_data/1-1 买卖合同（通用版）.pdf"
     import fitz
 
-    doc = fitz.open(pdf_path)
-    page = doc.load_page(3)
-    pix = page.get_pixmap()
-    pix.save("tests/test_data/test_image.png")
-    result = detector._detect_layout(input_data="tests/test_data/test_image.png")
-    import json
-    json.dump(result.model_dump(), open("test_image_result_cv.json", "w"), indent=2, ensure_ascii=False)
-    # result = detector.detect(test_image)
-    # print(result)
+    result = detector._detect_layout(pdf_path)
 
+    import json
+
+    json.dump(result.model_dump(), open("test_image_result_cv.json", "w"), indent=2, ensure_ascii=False)
 
     from ..utils.visualiza_layout_elements import visualize_pdf_layout
-    visualize_pdf_layout(pdf_path, result, "tests/test_data/test_image_cv.pdf")
+    visualize_pdf_layout(pdf_path, result, "visualized_cv_only.pdf")

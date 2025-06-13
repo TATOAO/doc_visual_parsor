@@ -414,18 +414,17 @@ def compare_layout_results(pdf_path: Union[str, Path],
 if __name__ == "__main__":
     # This would be used in conjunction with the PDF extractor
     from models.layout_detection.layout_extraction.pdf_layout_extractor import PdfLayoutExtractor
+    from models.layout_detection.layout_extraction.pdf_style_cv_mix_extractor import PdfStyleCVMixLayoutExtractor
     
     # Test file path
     test_pdf = "tests/test_data/1-1 买卖合同（通用版）.pdf"
     
     if Path(test_pdf).exists():
-        # Extract without merging
-        extractor_no_merge = PdfLayoutExtractor(merge_fragments=True, use_cv_guidance=False)
-        result_before = extractor_no_merge._detect_layout(test_pdf)
-        
         # Extract with merging
-        extractor_with_merge = PdfLayoutExtractor(merge_fragments=True, use_cv_guidance=True)
+        extractor_with_merge = PdfLayoutExtractor(merge_fragments=True)
         result_after = extractor_with_merge._detect_layout(test_pdf)
+
+        reulst_mix = PdfStyleCVMixLayoutExtractor(merge_fragments=True)._detect_layout(test_pdf)
         
         # Create comparison visualization
         output_dir = Path("visualization_output")
@@ -433,8 +432,8 @@ if __name__ == "__main__":
         
         success = compare_layout_results(
             test_pdf,
-            result_before,
             result_after,
+            reulst_mix,
             output_dir,
             show_labels=True,
             show_element_ids=True
