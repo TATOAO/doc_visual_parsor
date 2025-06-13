@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import Union, List, Dict, Any, Optional, Tuple
 import fitz  # PyMuPDF
-from models.schemas.layout_schemas import LayoutExtractionResult, LayoutElement
+from models.schemas.layout_schemas import LayoutExtractionResult, LayoutElement, BoundingBox
 
 logger = logging.getLogger(__name__)
 
@@ -147,13 +147,13 @@ class PdfLayoutVisualizer:
     
     def _group_elements_by_page(self, elements: List[LayoutElement]) -> Dict[int, List[LayoutElement]]:
         """
-        Group layout elements by page number.
+        Group layout elements by page number and sort them from top-left to bottom-right.
         
         Args:
             elements: List of layout elements
             
         Returns:
-            Dictionary mapping page numbers to element lists
+            Dictionary mapping page numbers to sorted element lists
         """
         page_elements = {}
         for element in elements:
@@ -162,7 +162,32 @@ class PdfLayoutVisualizer:
                 page_elements[page_num] = []
             page_elements[page_num].append(element)
         
+        # Sort elements within each page
+        for page_num in page_elements:
+            page_elements[page_num] = self._sort_elements_top_left_to_bottom_right(page_elements[page_num])
+        
         return page_elements
+    
+    def _sort_elements_top_left_to_bottom_right(self, elements: List[LayoutElement]) -> List[LayoutElement]:
+        """
+        Sort elements from top-left to bottom-right using a reading order algorithm.
+        
+        Args:
+            elements: List of elements to sort
+            
+        Returns:
+            Sorted list of elements
+        """
+        def get_sort_key(element: LayoutElement) -> Tuple[float, float]:
+            # Get the top-left point of the element
+            bbox = element.bbox
+            # Use y-coordinate as primary key (top to bottom)
+            # Use x-coordinate as secondary key (left to right)
+            # Add a small tolerance for elements that are roughly on the same line
+            y_tolerance = 10  # pixels
+            return (round(bbox.y1 / y_tolerance) * y_tolerance, bbox.x1)
+        
+        return sorted(elements, key=get_sort_key)
     
     def _draw_elements_on_page(self, 
                               page: fitz.Page, 
@@ -213,6 +238,31 @@ class PdfLayoutVisualizer:
         
         # Draw bounding box
         page.draw_rect(rect, color=color, width=self.line_width)
+        
+        # Add small index label in top-left corner
+        index_label = f"[{index}]"
+        index_rect = fitz.Rect(
+            rect.x0 + 2,  # Small offset from left
+            rect.y0 + 2,  # Small offset from top
+            rect.x0 + 25,  # Slightly wider for better visibility
+            rect.y0 + 15  # Slightly taller for better visibility
+        )
+        
+        # Add semi-transparent background for index label
+        page.draw_rect(index_rect, color=(1, 1, 1), fill=(1, 1, 1), width=0.5)
+        
+        # Add index label text with improved visibility
+        try:
+            page.insert_text(
+                (index_rect.x0 + 2, index_rect.y0 + 10),  # Position text within the box
+                index_label,
+                fontsize=8,  # Slightly larger font
+                color=color,
+                fontname="helv",
+                render_mode=0  # Normal rendering mode
+            )
+        except Exception as e:
+            logger.warning(f"Failed to insert index label: {str(e)}")
         
         # Add element information if enabled
         if self.show_labels or self.show_element_ids:
