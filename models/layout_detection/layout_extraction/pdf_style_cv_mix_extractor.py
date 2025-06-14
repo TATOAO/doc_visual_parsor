@@ -113,6 +113,8 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
             import json
             json.dump(cv_result.model_dump(), open("cv_result.json", "w"), indent=2, ensure_ascii=False)
             
+            logger.info(f"CV detection found {len(cv_result.elements)} elements")
+            
             if not cv_result.elements:
                 logger.warning("No elements detected by CV detector")
                 return cv_result
@@ -120,6 +122,11 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
             # Step 2: Get PDF content for enrichment
             logger.info("Extracting PDF content for enrichment")
             pdf_result = self.pdf_extractor._detect_layout(input_data, **kwargs)
+
+            # save pdf_result to json for debug
+            json.dump(pdf_result.model_dump(), open("pdf_result.json", "w"), indent=2, ensure_ascii=False)
+            
+            logger.info(f"PDF extraction found {len(pdf_result.elements)} elements")
             
             # Step 3: Process each page
             enriched_elements = []
@@ -130,15 +137,23 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
                 page_cv_elements = self._get_page_elements(cv_result, page_num)
                 page_pdf_elements = self._get_page_elements(pdf_result, page_num)
                 
+                logger.info(f"Page {page_num}: {len(page_cv_elements)} CV elements, {len(page_pdf_elements)} PDF elements")
+                
                 # Enrich CV elements with PDF content
                 page_enriched = self._enrich_cv_elements_with_pdf(
                     page_cv_elements,
                     page_pdf_elements
                 )
+                
+                logger.info(f"Page {page_num}: {len(page_enriched)} enriched elements")
                 enriched_elements.extend(page_enriched)
+            
+            logger.info(f"Total enriched elements before post-processing: {len(enriched_elements)}")
             
             # Step 4: Post-process elements
             processed_elements = self._post_process_elements(enriched_elements)
+            
+            logger.info(f"Total elements after post-processing: {len(processed_elements)}")
             
             # Step 5: Create final result
             return self._create_final_result(processed_elements, cv_result, pdf_result)
@@ -153,16 +168,24 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         for element in result.elements:
             if element.metadata and 'page_number' in element.metadata:
                 page_numbers.add(element.metadata['page_number'])
-        return sorted(list(page_numbers))
+            else:
+                logger.warning(f"Element {element.id} has no page_number in metadata: {element.metadata}")
+        
+        sorted_pages = sorted(list(page_numbers))
+        logger.info(f"Found page numbers: {sorted_pages}")
+        return sorted_pages
     
     def _get_page_elements(self, 
                           result: LayoutExtractionResult, 
                           page_num: int) -> List[LayoutElement]:
         """Get elements for a specific page."""
-        return [
+        page_elements = [
             elem for elem in result.elements
             if elem.metadata and elem.metadata.get('page_number') == page_num
         ]
+        
+        logger.debug(f"Page {page_num}: Found {len(page_elements)} elements")
+        return page_elements
     
     def _enrich_cv_elements_with_pdf(self,
                                    cv_elements: List[LayoutElement],
@@ -179,17 +202,25 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         """
         enriched_elements = []
         
+        logger.info(f"Enriching {len(cv_elements)} CV elements with {len(pdf_elements)} PDF elements")
+        
         for cv_elem in cv_elements:
+            logger.info(f"Processing CV element {cv_elem.id} with bbox: {cv_elem.bbox}")
+            
             # Find overlapping PDF elements
             overlapping_pdf = self._find_overlapping_pdf_elements(cv_elem, pdf_elements)
             
+            logger.info(f"Found {len(overlapping_pdf)} overlapping PDF elements for CV element {cv_elem.id}")
+            
             if not overlapping_pdf:
                 # Keep CV element as is if no PDF content found
+                logger.warning(f"No overlapping PDF elements found for CV element {cv_elem.id}")
                 enriched_elements.append(cv_elem)
                 continue
             
             # Create enriched element
             enriched = self._create_enriched_element(cv_elem, overlapping_pdf)
+            logger.info(f"Enriched CV element {cv_elem.id} with text: '{enriched.text[:50]}...' if len > 50")
             enriched_elements.append(enriched)
         
         return enriched_elements
@@ -197,7 +228,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
     def _find_overlapping_pdf_elements(self,
                                      cv_element: LayoutElement,
                                      pdf_elements: List[LayoutElement],
-                                     min_overlap: float = 0.1) -> List[LayoutElement]:
+                                     min_overlap: float = 0.01) -> List[LayoutElement]:
         """
         Find PDF elements that overlap with a CV element.
         
@@ -217,9 +248,17 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
             if not pdf_elem.bbox:
                 continue
             
-            overlap = self._calculate_bbox_overlap(cv_element.bbox, pdf_elem.bbox)
-            if overlap >= min_overlap:
+            # Try multiple overlap detection methods
+            iou_overlap = self._calculate_bbox_overlap(cv_element.bbox, pdf_elem.bbox)
+            intersection_ratio = self._calculate_intersection_ratio(cv_element.bbox, pdf_elem.bbox)
+            is_contained = self._is_bbox_contained(pdf_elem.bbox, cv_element.bbox)
+            
+            logger.debug(f"CV {cv_element.id} vs PDF {pdf_elem.id}: IoU={iou_overlap:.4f}, Intersection={intersection_ratio:.4f}, Contained={is_contained}")
+            
+            # Use more lenient criteria
+            if iou_overlap >= min_overlap or intersection_ratio >= 0.1 or is_contained:
                 overlapping.append(pdf_elem)
+                logger.debug(f"PDF element {pdf_elem.id} overlaps with CV element {cv_element.id}")
         
         return overlapping
     
@@ -241,6 +280,32 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         union = area1 + area2 - intersection
         return intersection / union if union > 0 else 0.0
     
+    def _calculate_intersection_ratio(self, bbox1: BoundingBox, bbox2: BoundingBox) -> float:
+        """Calculate intersection area as ratio of smaller bbox area."""
+        # Calculate intersection
+        x1 = max(bbox1.x1, bbox2.x1)
+        y1 = max(bbox1.y1, bbox2.y1)
+        x2 = min(bbox1.x2, bbox2.x2)
+        y2 = min(bbox1.y2, bbox2.y2)
+
+        if x2 <= x1 or y2 <= y1:
+            return 0.0
+
+        intersection = (x2 - x1) * (y2 - y1)
+        area1 = (bbox1.x2 - bbox1.x1) * (bbox1.y2 - bbox1.y1)
+        area2 = (bbox2.x2 - bbox2.x1) * (bbox2.y2 - bbox2.y1)
+        
+        # Return intersection as ratio of smaller area
+        smaller_area = min(area1, area2)
+        return intersection / smaller_area if smaller_area > 0 else 0.0
+    
+    def _is_bbox_contained(self, inner_bbox: BoundingBox, outer_bbox: BoundingBox) -> bool:
+        """Check if inner_bbox is contained within outer_bbox."""
+        return (inner_bbox.x1 >= outer_bbox.x1 and 
+                inner_bbox.y1 >= outer_bbox.y1 and
+                inner_bbox.x2 <= outer_bbox.x2 and 
+                inner_bbox.y2 <= outer_bbox.y2)
+    
     def _create_enriched_element(self,
                                cv_element: LayoutElement,
                                pdf_elements: List[LayoutElement]) -> LayoutElement:
@@ -257,9 +322,17 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         # Start with CV element as base
         enriched = deepcopy(cv_element)
         
+        # Sort PDF elements by position (top-to-bottom, left-to-right)
+        sorted_pdf_elements = sort_elements_by_position(pdf_elements)
+        
         # Extract and merge text content
-        text_content = self._merge_text_content(pdf_elements)
-        enriched.text = text_content
+        text_parts = []
+        for elem in sorted_pdf_elements:
+            if elem.text:
+                text_parts.append(elem.text.strip())
+        
+        # Join text parts with appropriate spacing
+        enriched.text = ' '.join(text_parts)
         
         # Extract and merge style information
         style_info = self._merge_style_info(pdf_elements)
@@ -322,21 +395,35 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         Returns:
             Processed elements
         """
+        logger.info(f"Post-processing {len(elements)} elements")
+        
         processed = []
-        for elem in elements:
+        for i, elem in enumerate(elements):
+            logger.debug(f"Processing element {i}: id={elem.id}, type={elem.element_type}, text='{elem.text[:30] if elem.text else 'None'}...'")
+            
             # Clean up text content
             if elem.text:
+                original_text = elem.text
                 elem.text = self._clean_text_content(elem.text)
+                if original_text != elem.text:
+                    logger.debug(f"Text cleaned for element {elem.id}: '{original_text[:30]}...' -> '{elem.text[:30]}...'")
             
             # Validate and fix element type
+            original_type = elem.element_type
             elem.element_type = self._validate_element_type(elem)
+            if original_type != elem.element_type:
+                logger.debug(f"Element type changed for element {elem.id}: {original_type} -> {elem.element_type}")
             
             # Clean up metadata
             if elem.metadata:
+                original_metadata_count = len(elem.metadata)
                 elem.metadata = self._clean_metadata(elem.metadata)
+                if len(elem.metadata) != original_metadata_count:
+                    logger.debug(f"Metadata cleaned for element {elem.id}: {original_metadata_count} -> {len(elem.metadata)} keys")
             
             processed.append(elem)
         
+        logger.info(f"Post-processing completed: {len(processed)} elements retained")
         return processed
     
     def _clean_text_content(self, text: str) -> str:
