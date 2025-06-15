@@ -35,7 +35,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
     """
 
     def __init__(self, 
-                 cv_confidence_threshold: float = 0.5,
+                 cv_confidence_threshold: float = 0.25,
                  cv_model_name: str = "docstructbench",
                  cv_image_size: int = 1024,
                  cv_pdf_dpi: int = 150,
@@ -203,10 +203,11 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         enriched_elements = []
         
         logger.info(f"Enriching {len(cv_elements)} CV elements with {len(pdf_elements)} PDF elements")
+
         
         for cv_elem in cv_elements:
             logger.info(f"Processing CV element {cv_elem.id} with bbox: {cv_elem.bbox}")
-            
+
             # Find overlapping PDF elements
             overlapping_pdf = self._find_overlapping_pdf_elements(cv_elem, pdf_elements)
             
@@ -332,7 +333,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
                 text_parts.append(elem.text.strip())
         
         # Join text parts with appropriate spacing
-        enriched.text = ' '.join(text_parts)
+        enriched.text = ''.join(text_parts)
         
         # Extract and merge style information
         style_info = self._merge_style_info(pdf_elements)
@@ -364,7 +365,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
             if elem.text:
                 text_parts.append(elem.text)
         
-        return ' '.join(text_parts)
+        return ''.join(text_parts)
     
     def _merge_style_info(self, pdf_elements: List[LayoutElement]) -> Dict:
         """
@@ -429,7 +430,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
     def _clean_text_content(self, text: str) -> str:
         """Clean up text content."""
         # Remove extra whitespace
-        text = ' '.join(text.split())
+        text = ''.join(text.split())
         return text
     
     def _validate_element_type(self, element: LayoutElement) -> ElementType:
@@ -510,7 +511,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
 # python -m models.layout_detection.layout_extraction.pdf_style_cv_mix_extractor
 if __name__ == "__main__":
     extractor = PdfStyleCVMixLayoutExtractor(
-        cv_confidence_threshold=0.5,
+        cv_confidence_threshold=0.25,
         cv_model_name="docstructbench",
         cv_image_size=1024,
         cv_pdf_dpi=150

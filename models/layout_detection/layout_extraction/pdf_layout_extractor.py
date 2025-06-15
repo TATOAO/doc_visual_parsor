@@ -101,6 +101,10 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
             else:
                 merged_elements = raw_elements
             
+            # Sort elements by reading order (page, then top-to-bottom, left-to-right)
+            if merged_elements:
+                merged_elements = self._sort_elements_by_reading_order(merged_elements)
+            
             # Clean up
             doc.close()
             
@@ -812,6 +816,26 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
             'cv_confidence_threshold': 0.3,
             'features': features
         }
+
+    def _sort_elements_by_reading_order(self, elements: List[LayoutElement]) -> List[LayoutElement]:
+        """
+        Sort elements by reading order: page number, then top-to-bottom, left-to-right.
+        
+        Args:
+            elements: List of elements to sort
+            
+        Returns:
+            Sorted list of elements
+        """
+        def sort_key(element):
+            page_num = element.metadata.get('page_number', 0) if element.metadata else 0
+            y_pos = element.bbox.y1 if element.bbox else 0
+            x_pos = element.bbox.x1 if element.bbox else 0
+            return (page_num, y_pos, x_pos)
+        
+        sorted_elements = sorted(elements, key=sort_key)
+        logger.info(f"Sorted {len(elements)} elements by reading order")
+        return sorted_elements
 
 
 # unit test
