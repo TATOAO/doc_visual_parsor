@@ -17,7 +17,8 @@ from models.schemas.layout_schemas import (
     LayoutExtractionResult,
     LayoutElement,
     BoundingBox,
-    ElementType
+    ElementType,
+    RunInfo
 )
 from ..utils.layout_processing import sort_elements_by_position
 
@@ -326,22 +327,45 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         # Sort PDF elements by position (top-to-bottom, left-to-right)
         sorted_pdf_elements = sort_elements_by_position(pdf_elements)
         
-        # Extract and merge text content
+        # Extract and merge text content and runs
         text_parts = []
+        all_runs = []
+        current_offset = 0
+        
         for elem in sorted_pdf_elements:
             if elem.text:
-                text_parts.append(elem.text.strip())
+                text_parts.append(elem.text)
+                
+                # Collect runs information if available
+                if elem.style and elem.style.runs:
+                    logger.debug(f"Found {len(elem.style.runs)} runs in PDF element {elem.id}")
+                    # Adjust run indices based on current text position
+                    for run in elem.style.runs:
+                        adjusted_run = deepcopy(run)
+                        if adjusted_run.start_index is not None:
+                            adjusted_run.start_index += current_offset
+                        if adjusted_run.end_index is not None:
+                            adjusted_run.end_index += current_offset
+                        all_runs.append(adjusted_run)
+                        logger.debug(f"Added run with text: '{run.text[:30]}...' at offset {current_offset}")
+                
+                current_offset += len(elem.text)
         
-        # Join text parts with appropriate spacing
+        logger.info(f"Collected {len(all_runs)} total runs for enriched element")
+        
+        # Join text parts
         enriched.text = ''.join(text_parts)
         
-        # Extract and merge style information
-        style_info = self._merge_style_info(pdf_elements)
+        # Create enriched style information with preserved runs
+        enriched_style = self._create_enriched_style(pdf_elements, all_runs)
+        enriched.style = enriched_style
+        
+        # Update metadata
         enriched.metadata = enriched.metadata or {}
         enriched.metadata.update({
-            'style_info': style_info,
             'source_pdf_elements': [e.id for e in pdf_elements],
-            'enrichment_method': 'cv_first_pdf_enriched'
+            'enrichment_method': 'cv_first_pdf_enriched',
+            'runs_count': len(all_runs)
         })
         
         return enriched
@@ -366,6 +390,51 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
                 text_parts.append(elem.text)
         
         return ''.join(text_parts)
+    
+    def _create_enriched_style(self, pdf_elements: List[LayoutElement], all_runs: List) -> Optional['StyleInfo']:
+        """
+        Create enriched style information from PDF elements with preserved runs.
+        
+        Args:
+            pdf_elements: List of PDF elements to merge
+            all_runs: List of all text runs with adjusted indices
+            
+        Returns:
+            Enriched StyleInfo object or None
+        """
+        from models.schemas.layout_schemas import StyleInfo, FontInfo
+        
+        if not pdf_elements:
+            return None
+        
+        # Find the primary style info from the first element with style
+        primary_style = None
+        for elem in pdf_elements:
+            if elem.style:
+                primary_style = elem.style
+                break
+        
+        if not primary_style and not all_runs:
+            return None
+        
+        # Create enriched style
+        enriched_style = StyleInfo()
+        
+        if primary_style:
+            # Copy basic style information
+            enriched_style.style_name = primary_style.style_name
+            enriched_style.style_type = primary_style.style_type
+            enriched_style.builtin = primary_style.builtin
+            enriched_style.paragraph_format = primary_style.paragraph_format
+            enriched_style.primary_font = primary_style.primary_font
+            enriched_style.table_style = primary_style.table_style
+            enriched_style.list_style = primary_style.list_style
+            enriched_style.custom_properties = primary_style.custom_properties
+        
+        # Set the merged runs
+        enriched_style.runs = all_runs if all_runs else None
+        
+        return enriched_style
     
     def _merge_style_info(self, pdf_elements: List[LayoutElement]) -> Dict:
         """
@@ -511,7 +580,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
 # python -m models.layout_detection.layout_extraction.pdf_style_cv_mix_extractor
 if __name__ == "__main__":
     extractor = PdfStyleCVMixLayoutExtractor(
-        cv_confidence_threshold=0.25,
+        cv_confidence_threshold=0.1,
         cv_model_name="docstructbench",
         cv_image_size=1024,
         cv_pdf_dpi=150

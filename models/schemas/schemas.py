@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Any
 from typing_extensions import Self
 from enum import Enum
 import hashlib
+from models.schemas.layout_schemas import BoundingBox
 
 
 class DocumentType(str, Enum):
@@ -13,21 +14,6 @@ class DocumentType(str, Enum):
     TEXT = "text"
 
 
-class BoundingBox(BaseModel):
-    """Bounding box coordinates"""
-    x1: float = Field(description="Left coordinate")
-    y1: float = Field(description="Top coordinate") 
-    x2: float = Field(description="Right coordinate")
-    y2: float = Field(description="Bottom coordinate")
-    page_number: Optional[int] = Field(description="Page number", default=None)
-    
-    @property
-    def width(self) -> float:
-        return self.x2 - self.x1
-    
-    @property
-    def height(self) -> float:
-        return self.y2 - self.y1
 
 
 class TextPosition(BaseModel):

@@ -65,7 +65,7 @@ class FontInfo(BaseModel):
     class Config:
         """Pydantic config."""
         validate_assignment = True
-        extra = "forbid"
+        extra = "ignore"
 
 
 class ParagraphFormat(BaseModel):
@@ -97,7 +97,7 @@ class ParagraphFormat(BaseModel):
     class Config:
         """Pydantic config."""
         validate_assignment = True
-        extra = "forbid"
+        extra = "ignore"
 
 
 class RunInfo(BaseModel):
@@ -126,7 +126,7 @@ class RunInfo(BaseModel):
     class Config:
         """Pydantic config."""
         validate_assignment = True
-        extra = "forbid"
+        extra = "ignore"
 
 
 class StyleInfo(BaseModel):
@@ -187,7 +187,7 @@ class StyleInfo(BaseModel):
     class Config:
         """Pydantic config."""
         validate_assignment = True
-        extra = "forbid"
+        extra = "ignore"
 
 
 class BoundingBox(BaseModel):
@@ -240,7 +240,7 @@ class BoundingBox(BaseModel):
     class Config:
         """Pydantic config."""
         validate_assignment = True
-        extra = "forbid"
+        extra = "ignore"
 
 
 class LayoutElement(BaseModel):
@@ -289,7 +289,7 @@ class LayoutElement(BaseModel):
     class Config:
         """Pydantic config."""
         validate_assignment = True
-        extra = "forbid"
+        extra = "ignore"
 
 
 class LayoutExtractionResult(BaseModel):
@@ -371,7 +371,7 @@ class LayoutExtractionResult(BaseModel):
     class Config:
         """Pydantic config."""
         validate_assignment = True
-        extra = "forbid"
+        extra = "ignore"
 
 
 # Export all models for easy import
