@@ -3,18 +3,17 @@ from models.utils.llm import get_llm_client
 from models.schemas.layout_schemas import LayoutExtractionResult, LayoutElement, ElementType
 from models.schemas.schemas import Section
 from typing import List, Optional, Dict, Any
-from .helper import (
-    TitleNumberType, 
-    TitleNumberUnit, 
-    TitleNumber, 
-    compare_title_numbers, 
-    get_title_hierarchy_path, 
-    title_number_extraction
-)
 from .element_encoder import ElementEncoder, FeatureWeights, ElementCode
+
+from models.layout_structuring.title_structure_builder_llm.structurer_llm import title_structure_builder_llm
+
+
+
+
 
 # python -m models.layout_structuring.content_merger.__init__
 if __name__ == "__main__":
+    import json
     async def main():
         
         # Load JSON data

@@ -2,6 +2,7 @@ import dotenv
 import os
 import langchain_openai
 
+
 dotenv.load_dotenv()
 
 LLM_API_KEY = os.getenv("QWEN_KEY")
@@ -18,15 +19,16 @@ def get_llm_client(timeout: int = 300, max_retries: int = 3, **kwargs):
         max_retries: Maximum number of retries for failed requests
         **kwargs: Additional arguments passed to ChatOpenAI
     """
-    model = kwargs.get("model", "qwen-max-latest")
+    model = kwargs.get("model", "qwen3-4b")
+    
     if model not in llm_model_map:
         llm_model_map[model] = langchain_openai.ChatOpenAI(
             api_key=LLM_API_KEY, 
             base_url=LLM_BASE_URL,
             timeout=timeout,
-                max_retries=max_retries,
-                **kwargs
-            )
+            max_retries=max_retries,
+            **kwargs
+        )
     return llm_model_map[model]
 
 
