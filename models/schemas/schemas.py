@@ -4,6 +4,7 @@ from typing_extensions import Self
 from enum import Enum
 import hashlib
 from models.schemas.layout_schemas import BoundingBox
+from models.schemas.layout_schemas import LayoutElement
 
 
 class DocumentType(str, Enum):
@@ -120,16 +121,10 @@ class Section(BaseModel):
     title: str = Field(description="The title of the section", default="")
     content: str = Field(description="The content of the section", default="")
     level: int = Field(description="The level of the section", default=0)
-    
-    # Enhanced position fields using the new Position system
-    title_position: Positions = Field(description="Position of the section title", default=Positions.from_text(-1, -1))
-    content_position: Positions = Field(description="Position of the section content", default=Positions.from_text(-1, -1))
+    element_id: int = Field(description="The element id of the section", default=None)
 
     sub_sections: List[Self] = Field(description="The sub sections of the section", default=[])
     parent_section: Optional[Self] = Field(description="The parent section of the section", default=None)
-
-    title_parsed: str = Field(description="The parsed title of the section", default="")
-    content_parsed: str = Field(description="The parsed content of the section", default="")
 
     @computed_field
     @property
@@ -138,7 +133,7 @@ class Section(BaseModel):
         Get the hash of the section based on title_parsed and content_parsed only
         """
         # Combine title_parsed and content_parsed for hashing
-        combined_content = f"{self.title_parsed}|{self.content_parsed}"
+        combined_content = f"{self.title}|{self.content}"
         
         # Generate hash from the combined content
         return hashlib.sha256(combined_content.encode('utf-8')).hexdigest()

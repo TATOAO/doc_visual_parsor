@@ -20,7 +20,6 @@ from models.schemas.layout_schemas import (
     ElementType,
     RunInfo
 )
-from ..utils.layout_processing import sort_elements_by_position
 
 logger = logging.getLogger(__name__)
 
@@ -324,8 +323,8 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         # Start with CV element as base
         enriched = deepcopy(cv_element)
         
-        # Sort PDF elements by position (top-to-bottom, left-to-right)
-        sorted_pdf_elements = sort_elements_by_position(pdf_elements)
+        # Sort PDF elements using improved superscript-aware sorting
+        sorted_pdf_elements = self.pdf_extractor._sort_elements_by_reading_order(pdf_elements)
         
         # Extract and merge text content and runs
         text_parts = []
@@ -380,8 +379,8 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         Returns:
             Merged text content
         """
-        # Sort elements by position (top-to-bottom, left-to-right)
-        sorted_elements = sort_elements_by_position(pdf_elements)
+        # Sort elements using improved superscript-aware sorting
+        sorted_elements = self.pdf_extractor._sort_elements_by_reading_order(pdf_elements)
         
         # Merge text with appropriate spacing
         text_parts = []

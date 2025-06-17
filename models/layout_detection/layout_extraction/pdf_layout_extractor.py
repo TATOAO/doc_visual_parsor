@@ -819,23 +819,172 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
 
     def _sort_elements_by_reading_order(self, elements: List[LayoutElement]) -> List[LayoutElement]:
         """
-        Sort elements by reading order: page number, then top-to-bottom, left-to-right.
+        Sort elements by reading order with intelligent superscript handling.
+        
+        For superscripts/annotations that appear above and to the right of main text,
+        they should be ordered after the main text they annotate, not before based on y-position.
         
         Args:
             elements: List of elements to sort
             
         Returns:
-            Sorted list of elements
+            Sorted list of elements with correct superscript ordering
         """
-        def sort_key(element):
-            page_num = element.metadata.get('page_number', 0) if element.metadata else 0
-            y_pos = element.bbox.y1 if element.bbox else 0
-            x_pos = element.bbox.x1 if element.bbox else 0
-            return (page_num, y_pos, x_pos)
+        if not elements:
+            return elements
         
-        sorted_elements = sorted(elements, key=sort_key)
-        logger.info(f"Sorted {len(elements)} elements by reading order")
+        # Group elements by page first
+        pages = {}
+        for element in elements:
+            page_num = element.metadata.get('page_number', 0) if element.metadata else 0
+            if page_num not in pages:
+                pages[page_num] = []
+            pages[page_num].append(element)
+        
+        sorted_elements = []
+        
+        # Process each page separately
+        for page_num in sorted(pages.keys()):
+            page_elements = pages[page_num]
+            
+            # Identify potential superscripts and their associated main text
+            superscript_pairs = self._identify_superscript_associations(page_elements)
+            
+            # Create a custom sort key that handles superscripts
+            def smart_sort_key(element):
+                # Check if this element is a superscript
+                for main_element, superscript_element in superscript_pairs:
+                    if element == superscript_element:
+                        # Use the main element's position for sorting, but add small offset for ordering
+                        main_y = main_element.bbox.y1 if main_element.bbox else 0
+                        main_x = main_element.bbox.x1 if main_element.bbox else 0
+                        # Add small offset to ensure superscript comes after main text
+                        return (page_num, main_y, main_x + 0.1)
+                
+                # Regular element sorting
+                y_pos = element.bbox.y1 if element.bbox else 0
+                x_pos = element.bbox.x1 if element.bbox else 0
+                return (page_num, y_pos, x_pos)
+            
+            # Sort elements on this page
+            page_sorted = sorted(page_elements, key=smart_sort_key)
+            sorted_elements.extend(page_sorted)
+        
+        logger.info(f"Sorted {len(elements)} elements by reading order with superscript handling")
         return sorted_elements
+    
+    def _identify_superscript_associations(self, elements: List[LayoutElement]) -> List[Tuple[LayoutElement, LayoutElement]]:
+        """
+        Identify superscript elements and their associated main text elements.
+        
+        Args:
+            elements: List of elements on a single page
+            
+        Returns:
+            List of (main_element, superscript_element) pairs
+        """
+        superscript_pairs = []
+        
+        for i, element in enumerate(elements):
+            # Check if this could be a superscript
+            if self._is_potential_superscript(element):
+                # Find the most likely main text this superscript belongs to
+                main_element = self._find_main_text_for_superscript(element, elements)
+                if main_element and main_element != element:
+                    superscript_pairs.append((main_element, element))
+        
+        return superscript_pairs
+    
+    def _is_potential_superscript(self, element: LayoutElement) -> bool:
+        """
+        Check if an element is likely a superscript based on its characteristics.
+        
+        Args:
+            element: Element to check
+            
+        Returns:
+            True if element appears to be a superscript
+        """
+        if not element.style or not element.style.primary_font:
+            return False
+        
+        font = element.style.primary_font
+        text = element.text.strip()
+        
+        # Check for typical superscript characteristics
+        superscript_indicators = [
+            # Small font size (relative check will be done later)
+            font.size and font.size < 10,
+            # Short text (typically numbers or symbols)
+            len(text) <= 3,
+            # Numeric content (footnote references)
+            text.isdigit(),
+            # Common superscript symbols
+            text in ['*', '†', '‡', '§', '¶', '°', '™', '®', '©'],
+            # Bracketed numbers like [1], (1)
+            bool(re.match(r'^[\(\[]?\d+[\)\]]?$', text)),
+        ]
+        
+        # Element is potential superscript if it meets multiple criteria
+        return sum(superscript_indicators) >= 2
+    
+    def _find_main_text_for_superscript(self, superscript: LayoutElement, elements: List[LayoutElement]) -> Optional[LayoutElement]:
+        """
+        Find the main text element that this superscript is associated with.
+        
+        Args:
+            superscript: The potential superscript element
+            elements: All elements on the page
+            
+        Returns:
+            The main text element, or None if not found
+        """
+        if not superscript.bbox:
+            return None
+        
+        super_bbox = superscript.bbox
+        candidates = []
+        
+        for element in elements:
+            if element == superscript or not element.bbox:
+                continue
+            
+            elem_bbox = element.bbox
+            
+            # Check if element is positioned to the left and slightly below the superscript
+            # (i.e., superscript is above and to the right of main text)
+            if (elem_bbox.x2 <= super_bbox.x2 and  # Main text ends before or at superscript
+                elem_bbox.y1 >= super_bbox.y1 - 5 and  # Main text is at similar or lower y position (allowing small tolerance)
+                elem_bbox.y1 <= super_bbox.y2 + 10):  # But not too far below
+                
+                # Calculate distance and other factors
+                horizontal_distance = super_bbox.x1 - elem_bbox.x2
+                vertical_distance = abs(elem_bbox.y1 - super_bbox.y1)
+                
+                # Prefer elements that are close horizontally and have reasonable vertical alignment
+                if horizontal_distance >= 0 and horizontal_distance <= 50:  # Within reasonable horizontal distance
+                    font_size_ratio = 1.0
+                    if (element.style and element.style.primary_font and element.style.primary_font.size and
+                        superscript.style and superscript.style.primary_font and superscript.style.primary_font.size):
+                        main_size = element.style.primary_font.size
+                        super_size = superscript.style.primary_font.size
+                        font_size_ratio = super_size / main_size if main_size > 0 else 1.0
+                    
+                    # Score based on proximity and font size relationship
+                    score = 1.0 / (1.0 + horizontal_distance + vertical_distance * 2)
+                    
+                    # Boost score if superscript has smaller font
+                    if font_size_ratio < 0.8:
+                        score *= 1.5
+                    
+                    candidates.append((element, score, horizontal_distance, vertical_distance))
+        
+        # Return the best candidate (highest score)
+        if candidates:
+            candidates.sort(key=lambda x: (-x[1], x[2], x[3]))  # Sort by score (desc), then distances (asc)
+            return candidates[0][0]
+        
+        return None
 
 
 # unit test

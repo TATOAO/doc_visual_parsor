@@ -1,8 +1,10 @@
-from models.schemas.layout_schemas import LayoutExtractionResult, LayoutElement
+from typing import List, Optional
+from models.schemas.layout_schemas import LayoutExtractionResult, LayoutElement, ElementType
 from pydantic import BaseModel
 
 
-def display_layout(layout_extraction_result: LayoutExtractionResult):
+def display_layout(layout_extraction_result: LayoutExtractionResult, 
+                   exclude_types: List[ElementType] = []):
     """
     Display the layout in a human-readable format.
     Using special tags to indicate the element type, position, style, text, etc.
@@ -17,11 +19,11 @@ def display_layout(layout_extraction_result: LayoutExtractionResult):
     display_result = []
 
     for element in layout_extraction_result.elements:
+        if element.element_type in exclude_types:
+            continue
         line = str(DisplayLine.from_layout_element(element))
         display_result.append(line)
 
-    with open("./layout_displayer.txt", "w") as f:
-        f.write("\n".join(display_result))
 
     return display_result
 
@@ -31,7 +33,8 @@ class DisplayLine(BaseModel):
     element_id: int
     element_text: str
     element_bbox: str
-    font_style: str
+    font_name: str
+    font_size: float
     font_color: str = ""
     font_italic: bool = False
     font_underline: bool = False
@@ -54,7 +57,8 @@ class DisplayLine(BaseModel):
             element_id=layout_element.id,
             element_text=layout_element.text,
             element_bbox=bbox_str,
-            font_style=layout_element.style.style_name,
+            font_name=layout_element.style.runs[0].font.name,
+            font_size=round(layout_element.style.runs[0].font.size, 1),
             font_color=layout_element.style.runs[0].font.color if layout_element.style.runs[0].font.color != '#000000' else "",
             font_italic=layout_element.style.runs[0].font.italic,
             font_underline=layout_element.style.runs[0].font.underline,
@@ -65,8 +69,8 @@ class DisplayLine(BaseModel):
         return f"[id:{self.element_id}]" + \
             f"[page:{self.page_number}]" + \
             f"[type:{self.element_type}]" + \
-            f"[pos:{self.element_bbox}]" + \
-            f"[{self.font_style}]" + \
+            (f"[pos:{self.element_bbox}]" if False else "") + \
+            f"[{self.font_name} {self.font_size}pt]" + \
             (f"[color:{self.font_color}]" if self.font_color else "") + \
             (f"[italic:{self.font_italic}]" if self.font_italic else "") + \
             (f"[underline:{self.font_underline}]" if self.font_underline else "") + \
@@ -85,4 +89,7 @@ if __name__ == "__main__":
         metadata=layout_data["metadata"]
     )
 
-    display_layout(layout_extraction_result)
+    display_result = display_layout(layout_extraction_result, exclude_types=[])
+
+    with open("./layout_displayer.txt", "w") as f:
+        f.write("\n".join(display_result))
