@@ -3,7 +3,8 @@ from models.layout_structuring.title_structure_builder_llm.layout_displayer impo
 from models.naive_llm.helpers.tree_like_structure_mapping import find_ordered_fuzzy_sequence
 from models.schemas.layout_schemas import LayoutExtractionResult
 from models.schemas.schemas import Section, Positions
-from fuzzysearch import find_near_matches
+from rapidfuzz import fuzz, process
+import re
 
 
 
@@ -61,14 +62,13 @@ def section_reconstructor(title_raw_structure: str, layout_extraction_result: La
             except ValueError:
                 continue
     
-    def fuzzy_match_title(title_text: str, element_text: str, max_l_dist: int = 3) -> bool:
+    def enhanced_fuzzy_match_title(title_text: str, element_text: str) -> bool:
         """
-        Fuzzy match title text against element text using fuzzy search.
+        Enhanced fuzzy match title text against element text.
         
         Args:
             title_text: The title to search for
             element_text: The element text to search in
-            max_l_dist: Maximum Levenshtein distance for fuzzy matching
             
         Returns:
             True if fuzzy match found, False otherwise
@@ -80,22 +80,45 @@ def section_reconstructor(title_raw_structure: str, layout_extraction_result: La
         title_clean = " ".join(title_text.strip().split())
         element_clean = " ".join(element_text.strip().split())
         
-        # Try exact match first
+        # Try exact match first (most reliable)
         if title_clean in element_clean:
             return True
-            
-        # Try fuzzy matching with the cleaned text
-        matches = find_near_matches(title_clean, element_clean, max_l_dist=max_l_dist)
-        if matches:
+        
+        # Calculate minimum similarity threshold based on title length
+        title_len = len(title_clean)
+        if title_len <= 2:
+            min_similarity = 95  # Very short titles need high similarity
+        elif title_len <= 4:
+            min_similarity = 85  # Short titles need high similarity  
+        elif title_len <= 8:
+            min_similarity = 75  # Medium titles need good similarity
+        else:
+            min_similarity = 65  # Longer titles can have lower similarity
+        
+        # Use different fuzzy matching strategies
+        
+        # 1. Overall ratio (entire strings)
+        ratio = fuzz.ratio(title_clean, element_clean)
+        if ratio >= min_similarity:
             return True
             
-        # Try fuzzy matching with a shorter version of the title (first few words)
-        # This helps when titles are truncated or have additional formatting
-        title_words = title_clean.split()
-        if len(title_words) > 2:
-            short_title = " ".join(title_words[:2])
-            matches = find_near_matches(short_title, element_clean, max_l_dist=max_l_dist)
-            if matches:
+        # 2. Partial ratio (best matching substring)
+        partial_ratio = fuzz.partial_ratio(title_clean, element_clean)
+        if partial_ratio >= min_similarity:
+            return True
+            
+        # 3. For very short titles, also check if title appears as separate words
+        if title_len <= 4:
+            # Split element text into words and check individual words
+            element_words = re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z]+', element_clean)
+            for word in element_words:
+                if fuzz.ratio(title_clean, word) >= min_similarity:
+                    return True
+        
+        # 4. Token-based matching for longer titles
+        if title_len > 4:
+            token_ratio = fuzz.token_sort_ratio(title_clean, element_clean)
+            if token_ratio >= min_similarity - 10:  # Slightly lower threshold for token matching
                 return True
         
         return False
@@ -109,19 +132,14 @@ def section_reconstructor(title_raw_structure: str, layout_extraction_result: La
         # Search from current position to end
         while current_element_idx < len(sorted_elements):
             element = sorted_elements[current_element_idx]
-            # Clean and compare the text using fuzzy matching
+            # Clean and compare the text using enhanced fuzzy matching
             element_text = element.text.strip() if element.text else ""
-            if fuzzy_match_title(title_text, element_text):
+
+            if enhanced_fuzzy_match_title(title_text, element_text):
                 found_element = element
                 current_element_idx += 1  # Move to next element for next search
                 break
             current_element_idx += 1
-
-
-            if title_text == "附件：":
-                import ipdb; ipdb.set_trace()
-                print(element_text)
-                pass
             
         if found_element:
             title_elements.append(found_element)
