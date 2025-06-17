@@ -13,20 +13,20 @@ from enum import Enum
 
 class ElementType(str, Enum):
     """Standardized element types across all detection methods."""
-    TEXT = "Text"
+    PLAIN_TEXT = "Plain Text"
     TITLE = "Title"
     HEADING = "Heading"
     FIGURE = "Figure"
     FIGURE_CAPTION = "Figure Caption"
     TABLE = "Table"
     TABLE_CAPTION = "Table Caption"
-    HEADER = "Header"
-    FOOTER = "Footer"
-    REFERENCE = "Reference"
-    EQUATION = "Equation"
+    TABLE_FOOTNOTE = "Table Footnote"
+    ISOLATE_FORMULA = "Isolate Formula"
+    FORMULA_CAPTION = "Formula Caption"
     LIST = "List"
     PARAGRAPH = "Paragraph"
     UNKNOWN = "Unknown"
+    ABANDON = "Abandon"
 
 
 class TextAlignment(str, Enum):

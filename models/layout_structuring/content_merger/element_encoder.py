@@ -360,7 +360,7 @@ class ElementEncoder:
     def _encode_element_type(self, element: LayoutElement) -> int:
         """Encode element type as integer"""
         type_map = {
-            ElementType.TEXT: 0,
+            ElementType.PLAIN_TEXT: 0,
             ElementType.TITLE: 1,
             ElementType.HEADING: 2,
             ElementType.FIGURE: 3,

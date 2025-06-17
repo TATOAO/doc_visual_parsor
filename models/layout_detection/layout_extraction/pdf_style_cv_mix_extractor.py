@@ -504,8 +504,8 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
     
     def _validate_element_type(self, element: LayoutElement) -> ElementType:
         """Validate and fix element type based on content and metadata."""
-        # Keep CV-detected type if it's not TEXT
-        if element.element_type != ElementType.TEXT:
+        # Keep CV-detected type if it's not PLAIN_TEXT
+        if element.element_type != ElementType.PLAIN_TEXT:
             return element.element_type
         
         # Try to determine type from metadata
@@ -518,7 +518,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
             
             # Add more type detection logic here
         
-        return ElementType.TEXT
+        return ElementType.PLAIN_TEXT
     
     def _clean_metadata(self, metadata: Dict) -> Dict:
         """Clean up metadata dictionary."""

@@ -181,7 +181,7 @@ class DocxLayoutExtrator(BaseLayoutExtractor):
             # Note: We set element_type to TEXT as default, classification will happen later
             element = LayoutElement(
                 id=element_id,
-                element_type=ElementType.TEXT,  # Default type, classification happens later
+                element_type=ElementType.PLAIN_TEXT,  # Default type, classification happens later
                 confidence=1.0,  # Raw extraction has full confidence in style info
                 bbox=bbox,
                 text=text,

@@ -41,17 +41,18 @@ from ..utils.layout_processing import sort_elements_by_position, filter_redundan
 logger = logging.getLogger(__name__)
 
 # Mapping from DocLayout-YOLO class IDs to our standardized ElementType
+# {0: 'title', 1: 'plain text', 2: 'abandon', 3: 'figure', 4: 'figure_caption', 5: 'table', 6: 'table_caption', 7: 'table_footnote', 8: 'isolate_formula', 9: 'formula_caption'}
 DOCLAYOUT_CLASS_MAPPING = {
-    0: ElementType.TEXT,
-    1: ElementType.TITLE, 
-    2: ElementType.FIGURE,
-    3: ElementType.FIGURE_CAPTION,
-    4: ElementType.TABLE,
-    5: ElementType.TABLE_CAPTION,
-    6: ElementType.HEADER,
-    7: ElementType.FOOTER,
-    8: ElementType.REFERENCE,
-    9: ElementType.EQUATION
+    0: ElementType.TITLE,
+    1: ElementType.PLAIN_TEXT,
+    2: ElementType.ABANDON,
+    3: ElementType.FIGURE,
+    4: ElementType.FIGURE_CAPTION,
+    5: ElementType.TABLE,
+    6: ElementType.TABLE_CAPTION,
+    7: ElementType.TABLE_FOOTNOTE,
+    8: ElementType.ISOLATE_FORMULA,
+    9: ElementType.FORMULA_CAPTION
 }
 
 class CVLayoutDetector(BaseLayoutExtractor):
@@ -490,7 +491,7 @@ class CVLayoutDetector(BaseLayoutExtractor):
         
         # Colors for different element types (RGB)
         colors = {
-            ElementType.TEXT: (0, 255, 0),          # Green
+            ElementType.PLAIN_TEXT: (0, 255, 0),    # Green
             ElementType.TITLE: (255, 0, 0),         # Red
             ElementType.HEADING: (255, 0, 0),       # Red
             ElementType.FIGURE: (0, 0, 255),        # Blue
