@@ -32,7 +32,11 @@ class PDFPosition(BaseModel):
 
 
 class DOCXPosition(BaseModel):
-    """DOCX-specific position using paragraph and character indices"""
+    """
+    DOCX-specific position using paragraph and character indices
+
+    DOCX files (unlike PDFs) are flow-based, not fixed-layout. So no page number.
+    """
     paragraph_index: int = Field(description="Paragraph index")
     character_start: Optional[int] = Field(description="Character start within paragraph", default=None)
     character_end: Optional[int] = Field(description="Character end within paragraph", default=None)

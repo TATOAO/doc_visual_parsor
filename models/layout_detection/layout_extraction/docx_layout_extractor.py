@@ -225,7 +225,7 @@ class DocxLayoutExtrator(BaseLayoutExtractor):
                     confidence=1.0,
                     bbox=bbox,
                     text=table_text,
-                    style=None,  # Tables don't have the same style structure as paragraphs
+                    style=self._extract_table_style_info(table),  # Extract table style information
                     metadata=metadata
                 )
                 
@@ -516,17 +516,91 @@ class DocxLayoutExtrator(BaseLayoutExtractor):
         
         return table_text, table_metadata
 
+    def _extract_table_style_info(self, table) -> StyleInfo:
+        """
+        Extract comprehensive style information from a table.
+        
+        Args:
+            table: Document table object
+            
+        Returns:
+            StyleInfo object with table formatting details
+        """
+        # Extract table-level style information
+        table_style_info = {}
+        
+        # Get table style name if available
+        style_name = None
+        if hasattr(table, 'style') and table.style:
+            style_name = table.style.name
+            table_style_info['style_name'] = style_name
+            
+        # Extract table alignment if available
+        if hasattr(table, 'alignment') and table.alignment:
+            table_style_info['alignment'] = str(table.alignment)
+            
+        # Extract table width information
+        if hasattr(table, 'autofit'):
+            table_style_info['autofit'] = table.autofit
+            
+        # Extract font information from first cell with text
+        primary_font = None
+        runs = []
+        
+        # Iterate through table cells to find text and extract font information
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    if paragraph.text.strip():  # Only process paragraphs with text
+                        for run in paragraph.runs:
+                            if run.text:
+                                # Extract font information similar to paragraph runs
+                                font_info = FontInfo(
+                                    name=getattr(run.font, 'name', None),
+                                    size=self._points_to_float(getattr(run.font, 'size', None)),
+                                    bold=self._safe_bool_property(run.font, 'bold'),
+                                    italic=self._safe_bool_property(run.font, 'italic'),
+                                    underline=self._safe_bool_property(run.font, 'underline')
+                                )
+                                
+                                runs.append(RunInfo(
+                                    text=run.text,
+                                    font=font_info
+                                ))
+                                
+                                # Set primary font from first run found
+                                if primary_font is None:
+                                    primary_font = font_info
+                        
+                        # Exit early after finding first text content
+                        if runs:
+                            break
+                if runs:
+                    break
+            if runs:
+                break
+        
+        return StyleInfo(
+            style_name=style_name,
+            style_type='table',
+            paragraph_format=None,  # Tables don't have paragraph-level formatting
+            runs=runs,
+            primary_font=primary_font,
+            table_style=table_style_info if table_style_info else None,
+            custom_properties={'element_type': 'table'}
+        )
+
 
 # unit test
-# python -m models.layout_detection.document_detector
+# python -m models.layout_detection.layout_extraction.docx_layout_extractor
 if __name__ == "__main__":
     detector = DocxLayoutExtrator()
     result = detector._detect_layout(input_data="tests/test_data/1-1 买卖合同（通用版）.docx")
     import json 
 
     # remove all runs
-    for element in result.elements:
-        if element.style and element.style.runs:
-            element.style.runs = [] 
+    # for element in result.elements:
+    #     if element.style and element.style.runs:
+    #         element.style.runs = [] 
 
-    json.dump(result.model_dump(), open("layout_detection_result_no_runs.json", "w"), indent=2, ensure_ascii=False)
+    json.dump(result.model_dump(), open("layout_detection_result_with_runs.json", "w"), indent=2, ensure_ascii=False)

@@ -110,8 +110,6 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
             cv_result = self.cv_detector._detect_layout(input_data, **kwargs)
 
             # save cv_reuslt to json for debug
-            import json
-            json.dump(cv_result.model_dump(), open("cv_result.json", "w"), indent=2, ensure_ascii=False)
             
             logger.info(f"CV detection found {len(cv_result.elements)} elements")
             
@@ -123,9 +121,6 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
             logger.info("Extracting PDF content for enrichment")
             pdf_result = self.pdf_extractor._detect_layout(input_data, **kwargs)
 
-            # save pdf_result to json for debug
-            json.dump(pdf_result.model_dump(), open("pdf_result.json", "w"), indent=2, ensure_ascii=False)
-            
             logger.info(f"PDF extraction found {len(pdf_result.elements)} elements")
             
             # Step 3: Process each page

@@ -28,17 +28,18 @@ def display_layout(layout_extraction_result: LayoutExtractionResult,
     return display_result
 
 class DisplayLine(BaseModel):
-    page_number: int
+    page_number: Optional[int] = None
     element_type: str
     element_id: int
     element_text: str
     element_bbox: str
     font_name: str
     font_size: float
-    font_color: str = ""
-    font_italic: bool = False
-    font_underline: bool = False
-    alignment: str = ""
+    font_color: Optional[str] = None
+    font_italic: Optional[bool] = None
+    font_underline: Optional[bool] = None
+    font_bold: Optional[bool] = None
+    alignment: Optional[str] = None
 
     @classmethod
     def from_layout_element(cls, layout_element: LayoutElement) -> "DisplayLine":
@@ -52,27 +53,30 @@ class DisplayLine(BaseModel):
 
 
         return cls(
-            page_number=layout_element.metadata['page_number'],
+            page_number=layout_element.metadata.get('page_number', None),
             element_type=layout_element.element_type,
             element_id=layout_element.id,
             element_text=layout_element.text,
             element_bbox=bbox_str,
-            font_name=layout_element.style.runs[0].font.name,
-            font_size=round(layout_element.style.runs[0].font.size, 1),
-            font_color=layout_element.style.runs[0].font.color if layout_element.style.runs[0].font.color != '#000000' else "",
-            font_italic=layout_element.style.runs[0].font.italic,
+            font_name=layout_element.style.runs[0].font.name if layout_element.style.runs else None,
+            font_size=round(layout_element.style.runs[0].font.size, 1) if layout_element.style.runs else None,
+            font_color=layout_element.style.runs[0].font.color if layout_element.style.runs[0].font.color != '#000000' else None,
+            font_italic=layout_element.style.runs[0].font.italic if layout_element.style.runs else None,
             font_underline=layout_element.style.runs[0].font.underline,
-            alignment=layout_element.style.paragraph_format.alignment.value
+            font_bold=layout_element.style.runs[0].font.bold if layout_element.style.runs else None,
+            alignment=layout_element.style.paragraph_format.alignment.value if layout_element.style.paragraph_format else None
         )
+
     
     def __str__(self) -> str:
         return f"[id:{self.element_id}]" + \
-            f"[page:{self.page_number}]" + \
+            (f"[page:{self.page_number}]" if self.page_number else "") + \
             f"[type:{self.element_type}]" + \
             (f"[pos:{self.element_bbox}]" if False else "") + \
             f"[{self.font_name} {self.font_size}pt]" + \
             (f"[color:{self.font_color}]" if self.font_color else "") + \
             (f"[italic:{self.font_italic}]" if self.font_italic else "") + \
+            (f"[bold:{self.font_bold}]" if self.font_bold else "") + \
             (f"[underline:{self.font_underline}]" if self.font_underline else "") + \
             (f"[alignment:{self.alignment}]" if self.alignment else "") + \
             f"{self.element_text}"
@@ -82,7 +86,7 @@ class DisplayLine(BaseModel):
 # python -m models.layout_structuring.title_structure_builder_llm.layout_displayer
 if __name__ == "__main__":
     import json
-    with open("./hybrid_extraction_result.json", "r") as f:
+    with open("./layout_detection_result_with_runs.json", "r") as f:
         layout_data = json.load(f)
     layout_extraction_result = LayoutExtractionResult(
         elements=layout_data["elements"], 

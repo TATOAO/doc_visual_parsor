@@ -1,10 +1,11 @@
+import asyncio
+from typing import AsyncGenerator
 from models.layout_structuring.title_structure_builder_llm.layout_displayer import display_layout
 from models.schemas.layout_schemas import LayoutExtractionResult, ElementType
 from models.utils.llm import get_llm_client
 
-def title_structure_builder_llm(layout_extraction_result: LayoutExtractionResult) -> str:
-    llm_client = get_llm_client(model="qwen3-4b", extra_body={"enable_thinking": False})
-    system_prompt = f"""
+
+system_prompt = f"""
 你是一个可以帮助构建文档标题结构的智能助手。
 
 输入的文本开头包含的是id, page_number, style, font, alignment, bbox 等信息, 这些信息可以作参考
@@ -28,11 +29,29 @@ def title_structure_builder_llm(layout_extraction_result: LayoutExtractionResult
 2.3. 标题xxx
 """
 
+
+async def _collect_chunks(layout_extraction_result: LayoutExtractionResult) -> str:
+    """Helper async function to collect all chunks from the async generator."""
+    content = ""
+    async for chunk in stream_title_structure_builder_llm(layout_extraction_result):
+        print(chunk, end="", flush=True)
+        content += chunk
+    return content
+
+
+def title_structure_builder_llm(layout_extraction_result: LayoutExtractionResult) -> str:
+    """Synchronous wrapper that runs the async generator using asyncio.run()."""
+    return asyncio.run(_collect_chunks(layout_extraction_result))
+
+
+async def stream_title_structure_builder_llm(layout_extraction_result: LayoutExtractionResult) -> AsyncGenerator[str, None]:
+    llm_client = get_llm_client(model="qwen3-4b", extra_body={"enable_thinking": False})
+
     user_prompt = f"""
 文档内容如下：
 {display_layout(layout_extraction_result, exclude_types=[])}
 
-你可以忽略小的标题结构， 优先构建大的标题结构。
+你可以忽略小的标题结构， 优先构建大的标题结构。总字数不超过500字。
 """
 
     messages = [
@@ -40,20 +59,16 @@ def title_structure_builder_llm(layout_extraction_result: LayoutExtractionResult
         {"role": "user", "content": user_prompt}
     ]
 
-    response = llm_client.stream(messages)
-    content = ""
+    response = llm_client.astream(messages)
     
-    for chunk in response:
+    async for chunk in response:
         # Regular content
         if chunk.content:
-            print(chunk.content, end="", flush=True)
-            content += chunk.content
-    
-    return content
+            yield chunk.content
 
 
 # python -m models.layout_structuring.title_structure_builder_llm.structurer_llm
 if __name__ == "__main__":
-    layout_extraction_result = LayoutExtractionResult.model_validate_json(open("./hybrid_extraction_result.json", "r").read())
+    layout_extraction_result = LayoutExtractionResult.model_validate_json(open("./layout_detection_result_with_runs.json", "r").read())
     title_structure = title_structure_builder_llm(layout_extraction_result)
-    # print(title_structure)
+    print(title_structure)

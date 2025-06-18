@@ -140,7 +140,7 @@ class StyleInfo(BaseModel):
     paragraph_format: Optional[ParagraphFormat] = Field(None, description="Paragraph formatting information")
     
     # Text runs with individual formatting
-    runs: Optional[List[RunInfo]] = Field(None, description="List of text runs with formatting")
+    runs: Optional[List[RunInfo]] = Field([], description="List of text runs with formatting")
     
     # Dominant/primary font info (for backward compatibility)
     primary_font: Optional[FontInfo] = Field(None, description="Primary font information")
@@ -250,7 +250,7 @@ class LayoutElement(BaseModel):
     confidence: float = Field(..., description="Confidence score for the detection", ge=0.0, le=1.0)
     bbox: Optional[BoundingBox] = Field(None, description="Bounding box coordinates")
     text: Optional[str] = Field(None, description="Text content of the element")
-    style: Optional[StyleInfo] = Field(None, description="Style information")
+    style: Optional[StyleInfo] = Field(StyleInfo(runs=[]), description="Style information")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
     
     @field_validator('text')
