@@ -5,6 +5,8 @@ from models.schemas.layout_schemas import LayoutExtractionResult
 from models.schemas.schemas import Section, Positions
 from rapidfuzz import fuzz, process
 import re
+import asyncio
+from typing import Generator, AsyncGenerator, Union, Any
 
 
 
@@ -206,6 +208,233 @@ def section_reconstructor(title_raw_structure: str, layout_extraction_result: La
     return root_section
 
 
+async def streaming_section_reconstructor(
+    title_structure_stream: AsyncGenerator[str, None], 
+    layout_extraction_result: LayoutExtractionResult
+) -> AsyncGenerator[Section, None]:
+    """
+    Async streaming version of section_reconstructor that processes title structure chunks
+    as they arrive and yields incremental section trees.
+
+    Args:
+        title_structure_stream: An async generator yielding string chunks of the title structure
+        layout_extraction_result: A LayoutExtractionResult object containing the document layout
+
+    Yields:
+        Section: Incremental Section tree objects as more structure is parsed
+    """
+    # Initialize state
+    accumulated_text = ""
+    processed_lines = []
+    title_structure = []
+    
+    # Create root section
+    root_section = Section(
+        title="",
+        content="",
+        level=-1,
+        element_id=-1
+    )
+    
+    # Keep track of sections at each level for building the hierarchy
+    level_sections = {-1: root_section}
+    
+    # Get layout elements and prepare matching infrastructure
+    sorted_elements = layout_extraction_result.elements
+    layout_lines = display_layout(layout_extraction_result)
+    
+    # Create mapping from line index to element ID
+    line_to_element_id = {}
+    for i, line in enumerate(layout_lines):
+        if line.startswith('[id:'):
+            try:
+                element_id = int(line[4:line.index(']')])
+                line_to_element_id[i] = element_id
+            except ValueError:
+                continue
+    
+    def enhanced_fuzzy_match_title(title_text: str, element_text: str) -> bool:
+        """Enhanced fuzzy match title text against element text."""
+        if not title_text or not element_text:
+            return False
+        
+        # Clean both texts by removing extra whitespace and normalizing
+        title_clean = " ".join(title_text.strip().split())
+        element_clean = " ".join(element_text.strip().split())
+        
+        # Try exact match first (most reliable)
+        if title_clean in element_clean:
+            return True
+        
+        # Calculate minimum similarity threshold based on title length
+        title_len = len(title_clean)
+        if title_len <= 2:
+            min_similarity = 95
+        elif title_len <= 4:
+            min_similarity = 85
+        elif title_len <= 8:
+            min_similarity = 75
+        else:
+            min_similarity = 65
+        
+        # Use different fuzzy matching strategies
+        ratio = fuzz.ratio(title_clean, element_clean)
+        if ratio >= min_similarity:
+            return True
+            
+        partial_ratio = fuzz.partial_ratio(title_clean, element_clean)
+        if partial_ratio >= min_similarity:
+            return True
+            
+        if title_len <= 4:
+            element_words = re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z]+', element_clean)
+            for word in element_words:
+                if fuzz.ratio(title_clean, word) >= min_similarity:
+                    return True
+        
+        if title_len > 4:
+            token_ratio = fuzz.token_sort_ratio(title_clean, element_clean)
+            if token_ratio >= min_similarity - 10:
+                return True
+        
+        return False
+    
+    def parse_new_lines(text_chunk: str) -> list:
+        """Parse complete lines from accumulated text."""
+        lines = text_chunk.split('\n')
+        complete_lines = []
+        
+        for line in lines[:-1]:  # All but the last line are complete
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Extract level from numbering (e.g., "1.1.2" -> level 2)
+            parts = line.split(' ', 1)
+            if len(parts) != 2:
+                continue
+                
+            number, title = parts
+            level = number.count('.')
+            complete_lines.append((level, title.strip(), number.strip('.')))
+        
+        return complete_lines
+    
+    def build_incremental_section_tree(current_title_structure: list) -> Section:
+        """Build section tree from current title structure."""
+        # Reset sections for rebuilding
+        new_root = Section(
+            title="",
+            content="",
+            level=-1,
+            element_id=-1
+        )
+        new_level_sections = {-1: new_root}
+        
+        # Map titles to elements
+        title_elements = []
+        current_element_idx = 0
+        
+        for _, title_text, _ in current_title_structure:
+            found_element = None
+            search_start = current_element_idx
+            
+            # Search from current position to end
+            while current_element_idx < len(sorted_elements):
+                element = sorted_elements[current_element_idx]
+                element_text = element.text.strip() if element.text else ""
+
+                if enhanced_fuzzy_match_title(title_text, element_text):
+                    found_element = element
+                    current_element_idx += 1
+                    break
+                current_element_idx += 1
+                
+            if found_element:
+                title_elements.append(found_element)
+            else:
+                # Reset search position if no match found
+                current_element_idx = search_start
+        
+        # Build section tree with matched elements
+        for idx, ((level, title_text, number), matching_element) in enumerate(zip(current_title_structure[:len(title_elements)], title_elements)):
+            # Create new section
+            section = Section(
+                title=title_text,
+                content="",
+                level=level,
+                element_id=matching_element.id if matching_element else -1
+            )
+            
+            # Find parent section
+            parent_level = level - 1
+            while parent_level >= -1:
+                if parent_level in new_level_sections:
+                    parent_section = new_level_sections[parent_level]
+                    section.parent_section = parent_section
+                    parent_section.sub_sections.append(section)
+                    break
+                parent_level -= 1
+                
+            # Update level_sections map
+            new_level_sections[level] = section
+            
+            # Extract content between this title and the next
+            if matching_element:
+                current_element_index = sorted_elements.index(matching_element)
+                next_title_index = len(sorted_elements)
+                
+                if idx + 1 < len(title_elements):
+                    next_title = title_elements[idx + 1]
+                    try:
+                        next_title_index = sorted_elements.index(next_title)
+                    except ValueError:
+                        pass
+                
+                # Collect content elements
+                content_elements = []
+                for i in range(current_element_index + 1, next_title_index):
+                    element = sorted_elements[i]
+                    if element in title_elements:
+                        continue
+                    if element.text:
+                        content_elements.append(element.text)
+                
+                section.content = "\n".join(content_elements)
+        
+        return new_root
+    
+    # Process streaming input
+    async for chunk in title_structure_stream:
+        accumulated_text += chunk
+        
+        # Check if we have any complete lines
+        lines = accumulated_text.split('\n')
+        if len(lines) > 1:
+            # Process complete lines
+            complete_text = '\n'.join(lines[:-1])
+            accumulated_text = lines[-1]  # Keep the incomplete last line
+            
+            # Parse new complete lines
+            new_lines = parse_new_lines(complete_text + '\n')
+            
+            if new_lines:
+                # Add new lines to our title structure
+                title_structure.extend(new_lines)
+                
+                # Build and yield incremental section tree
+                current_root = build_incremental_section_tree(title_structure)
+                yield current_root
+    
+    # Process any remaining content
+    if accumulated_text.strip():
+        final_lines = parse_new_lines(accumulated_text + '\n')
+        if final_lines:
+            title_structure.extend(final_lines)
+            final_root = build_incremental_section_tree(title_structure)
+            yield final_root
+
+
 # python -m models.layout_structuring.title_structure_builder_llm.section_reconstructor
 if __name__ == "__main__":
     # Example usage
@@ -251,9 +480,47 @@ if __name__ == "__main__":
         1.2.18. 附件：
     """
     
-    # Build section tree
+    # Test regular section reconstructor
+    print("=== Testing Regular Section Reconstructor ===")
     section_tree = section_reconstructor(title_structure, layout_result)
     from models.naive_llm.helpers.section_token_parsor import remove_circular_references
     remove_circular_references(section_tree)
     
     json.dump(section_tree.model_dump(), open("./section_tree_0617.json", "w"), indent=4, ensure_ascii=False)
+    
+    # Test streaming section reconstructor
+    print("\n=== Testing Streaming Section Reconstructor ===")
+    
+    async def simulate_llm_stream():
+        """Simulate an LLM streaming title structure."""
+        lines = title_structure.strip().split('\n')
+        for line in lines:
+            # Simulate streaming by yielding chunks of each line
+            line_with_newline = line + '\n'
+            # Split each line into smaller chunks to simulate streaming
+            chunk_size = max(1, len(line_with_newline) // 3)
+            for i in range(0, len(line_with_newline), chunk_size):
+                chunk = line_with_newline[i:i+chunk_size]
+                yield chunk
+                await asyncio.sleep(0.01)  # Simulate delay
+    
+    async def test_streaming():
+        """Test the streaming section reconstructor."""
+        print("Starting streaming reconstruction...")
+        
+        section_count = 0
+        async for partial_section_tree in streaming_section_reconstructor(
+            simulate_llm_stream(), layout_result
+        ):
+            section_count += 1
+            print(f"Received partial section tree #{section_count} with {len(partial_section_tree.sub_sections)} top-level sections")
+            
+            # Save each intermediate result
+            remove_circular_references(partial_section_tree)
+            filename = f"./section_tree_streaming_{section_count:03d}.json"
+            json.dump(partial_section_tree.model_dump(), open(filename, "w"), indent=4, ensure_ascii=False)
+        
+        print(f"Streaming reconstruction completed with {section_count} intermediate results")
+    
+    # Run the streaming test
+    asyncio.run(test_streaming())
