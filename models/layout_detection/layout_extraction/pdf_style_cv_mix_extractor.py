@@ -20,10 +20,10 @@ from models.schemas.layout_schemas import (
     ElementType,
     RunInfo
 )
+from models.schemas.schemas import InputDataType
 
 logger = logging.getLogger(__name__)
 
-InputDataType = Union[str, Path, bytes, Any]
 
 class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
     """

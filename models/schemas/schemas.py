@@ -1,10 +1,14 @@
 from pydantic import BaseModel, Field, computed_field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from typing_extensions import Self
+from pathlib import Path
 from enum import Enum
 import hashlib
 from models.schemas.layout_schemas import BoundingBox
-from models.schemas.layout_schemas import LayoutElement
+
+import numpy as np
+from PIL import Image
+from typing import BinaryIO
 
 
 class DocumentType(str, Enum):
@@ -14,6 +18,15 @@ class DocumentType(str, Enum):
     HTML = "html"
     TEXT = "text"
 
+InputDataType = Union[
+    str,                    # File path as string
+    Path,                   # File path as Path object
+    bytes,                  # Raw file content
+    np.ndarray,            # Image as numpy array
+    Image.Image,           # PIL Image object
+    BinaryIO,              # File-like object with read() method
+    Any                    # For objects with getvalue() method (uploaded files)
+]
 
 
 

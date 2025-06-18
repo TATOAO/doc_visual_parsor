@@ -35,23 +35,10 @@ from models.schemas.layout_schemas import (
     BoundingBox,
     ElementType
 )
-from models.schemas.schemas import Section, Positions, DocumentType
+from models.schemas.schemas import Section, Positions, InputDataType
 
 logger = logging.getLogger(__name__)
 
-import numpy as np
-from PIL import Image
-from typing import BinaryIO
-
-InputDataType = Union[
-    str,                    # File path as string
-    Path,                   # File path as Path object
-    bytes,                  # Raw file content
-    np.ndarray,            # Image as numpy array
-    Image.Image,           # PIL Image object
-    BinaryIO,              # File-like object with read() method
-    Any                    # For objects with getvalue() method (uploaded files)
-]
 
 class DocxLayoutExtrator(BaseLayoutExtractor):
     """

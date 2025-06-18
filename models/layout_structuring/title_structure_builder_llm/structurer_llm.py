@@ -34,7 +34,7 @@ async def _collect_chunks(layout_extraction_result: LayoutExtractionResult) -> s
     """Helper async function to collect all chunks from the async generator."""
     content = ""
     async for chunk in stream_title_structure_builder_llm(layout_extraction_result):
-        print(chunk, end="", flush=True)
+        # print(chunk, end="", flush=True)
         content += chunk
     return content
 
