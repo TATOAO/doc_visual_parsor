@@ -10,5 +10,4 @@
 
 # curl -X POST http://localhost:8000/api/extract-docx-content -F "file=@tests/test_data/1-1 买卖合同（通用版）.docx;type=application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-
-curl -X POST http://localhost:8000/api/analyze-docx-with-naive-llm -F "file=@tests/test_data/1-1 买卖合同（通用版）.docx;type=application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+# curl -X POST http://localhost:8000/api/analyze-docx-with-naive-llm -F "file=@tests/test_data/1-1 买卖合同（通用版）.docx;type=application/vnd.openxmlformats-officedocument.wordprocessingml.document" 

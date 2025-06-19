@@ -127,14 +127,24 @@ class Chunker:
 
 # python -m models.documents_chunking.chunker
 if __name__ == "__main__":
-    chunker = Chunker()
-    word_path = "tests/test_data/1-1 买卖合同（通用版）.docx"
-    section_result = chunker.chunk(word_path)
-    print(f"Result: {section_result.title}")
-    print(f"Content length: {len(section_result.content)}")
 
-    from models.naive_llm.helpers.section_token_parsor import remove_circular_references
-    remove_circular_references(section_result)
-    import json
-    json.dump(section_result.model_dump(), open("section_result.json", "w"), indent=2, ensure_ascii=False)
 
+    def test_chunker():
+        chunker = Chunker()
+        word_path = "tests/test_data/1-1 买卖合同（通用版）.docx"
+        section_result = chunker.chunk(word_path)
+        print(f"Result: {section_result.title}")
+        print(f"Content length: {len(section_result.content)}")
+
+        from models.naive_llm.helpers.section_token_parsor import remove_circular_references
+        remove_circular_references(section_result)
+        import json
+        json.dump(section_result.model_dump(), open("section_result.json", "w"), indent=2, ensure_ascii=False)
+
+    async def test_chunker_async():
+        chunker = Chunker()
+        word_path = "tests/test_data/1-1 买卖合同（通用版）.docx"
+        async for section in chunker.chunk_async(word_path):
+            print(f"Result: {section}")
+
+    asyncio.run(test_chunker_async())

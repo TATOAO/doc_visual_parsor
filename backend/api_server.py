@@ -7,23 +7,29 @@ import base64
 from PIL import Image
 import tempfile
 import os
+import sys
+from pathlib import Path
+from sse_starlette.sse import EventSourceResponse
+import json
 
-# Import existing backend modules
-from .pdf_processor import extract_pdf_pages_into_images, get_pdf_document_object, close_pdf_document
-from .docx_processor import extract_docx_content, extract_docx_structure, extract_docx_structure_with_naive_llm
-from .document_analyzer import (
+# Fix: Use absolute imports for backend modules
+from backend.pdf_processor import extract_pdf_pages_into_images, get_pdf_document_object, close_pdf_document
+from backend.docx_processor import extract_docx_content, extract_docx_structure, extract_docx_structure_with_naive_llm
+from backend.document_analyzer import (
     extract_pdf_document_structure, 
     analyze_document_structure, 
     get_structure_summary
 )
 
 # Import layout detection module
-import sys
-from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
-from models.layout_detection import DocLayoutDetector
+from models.layout_detection.layout_extraction.docx_layout_extractor import DocxLayoutExtrator
+from models.layout_detection.layout_extraction.pdf_layout_extractor import PdfLayoutExtractor
+from models.layout_detection.layout_extraction.pdf_style_cv_mix_extractor import PdfStyleCVMixLayoutExtractor
 
-
+# --- Chunker import ---
+from models.documents_chunking.chunker import Chunker
+from models.naive_llm.helpers.section_token_parsor import remove_circular_references
 
 app = FastAPI(title="Document Visual Parser API", version="1.0.0")
 
@@ -311,152 +317,6 @@ async def analyze_docx_with_naive_llm(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error processing DOCX with naive_llm: {str(e)}")
 
 
-# Global layout detector instance (lazy loading)
-_layout_detector = None
-
-def get_layout_detector():
-    """Get or create the layout detector instance"""
-    global _layout_detector
-    if _layout_detector is None:
-        _layout_detector = DocLayoutDetector(model_name="docstructbench")
-    return _layout_detector
-
-
-@app.post("/api/detect-layout")
-async def detect_layout(
-    file: UploadFile = File(...),
-    confidence: float = 0.25,
-    model_name: str = "docstructbench",
-    image_size: int = 1024
-):
-    """
-    Detect document layout elements in an uploaded image or document.
-    
-    Args:
-        file: Image file (PNG, JPG, etc.) or PDF file
-        confidence: Confidence threshold for detections (0.0-1.0)
-        model_name: Model to use ('docstructbench', 'd4la', 'doclaynet')
-        image_size: Input image size for the model
-    
-    Returns:
-        JSON with detected layout elements
-    """
-    try:
-        # Validate file type
-        allowed_image_types = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/bmp"]
-        allowed_document_types = ["application/pdf"]
-        all_allowed_types = allowed_image_types + allowed_document_types
-        
-        if file.content_type not in all_allowed_types:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported file type: {file.content_type}. "
-                      f"Supported types: {', '.join(all_allowed_types)}"
-            )
-        
-        # Read file content
-        file_content = await file.read()
-        
-        # Initialize detector with requested model
-        try:
-            detector = DocLayoutDetector(
-                model_name=model_name,
-                confidence_threshold=confidence,
-                image_size=image_size
-            )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
-        
-        results = []
-        
-        # Handle different file types
-        if file.content_type in allowed_image_types:
-            # Direct image processing
-            # Save content to temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file.filename.split('.')[-1]}") as tmp_file:
-                tmp_file.write(file_content)
-                tmp_path = tmp_file.name
-            
-            try:
-                # Detect layout
-                result = detector.detect(tmp_path)
-                elements = result.get_elements()
-                
-                results.append({
-                    "page_number": 0,
-                    "elements": elements,
-                    "total_elements": len(elements)
-                })
-                
-            finally:
-                # Clean up temporary file
-                os.unlink(tmp_path)
-        
-        elif file.content_type == "application/pdf":
-            # Extract PDF pages as images and process each
-            class MockUploadedFile:
-                def __init__(self, content, content_type, name):
-                    self._content = content
-                    self.type = content_type
-                    self.name = name
-                
-                def getvalue(self):
-                    return self._content
-            
-            mock_file = MockUploadedFile(file_content, file.content_type, file.filename)
-            pages = extract_pdf_pages(mock_file)
-            
-            if not pages:
-                raise HTTPException(status_code=500, detail="Failed to extract PDF pages")
-            
-            # Process each page
-            for page_num, page_img in enumerate(pages):
-                # Save page to temporary file
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
-                    page_img.save(tmp_file.name, format='PNG')
-                    tmp_path = tmp_file.name
-                
-                try:
-                    # Detect layout on this page
-                    result = detector.detect(tmp_path)
-                    elements = result.get_elements()
-                    
-                    results.append({
-                        "page_number": page_num,
-                        "elements": elements,
-                        "total_elements": len(elements)
-                    })
-                    
-                finally:
-                    # Clean up temporary file
-                    os.unlink(tmp_path)
-        
-        # Compile summary statistics
-        total_elements = sum(page["total_elements"] for page in results)
-        element_type_counts = {}
-        
-        for page in results:
-            for element in page["elements"]:
-                element_type = element["type"]
-                element_type_counts[element_type] = element_type_counts.get(element_type, 0) + 1
-        
-        return {
-            "filename": file.filename,
-            "file_type": file.content_type,
-            "model_used": model_name,
-            "confidence_threshold": confidence,
-            "total_pages": len(results),
-            "total_elements": total_elements,
-            "element_type_summary": element_type_counts,
-            "pages": results,
-            "success": True
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error detecting layout: {str(e)}")
-
 
 @app.post("/api/visualize-layout")
 async def visualize_layout(
@@ -494,10 +354,10 @@ async def visualize_layout(
         file_content = await file.read()
         
         # Initialize detector
-        detector = DocLayoutDetector(
-            model_name=model_name,
-            confidence_threshold=confidence,
-            image_size=image_size
+        detector = PdfStyleCVMixLayoutExtractor(
+            cv_model_name=model_name,
+            cv_confidence_threshold=confidence,
+            cv_image_size=image_size
         )
         
         annotated_images = []
@@ -540,7 +400,7 @@ async def visualize_layout(
                     return self._content
             
             mock_file = MockUploadedFile(file_content, file.content_type, file.filename)
-            pages = extract_pdf_pages(mock_file)
+            pages = extract_pdf_pages_into_images(mock_file)
             
             if not pages:
                 raise HTTPException(status_code=500, detail="Failed to extract PDF pages")
@@ -592,6 +452,85 @@ async def visualize_layout(
         raise HTTPException(status_code=500, detail=f"Error visualizing layout: {str(e)}")
 
 
+@app.post("/api/chunk-document")
+async def chunk_document(file: UploadFile = File(...)):
+    """Chunk a PDF or DOCX document and return the section tree."""
+    try:
+        allowed_types = [
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ]
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {file.content_type}. Supported types: PDF, DOCX"
+            )
+        file_content = await file.read()
+        # Save to a temporary file for compatibility with chunker
+        suffix = ".pdf" if file.content_type == "application/pdf" else ".docx"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+            tmp_file.write(file_content)
+            tmp_path = tmp_file.name
+        try:
+            chunker = Chunker()
+            section_result = chunker.chunk(tmp_path)
+            remove_circular_references(section_result)
+            return {
+                "filename": file.filename,
+                "file_type": file.content_type,
+                "success": True,
+                "section_tree": section_result.model_dump()
+            }
+        finally:
+            os.unlink(tmp_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error chunking document: {str(e)}")
+
+
+# curl -X POST http://localhost:8000/api/chunk-document-sse -F "file=@tests/test_data/1-1 买卖合同（通用版）.docx;type=application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+@app.post("/api/chunk-document-sse")
+async def chunk_document_sse(file: UploadFile = File(...)):
+    """
+    Chunk a PDF or DOCX document and stream the section tree as SSE events.
+    """
+    try:
+        allowed_types = [
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ]
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {file.content_type}. Supported types: PDF, DOCX"
+            )
+        file_content = await file.read()
+        suffix = ".pdf" if file.content_type == "application/pdf" else ".docx"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+            tmp_file.write(file_content)
+            tmp_path = tmp_file.name
+
+        async def event_generator():
+            try:
+                chunker = Chunker()
+                async for section in chunker.chunk_async(tmp_path):
+                    remove_circular_references(section)
+                    yield {
+                        "event": "section",
+                        "data": json.dumps(section.model_dump(), ensure_ascii=False)
+                    }
+                yield {
+                    "event": "end",
+                    "data": json.dumps({"success": True})
+                }
+            finally:
+                os.unlink(tmp_path)
+
+        return EventSourceResponse(event_generator())
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error chunking document (SSE): {str(e)}")
+
+# python -m backend.api_server
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000) 

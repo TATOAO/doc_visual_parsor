@@ -27,3 +27,5 @@ torchvision>=0.10.0
 opencv-python>=4.5.0
 ultralytics>=8.0.0
 rapidfuzz
+
+sse-starlette
