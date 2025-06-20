@@ -81,6 +81,8 @@ class Chunker:
                 layout_result
             ):
                 yield section
+
+            print("Chunking completed")
             
         except Exception as e:
             print(f"Error during chunking: {str(e)}")
