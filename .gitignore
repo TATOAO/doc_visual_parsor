@@ -6,3 +6,5 @@ visualization_output/
 *.pdf
 layout_displayer.txt
 **/*.pyc
+playground/
+doc_chunking.egg-info/

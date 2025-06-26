@@ -65,7 +65,7 @@ class CVLayoutDetector(BaseLayoutExtractor):
     
     def __init__(self, 
                  model_name: str = "docstructbench",
-                 model_path: Optional[str] = os.path.join(os.getcwd(), "models/layout_detection/visual_detection/model_parameters/docstructbench_doclayout_yolo_docstructbench_imgsz1024.pt"),
+                 model_path: Optional[str] = None,
                  device: str = "auto",
                  confidence_threshold: float = 0.25,
                  image_size: int = 1024,
@@ -104,10 +104,19 @@ class CVLayoutDetector(BaseLayoutExtractor):
     def _initialize_detector(self) -> None:
         """Initialize the detector by loading the YOLO model."""
         try:
-            # Download model if needed
+            # Determine model path
             if self.model_path is None:
-                logger.info(f"Downloading/loading model: {self.model_name}")
-                self.model_path = download_model(self.model_name)
+                # First try to find local model file
+                current_dir = Path(__file__).parent
+                local_model_path = current_dir / "model_parameters" / "docstructbench_doclayout_yolo_docstructbench_imgsz1024.pt"
+                
+                if local_model_path.exists():
+                    logger.info(f"Using local model file: {local_model_path}")
+                    self.model_path = str(local_model_path)
+                else:
+                    # Fall back to downloading model
+                    logger.info(f"Local model not found, downloading model: {self.model_name}")
+                    self.model_path = download_model(self.model_name)
             
             # Setup device
             self.device = self._setup_device(self.device)

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 def display_layout(layout_extraction_result: LayoutExtractionResult, 
-                   exclude_types: List[ElementType] = []):
+                   exclude_types: List[ElementType] = []) -> str:
     """
     Display the layout in a human-readable format.
     Using special tags to indicate the element type, position, style, text, etc.
@@ -25,7 +25,7 @@ def display_layout(layout_extraction_result: LayoutExtractionResult,
         display_result.append(line)
 
 
-    return display_result
+    return "\n".join(display_result)
 
 class DisplayLine(BaseModel):
     page_number: Optional[int] = None

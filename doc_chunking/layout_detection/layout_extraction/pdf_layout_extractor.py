@@ -60,6 +60,7 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
     
     def _detect_layout(self, 
                       input_data: InputDataType,
+                      confidence_threshold: Optional[float] = None,
                       **kwargs) -> LayoutExtractionResult:
         """
         Core extraction method - analyzes PDF structure to extract raw style information

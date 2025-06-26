@@ -18,7 +18,8 @@ from doc_chunking.schemas.layout_schemas import (
     LayoutElement,
     BoundingBox,
     ElementType,
-    RunInfo
+    RunInfo,
+    StyleInfo
 )
 from doc_chunking.schemas.schemas import InputDataType
 
@@ -93,12 +94,14 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
     
     def _detect_layout(self, 
                       input_data: InputDataType,
+                      confidence_threshold: Optional[float] = None,
                       **kwargs) -> LayoutExtractionResult:
         """
         Core hybrid extraction method using CV-first approach.
         
         Args:
             input_data: Input data (PDF file path, bytes, etc.)
+            confidence_threshold: Confidence threshold for CV detection
             **kwargs: Additional extraction parameters
             
         Returns:
@@ -107,7 +110,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         try:
             # Step 1: Get CV-based layout detection
             logger.info("Performing CV-based layout detection")
-            cv_result = self.cv_detector._detect_layout(input_data, **kwargs)
+            cv_result = self.cv_detector._detect_layout(input_data, confidence_threshold=confidence_threshold, **kwargs)
 
             # save cv_reuslt to json for debug
             
@@ -385,7 +388,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         
         return ''.join(text_parts)
     
-    def _create_enriched_style(self, pdf_elements: List[LayoutElement], all_runs: List) -> Optional['StyleInfo']:
+    def _create_enriched_style(self, pdf_elements: List[LayoutElement], all_runs: List) -> Optional[StyleInfo]:
         """
         Create enriched style information from PDF elements with preserved runs.
         
@@ -396,7 +399,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         Returns:
             Enriched StyleInfo object or None
         """
-        from doc_chunking.schemas.layout_schemas import StyleInfo, FontInfo
+
         
         if not pdf_elements:
             return None
