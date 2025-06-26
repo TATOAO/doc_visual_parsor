@@ -2,7 +2,7 @@ import docx
 import tempfile
 import os
 from typing import Union, Any, List
-from models.naive_llm.helpers import remove_circular_references
+from doc_chunking.naive_llm.helpers import remove_circular_references
 from pathlib import Path
 
 def extract_docx_content(docx_file: Union[str, bytes, Path, Any]) -> str:
@@ -49,8 +49,8 @@ def extract_docx_structure_with_naive_llm(docx_file: Union[str, bytes, Path, Any
         sys.path.append(str(Path(__file__).parent.parent))
         
         # TODO: use control for finer cut
-        from models.naive_llm import get_section_tree_by_llm
-        from models.naive_llm.helpers import generate_section_tree_from_tokens
+        from doc_chunking.naive_llm import get_section_tree_by_llm
+        from doc_chunking.naive_llm.helpers import generate_section_tree_from_tokens
         # Extract text content
         raw_text = extract_docx_content(docx_file)
         if not raw_text:

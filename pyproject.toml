@@ -1,0 +1,104 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "doc-chunking"
+version = "0.1.0"
+description = "A powerful document analysis and chunking library for PDF and DOCX files using AI-powered processing"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.8"
+keywords = ["document", "pdf", "docx", "chunking", "ai", "nlp", "layout-detection"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "streamlit>=1.28.0",
+    "PyMuPDF>=1.23.0",
+    "python-docx>=0.8.11",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "Pillow>=10.0.0",
+    "pathlib2>=2.3.7",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "requests>=2.31.0",
+    "python-multipart>=0.0.6",
+    "openai>=1.0.0",
+    "langchain-openai",
+    "langgraph",
+    "doclayout-yolo",
+    "huggingface-hub>=0.16.0",
+    "torchvision>=0.10.0",
+    "opencv-python>=4.5.0",
+    "ultralytics>=8.0.0",
+    "rapidfuzz",
+    "sse-starlette",
+]
+
+[project.optional-dependencies]
+# Optional dependencies for different use cases
+streamlit-ui = [
+    "streamlit-pdf-viewer>=0.0.12",
+]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "black",
+    "flake8",
+    "mypy",
+]
+all = [
+    "streamlit-pdf-viewer>=0.0.12",
+    "pytest",
+    "pytest-asyncio",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/doc-chunking"
+Documentation = "https://github.com/yourusername/doc-chunking#readme"
+Repository = "https://github.com/yourusername/doc-chunking"
+"Bug Tracker" = "https://github.com/yourusername/doc-chunking/issues"
+
+[project.scripts]
+doc-chunking-server = "doc_chunking.scripts.run_server:main"
+
+[tool.setuptools.packages.find]
+include = ["doc_chunking*"]
+exclude = ["tests*", "frontend*", "examples*"]
+
+[tool.setuptools.package-data]
+"doc_chunking" = ["*.json", "*.txt", "*.md"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true 

@@ -23,13 +23,13 @@ from backend.document_analyzer import (
 
 # Import layout detection module
 sys.path.append(str(Path(__file__).parent.parent))
-from models.layout_detection.layout_extraction.docx_layout_extractor import DocxLayoutExtrator
-from models.layout_detection.layout_extraction.pdf_layout_extractor import PdfLayoutExtractor
-from models.layout_detection.layout_extraction.pdf_style_cv_mix_extractor import PdfStyleCVMixLayoutExtractor
+from doc_chunking.layout_detection.layout_extraction.docx_layout_extractor import DocxLayoutExtrator
+from doc_chunking.layout_detection.layout_extraction.pdf_layout_extractor import PdfLayoutExtractor
+from doc_chunking.layout_detection.layout_extraction.pdf_style_cv_mix_extractor import PdfStyleCVMixLayoutExtractor
 
 # --- Chunker import ---
-from models.documents_chunking.chunker import Chunker
-from models.naive_llm.helpers.section_token_parsor import remove_circular_references
+from doc_chunking.documents_chunking.chunker import Chunker
+from doc_chunking.naive_llm.helpers.section_token_parsor import remove_circular_references
 
 app = FastAPI(title="Document Visual Parser API", version="1.0.0")
 

@@ -1,132 +1,306 @@
-# Document Visual Parser
+# Doc Chunking Library
 
-A powerful document analysis tool that extracts structure and content from PDF and DOCX files using AI-powered processing.
-
-## Architecture
-
-The application now uses a **microservices architecture** with separate backend and frontend components:
-
-- **Backend**: FastAPI server that handles document processing, structure analysis, and content extraction
-- **Frontend**: Streamlit web application that provides the user interface
+A powerful document analysis and chunking library for PDF and DOCX files using AI-powered processing. This library provides intelligent document structure detection, hierarchical section extraction, and content chunking capabilities.
 
 ## Features
 
-- 📄 **PDF Processing**: Extract pages as images and analyze document structure
-- 📝 **DOCX Processing**: Extract content and analyze document structure  
-- 🔍 **Structure Analysis**: AI-powered detection of headings, sections, and document hierarchy
-- 🖼️ **Visual Display**: Interactive PDF viewer with page navigation
-- ✂️ **Text Selection**: Select and copy text directly from PDFs (with streamlit-pdf-viewer)
-- 🌐 **API-First**: RESTful API for integration with other applications
-- 📊 **Document Info**: Detailed metadata and statistics
+- 📄 **PDF Processing**: Extract layout and structure from PDF documents
+- 📝 **DOCX Processing**: Analyze DOCX document structure and content
+- 🔍 **AI-Powered Structure Analysis**: Intelligent detection of headings, sections, and document hierarchy
+- ✂️ **Smart Chunking**: Context-aware document chunking with hierarchical relationships
+- 🌐 **API Server**: Optional FastAPI server for web integration
+- 🧠 **LLM Integration**: Leverage language models for advanced document understanding
+
+## Installation
+
+### Basic Installation
+
+```bash
+pip install doc-chunking
+```
+
+### Installation with Optional Dependencies
+
+```bash
+# For Streamlit UI components
+pip install doc-chunking[streamlit-ui]
+
+# For development tools
+pip install doc-chunking[dev]
+
+# Install all optional dependencies
+pip install doc-chunking[all]
+```
+
+### Development Installation
+
+```bash
+git clone https://github.com/yourusername/doc-chunking.git
+cd doc-chunking
+pip install -e .[dev]
+```
 
 ## Quick Start
 
-### Option 1: Run Both Servers Together (Recommended)
+### Basic Usage
+
+```python
+import doc_chunking
+
+# Process a PDF file
+pdf_sections = doc_chunking.quick_pdf_chunking("document.pdf")
+
+# Process a DOCX file  
+docx_sections = doc_chunking.quick_docx_chunking("document.docx")
+
+# Access the hierarchical structure
+for section in pdf_sections.sub_sections:
+    print(f"Section: {section.title}")
+    print(f"Content: {section.content[:100]}...")
+    
+    # Process subsections
+    for subsection in section.sub_sections:
+        print(f"  Subsection: {subsection.title}")
+```
+
+### Advanced Usage
+
+```python
+from doc_chunking import (
+    PDFLayoutExtractor, 
+    DocxLayoutExtractor,
+    section_reconstructor,
+    title_structure_builder_llm
+)
+
+# Extract layout from PDF
+pdf_extractor = PDFLayoutExtractor()
+layout_result = pdf_extractor.extract_layout("document.pdf")
+
+# Build title structure using LLM
+title_structure = title_structure_builder_llm(layout_result)
+
+# Reconstruct hierarchical sections
+sections = section_reconstructor(title_structure, layout_result)
+
+# Access detailed section information
+def print_section_tree(section, level=0):
+    indent = "  " * level
+    print(f"{indent}{section.title}")
+    print(f"{indent}Content length: {len(section.content)}")
+    print(f"{indent}Element ID: {section.element_id}")
+    
+    for subsection in section.sub_sections:
+        print_section_tree(subsection, level + 1)
+
+print_section_tree(sections)
+```
+
+### Streaming Processing
+
+```python
+import asyncio
+from doc_chunking import streaming_section_reconstructor, title_structure_builder_llm
+
+async def process_document_streaming(layout_result):
+    # Create a streaming title structure generator
+    async def title_stream():
+        title_structure = title_structure_builder_llm(layout_result)
+        # Simulate streaming by yielding chunks
+        for line in title_structure.split('\n'):
+            yield line + '\n'
+            await asyncio.sleep(0.01)  # Simulate processing delay
+    
+    # Process sections as they become available
+    async for partial_sections in streaming_section_reconstructor(title_stream(), layout_result):
+        print(f"Received {len(partial_sections.sub_sections)} sections so far...")
+        # Process partial results as needed
+
+# Run the streaming example
+# asyncio.run(process_document_streaming(layout_result))
+```
+
+## API Server
+
+The library includes an optional FastAPI server for web integration:
+
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Start the server
+doc-chunking-server
 
-# Run both backend and frontend
-python run_full_app.py
+# With custom options
+doc-chunking-server --host 0.0.0.0 --port 8080 --reload
 ```
 
-### Option 2: Run Servers Separately
+### API Endpoints
 
-**Terminal 1 - Backend API:**
+- `POST /api/upload-document` - Upload and process a document
+- `POST /api/analyze-pdf-structure` - Analyze PDF structure
+- `POST /api/analyze-structure` - Analyze document structure
+- `GET /docs` - Interactive API documentation
+
+## Configuration
+
+### Environment Variables
+
 ```bash
-python run_backend.py
+# OpenAI API key for LLM processing
+export OPENAI_API_KEY="your-api-key-here"
+
+# Optional: Custom model configurations
+export DOC_CHUNKING_MODEL="gpt-4"
+export DOC_CHUNKING_MAX_TOKENS=4000
 ```
 
-**Terminal 2 - Frontend:**
+### Configuration File
+
+Create a `.env` file in your project directory:
+
+```env
+OPENAI_API_KEY=your-api-key-here
+DOC_CHUNKING_MODEL=gpt-4
+DOC_CHUNKING_MAX_TOKENS=4000
+```
+
+## Data Models
+
+The library uses Pydantic models for type safety and validation:
+
+```python
+from doc_chunking import Section, LayoutExtractionResult, LayoutElement
+
+# Section represents a hierarchical document section
+section = Section(
+    title="Chapter 1",
+    content="Chapter content...",
+    level=0,
+    element_id=1,
+    sub_sections=[],
+    parent_section=None
+)
+
+# LayoutExtractionResult contains the document layout
+layout = LayoutExtractionResult(
+    elements=[
+        LayoutElement(
+            id=1,
+            text="Document text",
+            type="paragraph",
+            bbox=[100, 200, 300, 250]
+        )
+    ]
+)
+```
+
+## Supported Document Types
+
+### PDF Documents
+- Text-based PDFs with extractable content
+- Mixed text and image PDFs
+- Multi-column layouts
+- Complex document structures
+
+### DOCX Documents  
+- Microsoft Word documents (.docx)
+- Rich formatting and styles
+- Embedded images and tables
+- Hierarchical heading structures
+
+## Performance Optimization
+
+### Batch Processing
+
+```python
+from doc_chunking import PDFLayoutExtractor
+
+extractor = PDFLayoutExtractor()
+
+# Process multiple documents efficiently
+documents = ["doc1.pdf", "doc2.pdf", "doc3.pdf"]
+results = []
+
+for doc_path in documents:
+    layout = extractor.extract_layout(doc_path)
+    sections = doc_chunking.quick_pdf_chunking(doc_path)
+    results.append((doc_path, sections))
+```
+
+### Memory Management
+
+For large documents, consider processing in chunks:
+
+```python
+# For very large documents, you might want to process sections independently
+def process_large_document(doc_path, chunk_size=10):
+    extractor = PDFLayoutExtractor()
+    layout = extractor.extract_layout(doc_path)
+    
+    # Process elements in chunks
+    elements = layout.elements
+    for i in range(0, len(elements), chunk_size):
+        chunk_elements = elements[i:i+chunk_size]
+        # Process chunk_elements as needed
+        yield chunk_elements
+```
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+
 ```bash
-python run_app.py
+git clone https://github.com/yourusername/doc-chunking.git
+cd doc-chunking
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -e .[dev]
 ```
 
-## Access Points
+### Running Tests
 
-- **Frontend Application**: http://localhost:8501
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
-
-## API Endpoints
-
-- `POST /api/upload-document` - Upload and process a document (includes image conversion)
-- `POST /api/analyze-pdf-structure` - Analyze PDF structure only (no image conversion)
-- `POST /api/analyze-structure` - Analyze document structure only
-- `POST /api/extract-pdf-pages-into-images` - Extract PDF pages as images
-- `POST /api/extract-docx-content` - Extract DOCX content
-- `GET /` - Health check
-
-## Project Structure
-
-```
-doc_visual_parser/
-├── backend/                 # FastAPI backend
-│   ├── api_server.py       # Main FastAPI application
-│   ├── document_analyzer.py # Document structure analysis
-│   ├── pdf_processor.py    # PDF processing logic
-│   └── docx_processor.py   # DOCX processing logic
-├── frontend/               # Streamlit frontend
-│   ├── app.py             # Main Streamlit application
-│   ├── api_client.py      # Backend API client
-│   ├── ui_components.py   # UI components
-│   └── session_manager.py # Session state management
-├── run_backend.py         # Backend server startup
-├── run_app.py            # Frontend server startup
-├── run_full_app.py       # Both servers startup
-└── requirements.txt      # Dependencies
-```
-
-## Development
-
-### Backend Development
 ```bash
-# Run backend with auto-reload
-python run_backend.py
-
-# Or directly with uvicorn
-uvicorn backend.api_server:app --reload --port 8000
+pytest tests/
 ```
 
-### Frontend Development
+### Code Formatting
+
 ```bash
-# Run frontend (requires backend to be running)
-python run_app.py
-
-# Or directly with streamlit
-streamlit run frontend/app.py --server.port 8501
+black doc_chunking/
+isort doc_chunking/
 ```
-
-## Dependencies
-
-- **FastAPI**: Modern web framework for building APIs
-- **Streamlit**: Web app framework for data applications
-- **PyMuPDF**: PDF processing and text extraction
-- **python-docx**: DOCX document processing
-- **Pillow**: Image processing
-- **Requests**: HTTP client for API communication
-- **streamlit-pdf-viewer** (optional): Enables text selection and copying from PDFs
-
-## PDF Text Selection
-
-The application supports two PDF viewing modes:
-
-1. **With Text Selection** (Recommended):
-   - Install: `pip install streamlit-pdf-viewer`
-   - Uses the original PDF file for display
-   - Allows selecting and copying text directly from PDFs
-   - Better user experience for text-based documents
-
-2. **Image-Based Fallback**:
-   - Used when streamlit-pdf-viewer is not installed
-   - Converts PDF pages to images via the backend API
-   - Still provides full document analysis functionality
-   - Page navigation with previous/next buttons
-
-The app automatically detects whether streamlit-pdf-viewer is available and uses the best viewing method.
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Changelog
+
+### v0.1.0
+- Initial release
+- PDF and DOCX processing capabilities  
+- AI-powered structure analysis
+- Hierarchical section extraction
+- FastAPI server integration
+- Streaming processing support
+
+## Support
+
+- 📖 [Documentation](https://github.com/yourusername/doc-chunking#readme)
+- 🐛 [Issue Tracker](https://github.com/yourusername/doc-chunking/issues)
+- 💬 [Discussions](https://github.com/yourusername/doc-chunking/discussions)
+
+## Citation
+
+If you use this library in your research, please cite:
+
+```bibtex
+@software{doc_chunking,
+  title={Doc Chunking: AI-Powered Document Analysis and Chunking Library},
+  author={Your Name},
+  year={2024},
+  url={https://github.com/yourusername/doc-chunking}
+}
+```
 
 
