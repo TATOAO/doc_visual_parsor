@@ -8,3 +8,4 @@ layout_displayer.txt
 **/*.pyc
 playground/
 doc_chunking.egg-info/
+.vscode/

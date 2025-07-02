@@ -9,6 +9,9 @@ from doc_chunking.layout_detection.layout_extraction.pdf_style_cv_mix_extractor 
 from doc_chunking.layout_structuring.title_structure_builder_llm.structurer_llm import stream_title_structure_builder_llm
 from doc_chunking.layout_structuring.title_structure_builder_llm.section_reconstructor import streaming_section_reconstructor
 
+import logging
+logger = logging.getLogger(__name__)
+
 class Chunker:
 
     def __init__(self):
@@ -60,20 +63,20 @@ class Chunker:
             
             # Extract layout based on input type
             if input_type == 'pdf':
-                print(f"Processing PDF file: {input_data}")
+                logger.info(f"Processing PDF file: {input_data}")
                 extractor = self._get_pdf_extractor()
                 layout_result = extractor._detect_layout(input_data)
             elif input_type == 'docx':
-                print(f"Processing DOCX file: {input_data}")
+                logger.info(f"Processing DOCX file: {input_data}")
                 extractor = self._get_docx_extractor()
                 layout_result = extractor._detect_layout(input_data)
             else:
                 raise ValueError(f"Unsupported input type: {input_type}")
             
-            print(f"Extracted {len(layout_result.elements)} layout elements")
+            logger.info(f"Extracted {len(layout_result.elements)} layout elements")
             
             # Build title structure using streaming LLM and section reconstructor
-            print("Building title structure and reconstructing sections...")
+            logger.info("Building title structure and reconstructing sections...")
             
             # Use streaming_section_reconstructor to process LLM output and yield Section objects
             async for section in streaming_section_reconstructor(
@@ -82,10 +85,10 @@ class Chunker:
             ):
                 yield section
 
-            print("Chunking completed")
+            logger.info("Chunking completed")
             
         except Exception as e:
-            print(f"Error during chunking: {str(e)}")
+            logger.error(f"Error during chunking: {str(e)}")
             # Yield an error section
             error_section = Section(
                 title="Error",
@@ -108,8 +111,7 @@ class Chunker:
             sections = []
             async for section in self.chunk_async(input_data):
                 sections.append(section)
-
-                print(f"Collected section: {len(section.sub_sections)}")
+                logger.info(f"Collected section: {len(section.sub_sections)}")
             
             if not sections:
                 return Section(title="Empty Document", content="", level=0)
