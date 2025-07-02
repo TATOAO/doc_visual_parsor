@@ -1,6 +1,6 @@
 from doc_chunking.layout_structuring.title_structure_builder_llm.structurer_llm import title_structure_builder_llm
 from doc_chunking.layout_structuring.title_structure_builder_llm.layout_displayer import display_layout
-from doc_chunking.naive_llm.helpers.tree_like_structure_mapping import find_ordered_fuzzy_sequence
+from doc_chunking.utils.helper import remove_circular_references
 from doc_chunking.schemas.layout_schemas import LayoutExtractionResult
 from doc_chunking.schemas.schemas import Section, Positions
 from rapidfuzz import fuzz, process
@@ -483,7 +483,7 @@ if __name__ == "__main__":
     # Test regular section reconstructor
     print("=== Testing Regular Section Reconstructor ===")
     section_tree = section_reconstructor(title_structure, layout_result)
-    from doc_chunking.naive_llm.helpers.section_token_parsor import remove_circular_references
+    from doc_chunking.utils.helper import remove_circular_references
     remove_circular_references(section_tree)
     
     json.dump(section_tree.model_dump(), open("./section_tree_0617.json", "w"), indent=4, ensure_ascii=False)

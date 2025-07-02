@@ -20,7 +20,7 @@ from doc_chunking.layout_detection.layout_extraction.pdf_style_cv_mix_extractor 
 
 # --- Chunker import ---
 from doc_chunking.documents_chunking.chunker import Chunker
-from doc_chunking.naive_llm.helpers.section_token_parsor import remove_circular_references
+from doc_chunking.utils.helper import remove_circular_references
 
 app = FastAPI(title="Document Visual Parser API", version="1.0.0")
 

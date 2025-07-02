@@ -138,7 +138,7 @@ if __name__ == "__main__":
         print(f"Result: {section_result.title}")
         print(f"Content length: {len(section_result.content)}")
 
-        from doc_chunking.naive_llm.helpers.section_token_parsor import remove_circular_references
+        from doc_chunking.utils.helper import remove_circular_references
         remove_circular_references(section_result)
         import json
         json.dump(section_result.model_dump(), open("section_result.json", "w"), indent=2, ensure_ascii=False)

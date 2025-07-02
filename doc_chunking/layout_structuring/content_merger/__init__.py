@@ -10,7 +10,6 @@ from doc_chunking.layout_structuring.title_structure_builder_llm.structurer_llm 
 
 
 
-
 # python -m models.layout_structuring.content_merger.__init__
 if __name__ == "__main__":
     import json
@@ -29,7 +28,7 @@ if __name__ == "__main__":
         # Construct the document sections
         section = await content_merger.construct_section(layout_extraction_result)
 
-        from doc_chunking.naive_llm.helpers import remove_circular_references
+        from doc_chunking.utils.helper import remove_circular_references
         remove_circular_references(section)
 
         with open("./section_post_merger.json", "w") as f:
