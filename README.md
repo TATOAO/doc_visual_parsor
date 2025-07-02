@@ -57,7 +57,7 @@ docx_sections = doc_chunking.quick_docx_chunking("document.docx")
 for section in pdf_sections.sub_sections:
     print(f"Section: {section.title}")
     print(f"Content: {section.content[:100]}...")
-    
+  
     # Process subsections
     for subsection in section.sub_sections:
         print(f"  Subsection: {subsection.title}")
@@ -89,7 +89,7 @@ def print_section_tree(section, level=0):
     print(f"{indent}{section.title}")
     print(f"{indent}Content length: {len(section.content)}")
     print(f"{indent}Element ID: {section.element_id}")
-    
+  
     for subsection in section.sub_sections:
         print_section_tree(subsection, level + 1)
 
@@ -110,7 +110,7 @@ async def process_document_streaming(layout_result):
         for line in title_structure.split('\n'):
             yield line + '\n'
             await asyncio.sleep(0.01)  # Simulate processing delay
-    
+  
     # Process sections as they become available
     async for partial_sections in streaming_section_reconstructor(title_stream(), layout_result):
         print(f"Received {len(partial_sections.sub_sections)} sections so far...")
@@ -157,12 +157,10 @@ export DOC_CHUNKING_MAX_TOKENS=4000
 Create a `.env` file in your project directory:
 
 ```env
-OPENAI_API_KEY=your-api-key-here
-DOC_CHUNKING_MODEL=gpt-4
-DOC_CHUNKING_MAX_TOKENS=4000
+DOC_CHUNKING_LLM_API_KEY=""
+DOC_CHUNKING_LLM_BASE_URL=""
+DOC_CHUNKING_LLM_MODEL="qwen3-4b"
 ```
-
-## Data Models
 
 The library uses Pydantic models for type safety and validation:
 
@@ -195,12 +193,14 @@ layout = LayoutExtractionResult(
 ## Supported Document Types
 
 ### PDF Documents
+
 - Text-based PDFs with extractable content
 - Mixed text and image PDFs
 - Multi-column layouts
 - Complex document structures
 
-### DOCX Documents  
+### DOCX Documents
+
 - Microsoft Word documents (.docx)
 - Rich formatting and styles
 - Embedded images and tables
@@ -234,7 +234,7 @@ For large documents, consider processing in chunks:
 def process_large_document(doc_path, chunk_size=10):
     extractor = PDFLayoutExtractor()
     layout = extractor.extract_layout(doc_path)
-    
+  
     # Process elements in chunks
     elements = layout.elements
     for i in range(0, len(elements), chunk_size):
@@ -277,8 +277,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Changelog
 
 ### v0.1.0
+
 - Initial release
-- PDF and DOCX processing capabilities  
+- PDF and DOCX processing capabilities
 - AI-powered structure analysis
 - Hierarchical section extraction
 - FastAPI server integration
@@ -302,5 +303,3 @@ If you use this library in your research, please cite:
   url={https://github.com/yourusername/doc-chunking}
 }
 ```
-
-
