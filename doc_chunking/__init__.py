@@ -15,11 +15,11 @@ from .schemas.schemas import Section, Positions, InputDataType, DocumentType
 
 from .layout_structuring.title_structure_builder_llm.layout_displayer import display_layout
 
-from typing import Union, Any, Optional
+from typing import Optional
 from pathlib import Path
 import io
-import os
 import logging
+import aiofiles
 
 logger = logging.getLogger(__name__)
 
@@ -396,12 +396,24 @@ def quick_docx_chunking(docx_input: InputDataType, **kwargs) -> Section:
         logger.error(f"DOCX chunking failed: {e}")
         raise RuntimeError(f"Failed to process DOCX: {e}") from e
 
-
-
 # python -m doc_chunking.__init__
 if __name__ == "__main__":
-    # set logger level to debug
-    logging.basicConfig(level=logging.DEBUG)
-    pdf_input = "/Users/tatoaoliang/Downloads/金蝶/合同/第一编/1-1 买卖合同（通用版）.pdf"
-    result = quick_cv_mix_pdf_chunking(pdf_input)
-    print(result)
+    import asyncio
+    import aiofiles
+    
+    async def test_pdf_chunking():
+        # set logger level to debug
+        logging.basicConfig(level=logging.INFO)
+        pdf_input = "/Users/tatoaoliang/Downloads/金蝶/合同/第一编/1-1 买卖合同（通用版）.pdf"
+        
+        # Test with UploadFile
+        print("\nTesting with UploadFile:")
+        async with aiofiles.open(pdf_input, "rb") as file:
+            file_content = await file.read()
+            # Create a BytesIO object with the PDF content
+            pdf_bytes = io.BytesIO(file_content)
+            result2 = quick_cv_mix_pdf_chunking(pdf_bytes)
+            print(result2)
+
+    # Run the async test
+    asyncio.run(test_pdf_chunking())

@@ -43,7 +43,6 @@ dependencies = [
     "openai>=1.0.0",
     "numpy==1.24.4",
     "langchain-openai",
-    "langgraph",
     "doclayout-yolo",
     "huggingface-hub>=0.16.0",
     "torchvision>=0.10.0",
