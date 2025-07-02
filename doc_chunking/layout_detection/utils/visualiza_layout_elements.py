@@ -9,10 +9,43 @@ import logging
 from pathlib import Path
 from typing import Union, List, Dict, Any, Optional, Tuple
 import fitz  # PyMuPDF
-from doc_chunking.schemas.layout_schemas import LayoutExtractionResult, LayoutElement, BoundingBox
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.backends.backend_pdf import PdfPages
+import numpy as np
+import io
+import tempfile
+from doc_chunking.schemas.layout_schemas import LayoutExtractionResult, LayoutElement, BoundingBox, ElementType
 
 logger = logging.getLogger(__name__)
 
+# Type alias for input data - consistent with cv_detector.py
+InputDataType = Union[str, Path, bytes, io.BytesIO, io.BufferedReader, Any]
+
+def _load_pdf_document(input_data: InputDataType) -> fitz.Document:
+    """
+    Load PDF document from various input types.
+    
+    Args:
+        input_data: Input data in various formats
+        
+    Returns:
+        PyMuPDF Document object
+    """
+    if isinstance(input_data, (str, Path)):
+        return fitz.open(str(input_data))
+    elif isinstance(input_data, bytes):
+        return fitz.open(stream=input_data, filetype="pdf")
+    elif hasattr(input_data, 'read'):
+        # File-like object
+        content = input_data.read()
+        return fitz.open(stream=content, filetype="pdf")
+    elif hasattr(input_data, 'getvalue'):
+        # BytesIO or similar
+        content = input_data.getvalue()
+        return fitz.open(stream=content, filetype="pdf")
+    else:
+        raise ValueError(f"Unsupported input data type: {type(input_data)}")
 
 class PdfLayoutVisualizer:
     """
@@ -35,7 +68,10 @@ class PdfLayoutVisualizer:
                  line_width: float = 1.5,
                  font_size: int = 8,
                  show_labels: bool = True,
-                 show_element_ids: bool = True):
+                 show_element_ids: bool = True,
+                 colors: Optional[Dict[ElementType, str]] = None,
+                 figsize: tuple = (12, 16),
+                 dpi: int = 150):
         """
         Initialize the visualizer.
         
@@ -44,101 +80,116 @@ class PdfLayoutVisualizer:
             font_size: Font size for labels
             show_labels: Whether to show element type labels
             show_element_ids: Whether to show element IDs
+            colors: Custom color mapping for element types
+            figsize: Figure size for visualization
+            dpi: DPI for rendering
         """
         self.line_width = line_width
         self.font_size = font_size
         self.show_labels = show_labels
         self.show_element_ids = show_element_ids
+        self.colors = colors or self.COLORS
+        self.figsize = figsize
+        self.dpi = dpi
     
-    def visualize_layout_elements(self,
-                                  pdf_path: Union[str, Path],
-                                  layout_result: LayoutExtractionResult,
-                                  output_path: Union[str, Path],
-                                  title_suffix: str = "") -> bool:
+    def visualize_layout_elements(self, 
+                                pdf_input: InputDataType,
+                                layout_result: LayoutExtractionResult, 
+                                output_path: Union[str, Path]) -> bool:
         """
-        Create a visualization PDF with layout elements highlighted.
+        Create a visualization of layout elements overlaid on PDF pages.
         
         Args:
-            pdf_path: Path to the original PDF file
+            pdf_input: Path to original PDF file or file object
             layout_result: Layout extraction results
-            output_path: Path for the output visualization PDF
-            title_suffix: Suffix to add to visualization title
+            output_path: Output path for the visualization PDF
             
         Returns:
-            True if visualization was successful
+            True if successful, False otherwise
         """
         try:
-            # Open the original PDF
-            doc = fitz.open(str(pdf_path))
+            # Load PDF document
+            doc = _load_pdf_document(pdf_input)
             
             # Group elements by page
-            page_elements = self._group_elements_by_page(layout_result.elements)
+            page_elements = {}
+            for element in layout_result.elements:
+                page_num = element.metadata.get('page_number', 1)
+                if page_num not in page_elements:
+                    page_elements[page_num] = []
+                page_elements[page_num].append(element)
             
-            # Process each page
-            for page_num in range(doc.page_count):
-                page = doc[page_num]
-                elements = page_elements.get(page_num + 1, [])  # 1-indexed
-                
-                if elements:
-                    self._draw_elements_on_page(page, elements, title_suffix)
+            # Create visualization
+            with PdfPages(output_path) as pdf:
+                for page_num in range(1, doc.page_count + 1):
+                    elements = page_elements.get(page_num, [])
+                    
+                    fig, ax = plt.subplots(figsize=self.figsize, dpi=self.dpi)
+                    
+                    # Get page dimensions
+                    page = doc[page_num - 1]  # Convert to 0-indexed
+                    page_rect = page.rect
+                    
+                    # Set up the plot
+                    ax.set_xlim(0, page_rect.width)
+                    ax.set_ylim(0, page_rect.height)
+                    ax.invert_yaxis()  # PDF coordinates start from top
+                    ax.set_aspect('equal')
+                    ax.set_title(f'Layout Analysis - Page {page_num}')
+                    
+                    # Draw layout elements
+                    for element in elements:
+                        if element.bbox:
+                            self._draw_element(ax, element)
+                    
+                    # Add legend
+                    self._add_legend(ax, elements)
+                    
+                    plt.tight_layout()
+                    pdf.savefig(fig)
+                    plt.close(fig)
             
-            # Save the visualization
-            doc.save(str(output_path))
             doc.close()
-            
-            logger.info(f"Visualization saved to: {output_path}")
             return True
             
         except Exception as e:
             logger.error(f"Error creating visualization: {str(e)}")
             return False
     
-    def compare_before_after(self,
-                           pdf_path: Union[str, Path],
+    def compare_before_after(self, 
+                           pdf_input: InputDataType,
                            before_result: LayoutExtractionResult,
                            after_result: LayoutExtractionResult,
                            output_dir: Union[str, Path]) -> bool:
         """
-        Create side-by-side comparison visualizations.
+        Create a side-by-side comparison of before and after layout results.
         
         Args:
-            pdf_path: Path to the original PDF file
-            before_result: Layout results before merging
-            after_result: Layout results after merging
+            pdf_input: Path to original PDF file or file object
+            before_result: Layout results before processing
+            after_result: Layout results after processing  
             output_dir: Directory to save comparison files
             
         Returns:
-            True if comparison was successful
+            True if successful
         """
         try:
             output_dir = Path(output_dir)
             output_dir.mkdir(exist_ok=True)
             
-            # Create before visualization
-            before_path = output_dir / "layout_before_merging.pdf"
-            self.visualize_layout_elements(
-                pdf_path, 
-                before_result, 
-                before_path,
-                f"BEFORE Merging ({before_result.element_count} elements)"
+            before_path = output_dir / "before_layout.pdf"
+            after_path = output_dir / "after_layout.pdf"
+            comparison_path = output_dir / "comparison.pdf"
+            
+            # Create individual visualizations
+            self.visualize_layout_elements(pdf_input, before_result, before_path)
+            self.visualize_layout_elements(pdf_input, after_result, after_path)
+            
+            # Create side-by-side comparison
+            self._create_side_by_side_comparison(
+                pdf_input, before_result, after_result, comparison_path
             )
             
-            # Create after visualization
-            after_path = output_dir / "layout_after_merging.pdf"
-            self.visualize_layout_elements(
-                pdf_path, 
-                after_result, 
-                after_path,
-                f"AFTER Merging ({after_result.element_count} elements)"
-            )
-            
-            # Create detailed comparison
-            comparison_path = output_dir / "layout_comparison_detailed.pdf"
-            self._create_detailed_comparison(
-                pdf_path, before_result, after_result, comparison_path
-            )
-            
-            logger.info(f"Comparison visualizations saved to: {output_dir}")
             return True
             
         except Exception as e:
@@ -164,118 +215,41 @@ class PdfLayoutVisualizer:
         
         return page_elements
     
-    def _draw_elements_on_page(self, 
-                              page: fitz.Page, 
-                              elements: List[LayoutElement],
-                              title_suffix: str = "") -> None:
+    def _draw_element(self, ax: plt.Axes, element: LayoutElement) -> None:
         """
-        Draw layout elements on a PDF page.
+        Draw a single layout element on the plot.
         
         Args:
-            page: PyMuPDF page object
-            elements: List of elements to draw
-            title_suffix: Suffix for page title
-        """
-        # Add title at the top of the page
-        if title_suffix:
-            title_rect = fitz.Rect(10, 10, page.rect.width - 10, 30)
-            page.insert_textbox(
-                title_rect,
-                f"Layout Elements - {title_suffix}",
-                fontsize=12,
-                color=(0, 0, 0),
-                fontname="helv"
-            )
-        
-        # Draw each element
-        for i, element in enumerate(elements):
-            self._draw_single_element(page, element, i)
-    
-    def _draw_single_element(self, 
-                           page: fitz.Page, 
-                           element: LayoutElement, 
-                           index: int) -> None:
-        """
-        Draw a single layout element on the page.
-        
-        Args:
-            page: PyMuPDF page object
+            ax: Matplotlib Axes object
             element: Layout element to draw
-            index: Element index for coloring
         """
         bbox = element.bbox
         
         # Create rectangle for bounding box
-        rect = fitz.Rect(bbox.x1, bbox.y1, bbox.x2, bbox.y2)
-        
-        # Determine color based on element properties
-        color = self._get_element_color(element)
-        
-        # Draw bounding box
-        page.draw_rect(rect, color=color, width=self.line_width)
-        
-        # Add small index label in top-left corner
-        index_label = f"[{index}]"
-        index_rect = fitz.Rect(
-            rect.x0 + 2,  # Small offset from left
-            rect.y0 + 2,  # Small offset from top
-            rect.x0 + 25,  # Slightly wider for better visibility
-            rect.y0 + 15  # Slightly taller for better visibility
+        rect = patches.Rectangle(
+            (bbox.x1, bbox.y1),
+            bbox.x2 - bbox.x1,
+            bbox.y2 - bbox.y1,
+            linewidth=self.line_width,
+            edgecolor=self.colors.get(element.element_type, self.COLORS['default']),
+            facecolor='none'
         )
         
-        # Add semi-transparent background for index label
-        page.draw_rect(index_rect, color=(1, 1, 1), fill=(1, 1, 1), width=0.5)
-        
-        # Add index label text with improved visibility
-        try:
-            page.insert_text(
-                (index_rect.x0 + 2, index_rect.y0 + 10),  # Position text within the box
-                index_label,
-                fontsize=8,  # Slightly larger font
-                color=color,
-                fontname="helv",
-                render_mode=0  # Normal rendering mode
-            )
-        except Exception as e:
-            logger.warning(f"Failed to insert index label: {str(e)}")
+        # Draw bounding box
+        ax.add_patch(rect)
         
         # Add element information if enabled
         if self.show_labels or self.show_element_ids:
-            self._add_element_label(page, element, rect, color, index)
+            self._add_element_label(ax, element, rect)
     
-    def _get_element_color(self, element: LayoutElement) -> Tuple[float, float, float]:
-        """
-        Get color for an element based on its properties.
-        
-        Args:
-            element: Layout element
-            
-        Returns:
-            RGB color tuple (values 0-1)
-        """
-        # Check if element was merged
-        if element.metadata.get('merged_elements', 0) > 1:
-            return self.COLORS['merged']
-        
-        # Color by element type
-        element_type = element.element_type.lower()
-        return self.COLORS.get(element_type, self.COLORS['default'])
-    
-    def _add_element_label(self, 
-                          page: fitz.Page, 
-                          element: LayoutElement, 
-                          rect: fitz.Rect,
-                          color: Tuple[float, float, float],
-                          index: int) -> None:
+    def _add_element_label(self, ax: plt.Axes, element: LayoutElement, rect: patches.Rectangle) -> None:
         """
         Add label to an element.
         
         Args:
-            page: PyMuPDF page object
+            ax: Matplotlib Axes object
             element: Layout element
             rect: Element bounding rectangle
-            color: Element color
-            index: Element index
         """
         # Prepare label text
         label_parts = []
@@ -297,102 +271,99 @@ class PdfLayoutVisualizer:
         label_text = " | ".join(label_parts)
         
         # Position label outside the bounding box (above if possible)
-        label_y = max(rect.y0 - 5, 5)  # Above the box, or at top of page
-        label_rect = fitz.Rect(
-            rect.x0, 
-            label_y - self.font_size - 2,
-            min(rect.x0 + len(label_text) * self.font_size * 0.6, page.rect.width - 5),
-            label_y
+        label_y = max(rect.get_y() - 5, 5)  # Above the box, or at top of page
+        label_rect = patches.Rectangle(
+            (rect.get_x(), label_y - self.font_size - 2),
+            rect.get_width(),
+            self.font_size + 4,
+            linewidth=0.5,
+            edgecolor='none',
+            facecolor='white',
+            alpha=0.7
         )
         
-        # Add semi-transparent background for label
-        page.draw_rect(label_rect, color=(1, 1, 1), fill=(1, 1, 1), width=0.5)
-        
         # Add label text
-        try:
-            page.insert_textbox(
-                label_rect,
-                label_text,
-                fontsize=self.font_size,
-                color=color,
-                fontname="helv"
-            )
-        except Exception:
-            # Fallback if text insertion fails
-            pass
+        ax.text(
+            rect.get_x() + rect.get_width() / 2,
+            label_y,
+            label_text,
+            ha='center',
+            va='center',
+            fontsize=self.font_size,
+            color=self.colors.get(element.element_type, self.COLORS['default']),
+            bbox=dict(facecolor='white', edgecolor='none', alpha=0.7)
+        )
+        
+        # Add label rectangle
+        ax.add_patch(label_rect)
     
-    def _create_detailed_comparison(self,
-                                  pdf_path: Union[str, Path],
-                                  before_result: LayoutExtractionResult,
-                                  after_result: LayoutExtractionResult,
-                                  output_path: Union[str, Path]) -> None:
+    def _add_legend(self, ax: plt.Axes, elements: List[LayoutElement]) -> None:
         """
-        Create a detailed comparison showing merged elements.
+        Add a legend to the plot.
         
         Args:
-            pdf_path: Original PDF path
-            before_result: Results before merging
-            after_result: Results after merging
-            output_path: Output path for comparison
+            ax: Matplotlib Axes object
+            elements: List of layout elements
         """
-        doc = fitz.open(str(pdf_path))
+        handles = [
+            patches.Patch(facecolor=self.colors.get(element.element_type, self.COLORS['default']), label=element.element_type)
+            for element in elements
+        ]
+        ax.legend(handles=handles, loc='upper right')
+    
+    def _create_side_by_side_comparison(self, 
+                                      pdf_input: InputDataType,
+                                      before_result: LayoutExtractionResult,
+                                      after_result: LayoutExtractionResult,
+                                      output_path: Union[str, Path]) -> None:
+        """Create a side-by-side comparison visualization."""
+        doc = _load_pdf_document(pdf_input)
         
-        # Group elements by page
+        # Group elements by page for both results
         before_pages = self._group_elements_by_page(before_result.elements)
         after_pages = self._group_elements_by_page(after_result.elements)
         
-        for page_num in range(doc.page_count):
-            page = doc[page_num]
-            page_number = page_num + 1
-            
-            before_elements = before_pages.get(page_number, [])
-            after_elements = after_pages.get(page_number, [])
-            
-            # Add comparison title
-            reduction = len(before_elements) - len(after_elements)
-            title = f"Page {page_number}: {len(before_elements)} → {len(after_elements)} elements (-{reduction})"
-            
-            title_rect = fitz.Rect(10, 10, page.rect.width - 10, 30)
-            page.insert_textbox(
-                title_rect,
-                title,
-                fontsize=12,
-                color=(0, 0, 0),
-                fontname="helv"
-            )
-            
-            # Draw original fragments in light gray
-            for element in before_elements:
-                rect = fitz.Rect(element.bbox.x1, element.bbox.y1, element.bbox.x2, element.bbox.y2)
-                page.draw_rect(rect, color=(0.7, 0.7, 0.7), width=0.5)
-            
-            # Draw merged elements with highlighting
-            for element in after_elements:
-                rect = fitz.Rect(element.bbox.x1, element.bbox.y1, element.bbox.x2, element.bbox.y2)
+        with PdfPages(output_path) as pdf:
+            for page_num in range(1, doc.page_count + 1):
+                before_elements = before_pages.get(page_num, [])
+                after_elements = after_pages.get(page_num, [])
                 
-                merged_count = element.metadata.get('merged_elements', 0)
-                if merged_count > 1:
-                    # Highlight merged elements
-                    page.draw_rect(rect, color=self.COLORS['merged'], width=2.0)
-                    
-                    # Add merge count label
-                    label_rect = fitz.Rect(rect.x0, rect.y0 - 15, rect.x0 + 50, rect.y0)
-                    page.insert_textbox(
-                        label_rect,
-                        f"×{merged_count}",
-                        fontsize=10,
-                        color=self.COLORS['merged'],
-                        fontname="helv"
-                    )
-                else:
-                    # Single elements
-                    page.draw_rect(rect, color=(0, 0, 1), width=1.0)
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 16))
+                
+                # Get page dimensions
+                page = doc[page_num - 1]
+                page_rect = page.rect
+                
+                # Set up both plots
+                for ax in [ax1, ax2]:
+                    ax.set_xlim(0, page_rect.width)
+                    ax.set_ylim(0, page_rect.height)
+                    ax.invert_yaxis()
+                    ax.set_aspect('equal')
+                
+                ax1.set_title(f'Before - Page {page_num} ({len(before_elements)} elements)')
+                ax2.set_title(f'After - Page {page_num} ({len(after_elements)} elements)')
+                
+                # Draw elements
+                for element in before_elements:
+                    if element.bbox:
+                        self._draw_element(ax1, element)
+                
+                for element in after_elements:
+                    if element.bbox:
+                        self._draw_element(ax2, element)
+                
+                # Add legend to the right plot
+                self._add_legend(ax2, after_elements)
+                
+                plt.tight_layout()
+                pdf.savefig(fig)
+                plt.close(fig)
         
-        doc.save(str(output_path))
         doc.close()
 
 
-def visualize_pdf_layout(pdf_path: Union[str, Path],
+def visualize_pdf_layout(pdf_input: InputDataType,
                         layout_result: LayoutExtractionResult,
                         output_path: Union[str, Path],
                         **kwargs) -> bool:
@@ -400,7 +371,7 @@ def visualize_pdf_layout(pdf_path: Union[str, Path],
     Convenience function to create a layout visualization.
     
     Args:
-        pdf_path: Path to original PDF
+        pdf_input: Path to original PDF or file object
         layout_result: Layout extraction results
         output_path: Output path for visualization
         **kwargs: Additional arguments for PdfLayoutVisualizer
@@ -409,29 +380,29 @@ def visualize_pdf_layout(pdf_path: Union[str, Path],
         True if successful
     """
     visualizer = PdfLayoutVisualizer(**kwargs)
-    return visualizer.visualize_layout_elements(pdf_path, layout_result, output_path)
+    return visualizer.visualize_layout_elements(pdf_input, layout_result, output_path)
 
 
-def compare_layout_results(pdf_path: Union[str, Path],
+def compare_layout_results(pdf_input: InputDataType,
                           before_result: LayoutExtractionResult,
                           after_result: LayoutExtractionResult,
                           output_dir: Union[str, Path],
                           **kwargs) -> bool:
     """
-    Convenience function to compare layout results before and after processing.
+    Convenience function to create a comparison visualization.
     
     Args:
-        pdf_path: Path to original PDF
-        before_result: Results before processing
-        after_result: Results after processing
-        output_dir: Directory for output files
+        pdf_input: Path to original PDF or file object
+        before_result: Layout results before processing
+        after_result: Layout results after processing
+        output_dir: Directory to save comparison files
         **kwargs: Additional arguments for PdfLayoutVisualizer
         
     Returns:
         True if successful
     """
     visualizer = PdfLayoutVisualizer(**kwargs)
-    return visualizer.compare_before_after(pdf_path, before_result, after_result, output_dir)
+    return visualizer.compare_before_after(pdf_input, before_result, after_result, output_dir)
 
 
 # Example usage

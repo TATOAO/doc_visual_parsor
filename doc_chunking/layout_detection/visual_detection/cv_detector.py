@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Union, List, Dict, Tuple, Optional, Any
 from PIL import Image
 import torch
+import io
+import tempfile
 
 try:
     import fitz  # PyMuPDF for PDF support
@@ -54,6 +56,9 @@ DOCLAYOUT_CLASS_MAPPING = {
     8: ElementType.ISOLATE_FORMULA,
     9: ElementType.FORMULA_CAPTION
 }
+
+# Type alias for input data
+InputDataType = Union[str, Path, bytes, io.BytesIO, io.BufferedReader, Any]
 
 class CVLayoutDetector(BaseLayoutExtractor):
     """
@@ -201,7 +206,6 @@ class CVLayoutDetector(BaseLayoutExtractor):
             img_data = pix.tobytes("png")
             
             # Convert to numpy array
-            import io
             img = Image.open(io.BytesIO(img_data))
             return np.array(img), 1.0 / zoom  # Return image and inverse scale factor
             
@@ -209,8 +213,33 @@ class CVLayoutDetector(BaseLayoutExtractor):
             logger.warning(f"Could not convert page {page_num + 1} to image: {e}")
             return None, 1.0
     
+    def _load_pdf_document(self, input_data: InputDataType) -> fitz.Document:
+        """
+        Load PDF document from various input types.
+        
+        Args:
+            input_data: Input data in various formats
+            
+        Returns:
+            PyMuPDF Document object
+        """
+        if isinstance(input_data, (str, Path)):
+            return fitz.open(str(input_data))
+        elif isinstance(input_data, bytes):
+            return fitz.open(stream=input_data, filetype="pdf")
+        elif hasattr(input_data, 'read'):
+            # File-like object
+            content = input_data.read()
+            return fitz.open(stream=content, filetype="pdf")
+        elif hasattr(input_data, 'getvalue'):
+            # BytesIO or similar
+            content = input_data.getvalue()
+            return fitz.open(stream=content, filetype="pdf")
+        else:
+            raise ValueError(f"Unsupported input data type: {type(input_data)}")
+    
     def _detect_layout_pdf(self, 
-                          pdf_input: Any,
+                          pdf_input: InputDataType,
                           confidence_threshold: float,
                           image_size: int,
                           **kwargs) -> LayoutExtractionResult:
@@ -218,7 +247,7 @@ class CVLayoutDetector(BaseLayoutExtractor):
         Detect layout for PDF files by converting each page to image.
         
         Args:
-            pdf_input: PDF file path
+            pdf_input: PDF file path or file object
             confidence_threshold: Confidence threshold
             image_size: Image size for detection
             **kwargs: Additional parameters
@@ -230,8 +259,8 @@ class CVLayoutDetector(BaseLayoutExtractor):
             raise RuntimeError("PyMuPDF not available. Cannot process PDF files.")
         
         try:
-            # Load PDF document
-            doc = fitz.open(str(pdf_input))
+            # Load PDF document using the unified method
+            doc = self._load_pdf_document(pdf_input)
             all_elements = []
             element_id = 0
             
@@ -365,14 +394,14 @@ class CVLayoutDetector(BaseLayoutExtractor):
             raise
     
     def detect_pdf_page(self, 
-                       pdf_path: Union[str, Path], 
+                       pdf_input: InputDataType, 
                        page_num: int,
                        **kwargs) -> LayoutExtractionResult:
         """
         Detect layout for a specific PDF page.
         
         Args:
-            pdf_path: Path to PDF file
+            pdf_input: Path to PDF file or file object
             page_num: Page number (1-indexed)
             **kwargs: Additional detection parameters
             
@@ -383,13 +412,13 @@ class CVLayoutDetector(BaseLayoutExtractor):
             raise RuntimeError("PyMuPDF not available. Cannot process PDF files.")
         
         try:
-            doc = fitz.open(str(pdf_path))
+            doc = self._load_pdf_document(pdf_input)
             
             if page_num < 1 or page_num > doc.page_count:
                 raise ValueError(f"Page number {page_num} out of range (1-{doc.page_count})")
             
             # Convert page to image (convert to 0-indexed)
-            page_image = self._pdf_page_to_image(doc, page_num - 1)
+            page_image, scale_factor = self._pdf_page_to_image(doc, page_num - 1)
             doc.close()
             
             if page_image is None:
@@ -454,7 +483,12 @@ class CVLayoutDetector(BaseLayoutExtractor):
                 return fitz is not None
             else:
                 return ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']
-                
+        elif isinstance(input_data, bytes):
+            # Assume it's a PDF if it's bytes
+            return fitz is not None
+        elif hasattr(input_data, 'read') or hasattr(input_data, 'getvalue'):
+            # File-like object, assume PDF
+            return fitz is not None
         elif isinstance(input_data, Image.Image):
             return True
         elif isinstance(input_data, np.ndarray):
