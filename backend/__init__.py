@@ -1,12 +1,7 @@
 # Backend package for Document Visual Parser
 
 from .pdf_processor import extract_pdf_pages_into_images, get_pdf_document_object, close_pdf_document
-from .docx_processor import extract_docx_content, extract_docx_structure
-from .document_analyzer import (
-    extract_pdf_document_structure, 
-    analyze_document_structure, 
-    get_structure_summary
-)
+from .docx_processor import extract_docx_content
 from .session_manager import (
     initialize_session_state, 
     reset_document_state, 

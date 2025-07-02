@@ -20,6 +20,7 @@ from doc_chunking.layout_detection.layout_extraction.pdf_style_cv_mix_extractor 
 
 # --- Chunker import ---
 from doc_chunking.documents_chunking.chunker import Chunker
+from doc_chunking.schemas.schemas import Section
 from doc_chunking.utils.helper import remove_circular_references
 
 app = FastAPI(title="Document Visual Parser API", version="1.0.0")
@@ -46,6 +47,38 @@ app.add_middleware(
 
 # Global storage for session data (in production, use Redis or database)
 sessions = {}
+
+
+def detect_file_type(file: UploadFile) -> str:
+    """
+    Detect file type from content_type with fallback to file extension.
+    
+    Args:
+        file: UploadFile object
+        
+    Returns:
+        Detected MIME type
+    """
+    # If content type is already specific and valid, use it
+    if file.content_type and file.content_type not in [
+        "application/octet-stream", 
+        "binary/octet-stream"
+    ]:
+        return file.content_type
+    
+    # Fallback to file extension detection
+    if file.filename:
+        filename_lower = file.filename.lower()
+        if filename_lower.endswith('.pdf'):
+            return "application/pdf"
+        elif filename_lower.endswith('.docx'):
+            return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        elif filename_lower.endswith('.doc'):
+            # Note: .doc files are not supported, but we can detect them
+            return "application/msword"
+    
+    # Return original content type if no extension match
+    return file.content_type or "application/octet-stream"
 
 
 @app.get("/")
@@ -266,28 +299,50 @@ async def visualize_layout(
 async def chunk_document(file: UploadFile = File(...)):
     """Chunk a PDF or DOCX document and return the section tree."""
     try:
+        # Use improved file type detection
+        detected_type = detect_file_type(file)
+        
         allowed_types = [
             "application/pdf",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ]
-        if file.content_type not in allowed_types:
+        if detected_type not in allowed_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file type: {file.content_type}. Supported types: PDF, DOCX"
+                detail=f"Unsupported file type: {detected_type}. Supported types: PDF, DOCX. Original content_type: {file.content_type}"
             )
         file_content = await file.read()
         # Save to a temporary file for compatibility with chunker
-        suffix = ".pdf" if file.content_type == "application/pdf" else ".docx"
+        suffix = ".pdf" if detected_type == "application/pdf" else ".docx"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
             tmp_file.write(file_content)
             tmp_path = tmp_file.name
         try:
             chunker = Chunker()
-            section_result = chunker.chunk(tmp_path)
+            # Use async version to avoid asyncio.run() in existing event loop
+            sections = []
+            async for section in chunker.chunk_async(tmp_path):
+                sections.append(section)
+            
+            # Combine sections into single result like the sync version does
+            if not sections:
+                section_result = Section(title="Empty Document", content="", level=0)
+            elif len(sections) == 1:
+                section_result = sections[0]
+            else:
+                # If multiple sections, create a root section containing them
+                section_result = Section(
+                    title="Document",
+                    content="",
+                    level=0,
+                    sub_sections=sections
+                )
+            
             remove_circular_references(section_result)
             return {
                 "filename": file.filename,
-                "file_type": file.content_type,
+                "file_type": detected_type,
+                "original_content_type": file.content_type,
                 "success": True,
                 "section_tree": section_result.model_dump()
             }
@@ -304,17 +359,20 @@ async def chunk_document_sse(file: UploadFile = File(...)):
     Chunk a PDF or DOCX document and stream the section tree as SSE events.
     """
     try:
+        # Use improved file type detection
+        detected_type = detect_file_type(file)
+        
         allowed_types = [
             "application/pdf",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ]
-        if file.content_type not in allowed_types:
+        if detected_type not in allowed_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file type: {file.content_type}. Supported types: PDF, DOCX"
+                detail=f"Unsupported file type: {detected_type}. Supported types: PDF, DOCX. Original content_type: {file.content_type}"
             )
         file_content = await file.read()
-        suffix = ".pdf" if file.content_type == "application/pdf" else ".docx"
+        suffix = ".pdf" if detected_type == "application/pdf" else ".docx"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
             tmp_file.write(file_content)
             tmp_path = tmp_file.name
