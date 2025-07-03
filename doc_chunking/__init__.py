@@ -50,3 +50,26 @@ __all__ = [
     # Chunker
     "Chunker"
 ]
+
+# Doc Chunking Package - Document Analysis and Chunking Library
+
+from .api import app as fastapi_app
+from .documents_chunking.chunker import Chunker
+from .processors import extract_pdf_pages_into_images, extract_docx_content
+from .schemas.schemas import Section
+
+__version__ = "0.1.0"
+__author__ = "Doc Chunking Team"
+__description__ = "A powerful document analysis and chunking library for PDF and DOCX files using AI-powered processing"
+
+# Export main components for easy importing
+__all__ = [
+    'fastapi_app',
+    'Chunker',
+    'extract_pdf_pages_into_images', 
+    'extract_docx_content',
+    'Section',
+]
+
+# For backward compatibility and easy access
+app = fastapi_app

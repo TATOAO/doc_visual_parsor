@@ -81,7 +81,7 @@ Repository = "https://github.com/yourusername/doc-chunking"
 "Bug Tracker" = "https://github.com/yourusername/doc-chunking/issues"
 
 [project.scripts]
-doc-chunking-server = "doc_chunking.scripts.run_server:main"
+doc-chunking-server = "doc_chunking.api:run_server"
 
 [tool.setuptools.packages.find]
 include = ["doc_chunking*"]

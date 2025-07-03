@@ -10,31 +10,17 @@ from pathlib import Path
 from sse_starlette.sse import EventSourceResponse
 import json
 
-# Fix: Use absolute imports for backend modules
-from backend.pdf_processor import extract_pdf_pages_into_images
-from backend.docx_processor import extract_docx_content
+# Import from the same package
+from .layout_detection.layout_extraction.pdf_style_cv_mix_extractor import PdfStyleCVMixLayoutExtractor
+from .documents_chunking.chunker import Chunker
+from .schemas.schemas import Section
+from .utils.helper import remove_circular_references
 
-# Import layout detection module
-sys.path.append(str(Path(__file__).parent.parent))
-from doc_chunking.layout_detection.layout_extraction.pdf_style_cv_mix_extractor import PdfStyleCVMixLayoutExtractor
-
-# --- Chunker import ---
-from doc_chunking.documents_chunking.chunker import Chunker
-from doc_chunking.schemas.schemas import Section
-from doc_chunking.utils.helper import remove_circular_references
+# Import processors from the same package
+from .processors.pdf_processor import extract_pdf_pages_into_images
+from .processors.docx_processor import extract_docx_content
 
 app = FastAPI(title="Document Visual Parser API", version="1.0.0")
-
-
-"""
-app.post("/api/upload-document") # upload and process a document
-app.post("/api/analyze-structure") # analyze document structure only
-app.post("/api/analyze-pdf-structure") # analyze PDF structure only (no image conversion)
-app.post("/api/extract-pdf-pages-into-images") # extract PDF pages as images
-app.post("/api/extract-docx-content") # extract DOCX content
-
-"""
-
 
 # Add CORS middleware for frontend access
 app.add_middleware(
@@ -109,20 +95,20 @@ async def extract_pdf_pages_endpoint(file: UploadFile = File(...)):
         page_images = extract_pdf_pages_into_images(mock_file)
         
         if page_images:
-            page_images = []
+            page_images_result = []
             for i, page_img in enumerate(page_images):
                 img_buffer = io.BytesIO()
                 page_img.save(img_buffer, format='PNG')
                 img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
-                page_images.append({
+                page_images_result.append({
                     "page_number": i,
                     "image_data": img_base64
                 })
             
             return {
                 "filename": file.filename,
-                "pages": page_images,
-                "total_pages": len(page_images)
+                "pages": page_images_result,
+                "total_pages": len(page_images_result)
             }
         else:
             raise HTTPException(status_code=500, detail="Failed to extract PDF pages")
@@ -352,7 +338,6 @@ async def chunk_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error chunking document: {str(e)}")
 
 
-# curl -X POST http://localhost:8000/api/chunk-document-sse -F "file=@tests/test_data/1-1 买卖合同（通用版）.docx;type=application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 @app.post("/api/chunk-document-sse")
 async def chunk_document_sse(file: UploadFile = File(...)):
     """
@@ -398,7 +383,53 @@ async def chunk_document_sse(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error chunking document (SSE): {str(e)}")
 
-# python -m backend.api_server
-if __name__ == "__main__":
+
+def run_server():
+    """Entry point for running the server via console script"""
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    import logging
+    
+    # Setup logging
+    from .utils.logging_config import setup_logging
+    
+    # Get environment settings
+    log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+    env = os.getenv('ENVIRONMENT', 'development')
+    
+    # Configure logging
+    setup_logging(level=log_level, use_colors=True)
+    logger = logging.getLogger(__name__)
+    
+    logger.info("🚀 Starting Document Visual Parser API Server...")
+    logger.info(f"📍 Server will be available at: http://localhost:8000")
+    logger.info(f"📖 API documentation will be available at: http://localhost:8000/docs")
+    logger.info(f"🔄 Environment: {env}")
+    logger.info("Press Ctrl+C to stop the server")
+    
+    try:
+        # Use import string format when reload is enabled
+        if env == 'development':
+            uvicorn.run(
+                "doc_chunking.api:app",
+                host="0.0.0.0",
+                port=8000,
+                log_level=log_level.lower(),
+                reload=True
+            )
+        else:
+            uvicorn.run(
+                app,
+                host="0.0.0.0",
+                port=8000,
+                log_level=log_level.lower(),
+                reload=False
+            )
+    except KeyboardInterrupt:
+        logger.info("👋 Server stopped by user")
+    except Exception as e:
+        logger.error(f"❌ Error starting server: {e}")
+        raise
+
+
+if __name__ == "__main__":
+    run_server()
