@@ -12,9 +12,9 @@ A powerful document analysis and chunking library for PDF and DOCX files using A
 
 ## Installation
 
-```bash
-pip install doc-chunking
-```
+
+(haven't published)
+~~pip install doc-chunking~~
 
 For development:
 ```bash
@@ -30,9 +30,19 @@ pip install -e .
 Run the built-in server:
 ```bash
 doc-chunking-server
+# or with custom configuration
+doc-chunking-server --port 8001
+doc-chunking-server --host 127.0.0.1 --port 9000
+doc-chunking-server --port 8001 --reload --log-level debug
 ```
 
-The API will be available at `http://localhost:8000` with documentation at `http://localhost:8000/docs`.
+Available options:
+- `--host`: Host to bind to (default: 0.0.0.0)
+- `--port`: Port to bind to (default: 8000)
+- `--reload`: Enable auto-reload for development
+- `--log-level`: Set log level (critical, error, warning, info, debug, trace)
+
+The API will be available at `http://localhost:8000` (or your specified host/port) with documentation at `http://localhost:8000/docs`.
 
 ### Using as a Library
 
@@ -171,20 +181,15 @@ pytest
 ### Running the Server in Development
 
 ```bash
-# Using the console script
-doc-chunking-server
+# Using the console script with auto-reload
+doc-chunking-server --reload
+
+# With custom port and debug logging
+doc-chunking-server --port 8001 --reload --log-level debug
 
 # Or directly with uvicorn
 uvicorn doc_chunking.api:app --reload
 ```
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-Contributions are welcome! Please read the contributing guidelines and submit pull requests.
 
 ## Support
 

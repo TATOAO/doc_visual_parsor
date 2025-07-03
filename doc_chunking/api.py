@@ -386,14 +386,26 @@ async def chunk_document_sse(file: UploadFile = File(...)):
 
 def run_server():
     """Entry point for running the server via console script"""
+    import argparse
     import uvicorn
     import logging
+    
+    # Setup argument parser
+    parser = argparse.ArgumentParser(description='Run the doc-chunking FastAPI server')
+    parser.add_argument('--host', default='0.0.0.0', help='Host to bind to (default: 0.0.0.0)')
+    parser.add_argument('--port', type=int, default=8000, help='Port to bind to (default: 8000)')
+    parser.add_argument('--reload', action='store_true', help='Enable auto-reload for development')
+    parser.add_argument('--log-level', default='info', 
+                        choices=['critical', 'error', 'warning', 'info', 'debug', 'trace'],
+                        help='Log level (default: info)')
+    
+    args = parser.parse_args()
     
     # Setup logging
     from .utils.logging_config import setup_logging
     
-    # Get environment settings
-    log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+    # Get environment settings (can be overridden by CLI args)
+    log_level = os.getenv('LOG_LEVEL', args.log_level.upper()).upper()
     env = os.getenv('ENVIRONMENT', 'development')
     
     # Configure logging
@@ -401,27 +413,30 @@ def run_server():
     logger = logging.getLogger(__name__)
     
     logger.info("🚀 Starting Document Visual Parser API Server...")
-    logger.info(f"📍 Server will be available at: http://localhost:8000")
-    logger.info(f"📖 API documentation will be available at: http://localhost:8000/docs")
+    logger.info(f"📍 Server will be available at: http://{args.host}:{args.port}")
+    logger.info(f"📖 API documentation will be available at: http://{args.host}:{args.port}/docs")
     logger.info(f"🔄 Environment: {env}")
     logger.info("Press Ctrl+C to stop the server")
     
     try:
+        # Use reload option from CLI args or default to environment setting
+        reload_enabled = args.reload or (env == 'development')
+        
         # Use import string format when reload is enabled
-        if env == 'development':
+        if reload_enabled:
             uvicorn.run(
                 "doc_chunking.api:app",
-                host="0.0.0.0",
-                port=8000,
-                log_level=log_level.lower(),
+                host=args.host,
+                port=args.port,
+                log_level=args.log_level.lower(),
                 reload=True
             )
         else:
             uvicorn.run(
                 app,
-                host="0.0.0.0",
-                port=8000,
-                log_level=log_level.lower(),
+                host=args.host,
+                port=args.port,
+                log_level=args.log_level.lower(),
                 reload=False
             )
     except KeyboardInterrupt:
