@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 import io
 import base64
@@ -21,6 +21,7 @@ from .processors.pdf_processor import extract_pdf_pages_into_images
 from .processors.docx_processor import extract_docx_content
 
 app = FastAPI(title="Document Visual Parser API", version="1.0.0")
+router = APIRouter()
 
 # Add CORS middleware for frontend access
 app.add_middleware(
@@ -67,13 +68,13 @@ def detect_file_type(file: UploadFile) -> str:
     return file.content_type or "application/octet-stream"
 
 
-@app.get("/")
+@router.get("/")
 async def root():
     """Health check endpoint"""
     return {"message": "Document Visual Parser API", "status": "running"}
 
 
-@app.post("/api/extract-pdf-pages-into-images")
+@router.post("/api/extract-pdf-pages-into-images")
 async def extract_pdf_pages_endpoint(file: UploadFile = File(...)):
     """Extract PDF pages as images"""
     try:
@@ -117,7 +118,7 @@ async def extract_pdf_pages_endpoint(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error extracting PDF pages: {str(e)}")
 
 
-@app.post("/api/extract-docx-content")
+@router.post("/api/extract-docx-content")
 async def extract_docx_content_endpoint(file: UploadFile = File(...)):
     """Extract DOCX content"""
     try:
@@ -147,7 +148,7 @@ async def extract_docx_content_endpoint(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error extracting DOCX content: {str(e)}")
 
 
-@app.post("/api/visualize-layout")
+@router.post("/api/visualize-layout")
 async def visualize_layout(
     file: UploadFile = File(...),
     confidence: float = 0.25,
@@ -281,7 +282,7 @@ async def visualize_layout(
         raise HTTPException(status_code=500, detail=f"Error visualizing layout: {str(e)}")
 
 
-@app.post("/api/chunk-document")
+@router.post("/api/chunk-document")
 async def chunk_document(file: UploadFile = File(...)):
     """Chunk a PDF or DOCX document and return the section tree."""
     try:
@@ -338,7 +339,7 @@ async def chunk_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error chunking document: {str(e)}")
 
 
-@app.post("/api/chunk-document-sse")
+@router.post("/api/chunk-document-sse")
 async def chunk_document_sse(file: UploadFile = File(...)):
     """
     Chunk a PDF or DOCX document and stream the section tree as SSE events.
@@ -383,6 +384,9 @@ async def chunk_document_sse(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error chunking document (SSE): {str(e)}")
 
+
+
+app.include_router(router)
 
 def run_server():
     """Entry point for running the server via console script"""

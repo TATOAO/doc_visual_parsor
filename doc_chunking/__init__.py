@@ -8,16 +8,23 @@ __version__ = "0.1.0"
 __author__ = "TATOAO"
 __email__ = "tatoao@126.com"
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Import essential schemas that are least likely to have circular dependencies
 from .schemas.layout_schemas import LayoutExtractionResult, LayoutElement
 from .schemas.schemas import Section, Positions
 
+# Import layout and chunking components
 from .layout_structuring.title_structure_builder_llm.layout_displayer import display_layout
 from .documents_chunking.chunker import Chunker
 
-import logging
+# Import API components
+from .api import app as fastapi_app, router as chunking_router
 
-logger = logging.getLogger(__name__)
+# Import processors
+from .processors import extract_pdf_pages_into_images, extract_docx_content
 
 # Make commonly used classes and functions available at package level
 __all__ = [
@@ -31,6 +38,15 @@ __all__ = [
     "LayoutElement", 
     "Section",
     "Positions",
+    
+    # Core components
+    "Chunker",
+    "fastapi_app",
+    "chunking_router",
+    
+    # Processors
+    "extract_pdf_pages_into_images",
+    "extract_docx_content",
     
     # Convenience functions
     "display_layout",
@@ -46,29 +62,6 @@ __all__ = [
     "validate_input",
     "normalize_input",
     "get_document_type",
-
-    # Chunker
-    "Chunker"
-]
-
-# Doc Chunking Package - Document Analysis and Chunking Library
-
-from .api import app as fastapi_app
-from .documents_chunking.chunker import Chunker
-from .processors import extract_pdf_pages_into_images, extract_docx_content
-from .schemas.schemas import Section
-
-__version__ = "0.1.0"
-__author__ = "Doc Chunking Team"
-__description__ = "A powerful document analysis and chunking library for PDF and DOCX files using AI-powered processing"
-
-# Export main components for easy importing
-__all__ = [
-    'fastapi_app',
-    'Chunker',
-    'extract_pdf_pages_into_images', 
-    'extract_docx_content',
-    'Section',
 ]
 
 # For backward compatibility and easy access
