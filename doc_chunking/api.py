@@ -1,12 +1,13 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, APIRouter
+from fastapi import FastAPI, File, UploadFile, HTTPException, APIRouter, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any, Union
 import io
 import base64
 from PIL import Image
 import tempfile
 import os
-import sys
-from pathlib import Path
 from sse_starlette.sse import EventSourceResponse
 import json
 
@@ -20,7 +21,137 @@ from .utils.helper import remove_circular_references
 from .processors.pdf_processor import extract_pdf_pages_into_images
 from .processors.docx_processor import extract_docx_content
 
-app = FastAPI(title="Document Visual Parser API", version="1.0.0")
+# Pydantic models for API documentation
+class HealthCheckResponse(BaseModel):
+    """Health check response model"""
+    message: str = Field(..., description="API status message")
+    status: str = Field(..., description="Current status of the API")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "message": "Document Visual Parser API",
+                "status": "running"
+            }
+        }
+
+class PageImageData(BaseModel):
+    """Model for PDF page image data"""
+    page_number: int = Field(..., description="Page number (0-indexed)")
+    image_data: str = Field(..., description="Base64 encoded image data")
+
+class ExtractPdfPagesResponse(BaseModel):
+    """Response model for PDF page extraction"""
+    filename: str = Field(..., description="Original filename")
+    pages: List[PageImageData] = Field(..., description="List of extracted page images")
+    total_pages: int = Field(..., description="Total number of pages extracted")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "filename": "document.pdf",
+                "pages": [
+                    {
+                        "page_number": 0,
+                        "image_data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                    }
+                ],
+                "total_pages": 1
+            }
+        }
+
+class ExtractDocxContentResponse(BaseModel):
+    """Response model for DOCX content extraction"""
+    filename: str = Field(..., description="Original filename")
+    content: str = Field(..., description="Extracted text content from DOCX")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "filename": "document.docx",
+                "content": "This is the extracted text content from the DOCX file..."
+            }
+        }
+
+class AnnotatedPageData(BaseModel):
+    """Model for annotated page data"""
+    page_number: int = Field(..., description="Page number (0-indexed)")
+    annotated_image: str = Field(..., description="Base64 encoded annotated image")
+    total_elements: int = Field(..., description="Number of layout elements detected")
+
+class VisualizeLayoutResponse(BaseModel):
+    """Response model for layout visualization"""
+    filename: str = Field(..., description="Original filename")
+    model_used: str = Field(..., description="Model used for layout detection")
+    total_pages: int = Field(..., description="Total number of pages processed")
+    annotated_pages: List[AnnotatedPageData] = Field(..., description="List of annotated pages")
+    success: bool = Field(..., description="Whether the operation was successful")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "filename": "document.pdf",
+                "model_used": "docstructbench",
+                "total_pages": 1,
+                "annotated_pages": [
+                    {
+                        "page_number": 0,
+                        "annotated_image": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                        "total_elements": 5
+                    }
+                ],
+                "success": True
+            }
+        }
+
+class ChunkDocumentResponse(BaseModel):
+    """Response model for document chunking"""
+    filename: str = Field(..., description="Original filename")
+    file_type: str = Field(..., description="Detected file type")
+    original_content_type: Optional[str] = Field(None, description="Original content type from upload")
+    success: bool = Field(..., description="Whether the operation was successful")
+    section_tree: Dict[str, Any] = Field(..., description="Hierarchical section structure")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "filename": "document.pdf",
+                "file_type": "application/pdf",
+                "original_content_type": "application/pdf",
+                "success": True,
+                "section_tree": {
+                    "title": "Document Title",
+                    "content": "Document content...",
+                    "level": 0,
+                    "sub_sections": []
+                }
+            }
+        }
+
+class ErrorResponse(BaseModel):
+    """Error response model"""
+    detail: str = Field(..., description="Error message")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "detail": "Unsupported file type"
+            }
+        }
+
+app = FastAPI(
+    title="Document Visual Parser API",
+    version="1.0.0",
+    description="API for parsing, chunking, and analyzing document layouts with support for PDF and DOCX files",
+    contact={
+        "name": "Document Parser Team",
+        "email": "support@example.com"
+    },
+    license_info={
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT"
+    }
+)
 router = APIRouter()
 
 # Add CORS middleware for frontend access
@@ -68,15 +199,53 @@ def detect_file_type(file: UploadFile) -> str:
     return file.content_type or "application/octet-stream"
 
 
-@router.get("/")
-async def root():
-    """Health check endpoint"""
-    return {"message": "Document Visual Parser API", "status": "running"}
+@router.get(
+    "/",
+    response_model=HealthCheckResponse,
+    summary="Health Check",
+    description="Check if the API is running and healthy",
+    tags=["Health"]
+)
+async def root() -> HealthCheckResponse:
+    """
+    Health check endpoint to verify API status.
+    
+    Returns:
+        HealthCheckResponse: API status information
+    """
+    return HealthCheckResponse(
+        message="Document Visual Parser API",
+        status="running"
+    )
 
 
-@router.post("/api/extract-pdf-pages-into-images")
-async def extract_pdf_pages_endpoint(file: UploadFile = File(...)):
-    """Extract PDF pages as images"""
+@router.post(
+    "/api/extract-pdf-pages-into-images",
+    response_model=ExtractPdfPagesResponse,
+    summary="Extract PDF Pages as Images",
+    description="Extract all pages from a PDF file and return them as base64-encoded images",
+    responses={
+        200: {"description": "PDF pages extracted successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid file type or file format"},
+        500: {"model": ErrorResponse, "description": "Internal server error during extraction"}
+    },
+    tags=["PDF Processing"]
+)
+async def extract_pdf_pages_endpoint(
+    file: UploadFile = File(..., description="PDF file to extract pages from", media_type="application/pdf")
+) -> ExtractPdfPagesResponse:
+    """
+    Extract all pages from a PDF file and return them as base64-encoded PNG images.
+    
+    Args:
+        file: PDF file upload
+        
+    Returns:
+        ExtractPdfPagesResponse: List of extracted page images with metadata
+        
+    Raises:
+        HTTPException: If file type is not PDF or extraction fails
+    """
     try:
         if file.content_type != "application/pdf":
             raise HTTPException(status_code=400, detail="Only PDF files are supported")
@@ -101,26 +270,52 @@ async def extract_pdf_pages_endpoint(file: UploadFile = File(...)):
                 img_buffer = io.BytesIO()
                 page_img.save(img_buffer, format='PNG')
                 img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
-                page_images_result.append({
-                    "page_number": i,
-                    "image_data": img_base64
-                })
+                page_images_result.append(PageImageData(
+                    page_number=i,
+                    image_data=img_base64
+                ))
             
-            return {
-                "filename": file.filename,
-                "pages": page_images_result,
-                "total_pages": len(page_images_result)
-            }
+            return ExtractPdfPagesResponse(
+                filename=file.filename,
+                pages=page_images_result,
+                total_pages=len(page_images_result)
+            )
         else:
             raise HTTPException(status_code=500, detail="Failed to extract PDF pages")
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error extracting PDF pages: {str(e)}")
 
 
-@router.post("/api/extract-docx-content")
-async def extract_docx_content_endpoint(file: UploadFile = File(...)):
-    """Extract DOCX content"""
+@router.post(
+    "/api/extract-docx-content",
+    response_model=ExtractDocxContentResponse,
+    summary="Extract DOCX Content",
+    description="Extract text content from a DOCX file",
+    responses={
+        200: {"description": "DOCX content extracted successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid file type or file format"},
+        500: {"model": ErrorResponse, "description": "Internal server error during extraction"}
+    },
+    tags=["DOCX Processing"]
+)
+async def extract_docx_content_endpoint(
+    file: UploadFile = File(..., description="DOCX file to extract content from", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+) -> ExtractDocxContentResponse:
+    """
+    Extract text content from a DOCX file.
+    
+    Args:
+        file: DOCX file upload
+        
+    Returns:
+        ExtractDocxContentResponse: Extracted text content with metadata
+        
+    Raises:
+        HTTPException: If file type is not DOCX or extraction fails
+    """
     try:
         if file.content_type != "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
             raise HTTPException(status_code=400, detail="Only DOCX files are supported")
@@ -139,35 +334,55 @@ async def extract_docx_content_endpoint(file: UploadFile = File(...)):
         mock_file = MockUploadedFile(file_content, file.content_type, file.filename)
         content = extract_docx_content(mock_file)
         
-        return {
-            "filename": file.filename,
-            "content": content
-        }
+        return ExtractDocxContentResponse(
+            filename=file.filename,
+            content=content
+        )
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error extracting DOCX content: {str(e)}")
 
 
-@router.post("/api/visualize-layout")
+@router.post(
+    "/api/visualize-layout",
+    response_model=VisualizeLayoutResponse,
+    summary="Visualize Document Layout",
+    description="Detect layout elements in documents and return annotated images showing the detected elements",
+    responses={
+        200: {"description": "Layout visualization completed successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid file type or parameters"},
+        500: {"model": ErrorResponse, "description": "Internal server error during layout detection"}
+    },
+    tags=["Layout Detection"]
+)
 async def visualize_layout(
-    file: UploadFile = File(...),
-    confidence: float = 0.25,
-    model_name: str = "docstructbench",
-    image_size: int = 1024,
-    page_number: int = 0
-):
+    file: UploadFile = File(..., description="Image file (PNG, JPEG, GIF, BMP) or PDF file to analyze"),
+    confidence: float = Query(0.25, ge=0.0, le=1.0, description="Confidence threshold for layout element detection"),
+    model_name: str = Query("docstructbench", description="Model to use for layout detection"),
+    image_size: int = Query(1024, ge=512, le=2048, description="Input image size for the model"),
+    page_number: int = Query(0, ge=-1, description="Page number to process (for PDFs, -1 for all pages)")
+) -> VisualizeLayoutResponse:
     """
-    Detect layout and return annotated images.
+    Detect layout elements in documents and return annotated images.
+    
+    This endpoint processes image files (PNG, JPEG, GIF, BMP) or PDF files and detects
+    layout elements like text blocks, titles, figures, etc. It returns annotated images
+    showing the detected elements with bounding boxes.
     
     Args:
-        file: Image file or PDF file
-        confidence: Confidence threshold for detections
-        model_name: Model to use
-        image_size: Input image size for the model
+        file: Image file or PDF file to analyze
+        confidence: Confidence threshold for layout element detection (0.0-1.0)
+        model_name: Model to use for layout detection
+        image_size: Input image size for the model (512-2048)
         page_number: Page number to process (for PDFs, -1 for all pages)
     
     Returns:
-        JSON with annotated images as base64
+        VisualizeLayoutResponse: Annotated images with layout elements highlighted
+        
+    Raises:
+        HTTPException: If file type is not supported or processing fails
     """
     try:
         # Similar validation as detect_layout
@@ -209,11 +424,11 @@ async def visualize_layout(
                 img_pil.save(img_buffer, format='PNG')
                 img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
                 
-                annotated_images.append({
-                    "page_number": 0,
-                    "annotated_image": img_base64,
-                    "total_elements": len(result.get_elements())
-                })
+                annotated_images.append(AnnotatedPageData(
+                    page_number=0,
+                    annotated_image=img_base64,
+                    total_elements=len(result.get_elements())
+                ))
                 
             finally:
                 os.unlink(tmp_path)
@@ -259,22 +474,22 @@ async def visualize_layout(
                     img_pil.save(img_buffer, format='PNG')
                     img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
                     
-                    annotated_images.append({
-                        "page_number": page_num,
-                        "annotated_image": img_base64,
-                        "total_elements": len(result.get_elements())
-                    })
+                    annotated_images.append(AnnotatedPageData(
+                        page_number=page_num,
+                        annotated_image=img_base64,
+                        total_elements=len(result.get_elements())
+                    ))
                     
                 finally:
                     os.unlink(tmp_path)
         
-        return {
-            "filename": file.filename,
-            "model_used": model_name,
-            "total_pages": len(annotated_images),
-            "annotated_pages": annotated_images,
-            "success": True
-        }
+        return VisualizeLayoutResponse(
+            filename=file.filename,
+            model_used=model_name,
+            total_pages=len(annotated_images),
+            annotated_pages=annotated_images,
+            success=True
+        )
         
     except HTTPException:
         raise
@@ -282,9 +497,37 @@ async def visualize_layout(
         raise HTTPException(status_code=500, detail=f"Error visualizing layout: {str(e)}")
 
 
-@router.post("/api/chunk-document")
-async def chunk_document(file: UploadFile = File(...)):
-    """Chunk a PDF or DOCX document and return the section tree."""
+@router.post(
+    "/api/chunk-document",
+    response_model=ChunkDocumentResponse,
+    summary="Chunk Document",
+    description="Parse and chunk a PDF or DOCX document into hierarchical sections",
+    responses={
+        200: {"description": "Document chunked successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid file type or file format"},
+        500: {"model": ErrorResponse, "description": "Internal server error during chunking"}
+    },
+    tags=["Document Chunking"]
+)
+async def chunk_document(
+    file: UploadFile = File(..., description="PDF or DOCX file to chunk into sections")
+) -> ChunkDocumentResponse:
+    """
+    Parse and chunk a PDF or DOCX document into hierarchical sections.
+    
+    This endpoint processes PDF or DOCX files and extracts their content into a hierarchical
+    structure of sections and subsections. It uses layout detection and content analysis
+    to identify document structure.
+    
+    Args:
+        file: PDF or DOCX file to process
+        
+    Returns:
+        ChunkDocumentResponse: Hierarchical section structure with metadata
+        
+    Raises:
+        HTTPException: If file type is not supported or processing fails
+    """
     try:
         # Use improved file type detection
         detected_type = detect_file_type(file)
@@ -326,23 +569,54 @@ async def chunk_document(file: UploadFile = File(...)):
                 )
             
             remove_circular_references(section_result)
-            return {
-                "filename": file.filename,
-                "file_type": detected_type,
-                "original_content_type": file.content_type,
-                "success": True,
-                "section_tree": section_result.model_dump()
-            }
+            return ChunkDocumentResponse(
+                filename=file.filename,
+                file_type=detected_type,
+                original_content_type=file.content_type,
+                success=True,
+                section_tree=section_result.model_dump()
+            )
         finally:
             os.unlink(tmp_path)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error chunking document: {str(e)}")
 
 
-@router.post("/api/chunk-document-sse")
-async def chunk_document_sse(file: UploadFile = File(...)):
+@router.post(
+    "/api/chunk-document-sse",
+    summary="Chunk Document (Server-Sent Events)",
+    description="Parse and chunk a PDF or DOCX document into hierarchical sections, streaming results as SSE events",
+    responses={
+        200: {"description": "Document chunking stream started successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid file type or file format"},
+        500: {"model": ErrorResponse, "description": "Internal server error during chunking"}
+    },
+    tags=["Document Chunking"]
+)
+async def chunk_document_sse(
+    file: UploadFile = File(..., description="PDF or DOCX file to chunk into sections")
+) -> EventSourceResponse:
     """
-    Chunk a PDF or DOCX document and stream the section tree as SSE events.
+    Parse and chunk a PDF or DOCX document into hierarchical sections, streaming results as SSE events.
+    
+    This endpoint processes PDF or DOCX files and streams the extracted sections as
+    Server-Sent Events (SSE). This is useful for real-time progress updates and
+    handling large documents.
+    
+    The SSE stream will emit:
+    - 'section' events containing individual section data
+    - 'end' event when processing is complete
+    
+    Args:
+        file: PDF or DOCX file to process
+        
+    Returns:
+        EventSourceResponse: SSE stream of section data
+        
+    Raises:
+        HTTPException: If file type is not supported or processing fails
     """
     try:
         # Use improved file type detection
@@ -376,11 +650,18 @@ async def chunk_document_sse(file: UploadFile = File(...)):
                     "event": "end",
                     "data": json.dumps({"success": True})
                 }
+            except Exception as e:
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"error": str(e), "success": False})
+                }
             finally:
                 os.unlink(tmp_path)
 
         return EventSourceResponse(event_generator())
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error chunking document (SSE): {str(e)}")
 
