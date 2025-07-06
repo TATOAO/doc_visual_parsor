@@ -589,11 +589,22 @@ async def chunk_document(
     summary="Chunk Document (Server-Sent Events)",
     description="Parse and chunk a PDF or DOCX document into hierarchical sections, streaming results as SSE events",
     responses={
-        200: {"description": "Document chunking stream started successfully"},
+        200: {
+            "description": "Document chunking stream started successfully",
+            "content": {
+                "text/event-stream": {
+                    "schema": {
+                        "type": "string",
+                        "description": "Server-Sent Events stream containing section data and completion status"
+                    }
+                }
+            }
+        },
         400: {"model": ErrorResponse, "description": "Invalid file type or file format"},
         500: {"model": ErrorResponse, "description": "Internal server error during chunking"}
     },
-    tags=["Document Chunking"]
+    tags=["Document Chunking"],
+    response_class=EventSourceResponse
 )
 async def chunk_document_sse(
     file: UploadFile = File(..., description="PDF or DOCX file to chunk into sections")
