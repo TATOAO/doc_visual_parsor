@@ -1,13 +1,14 @@
 import asyncio 
 import os
 from pathlib import Path
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List, Dict, Any
 from doc_chunking.schemas.schemas import Section, InputDataType
 from doc_chunking.layout_detection.layout_extraction.docx_layout_extractor import DocxLayoutExtrator
 from doc_chunking.layout_detection.layout_extraction.pdf_style_cv_mix_extractor import PdfStyleCVMixLayoutExtractor
 
 from doc_chunking.layout_structuring.title_structure_builder_llm.structurer_llm import stream_title_structure_builder_llm
 from doc_chunking.layout_structuring.title_structure_builder_llm.section_reconstructor import streaming_section_reconstructor
+from doc_chunking.layout_structuring.title_structure_builder_llm.flatten_sections_generator import streaming_flatten_sections_generator, flatten_sections_generator
 
 import logging
 logger = logging.getLogger(__name__)
@@ -97,6 +98,59 @@ class Chunker:
             )
             yield error_section
 
+    async def chunk_flat_async(self, input_data: InputDataType) -> AsyncGenerator[List[Dict[str, Any]], None]:
+        """
+        Asynchronously chunk a document into flattened sections.
+        
+        Args:
+            input_data: Path to PDF or DOCX file, or file content
+            
+        Yields:
+            Lists of dictionaries with flattened section data containing:
+            - 'title': The title joined by all parent titles with format "titleA-titleA1-..."
+            - 'content': The content of the section
+            - 'level': The level of the section
+        """
+        try:
+            # Determine input type
+            input_type = self._get_input_type(input_data)
+            
+            # Extract layout based on input type
+            if input_type == 'pdf':
+                logger.info(f"Processing PDF file for flattening: {input_data}")
+                extractor = self._get_pdf_extractor()
+                layout_result = extractor._detect_layout(input_data)
+            elif input_type == 'docx':
+                logger.info(f"Processing DOCX file for flattening: {input_data}")
+                extractor = self._get_docx_extractor()
+                layout_result = extractor._detect_layout(input_data)
+            else:
+                raise ValueError(f"Unsupported input type: {input_type}")
+            
+            logger.info(f"Extracted {len(layout_result.elements)} layout elements")
+            
+            # Build title structure using streaming LLM and flatten sections generator
+            logger.info("Building title structure and flattening sections...")
+            
+            # Use streaming_flatten_sections_generator to process LLM output and yield flattened sections
+            async for flattened_sections in streaming_flatten_sections_generator(
+                stream_title_structure_builder_llm(layout_result), 
+                layout_result
+            ):
+                yield flattened_sections
+
+            logger.info("Flattening completed")
+            
+        except Exception as e:
+            logger.error(f"Error during flattening: {str(e)}")
+            # Yield an error section
+            error_section = [{
+                'title': "Error",
+                'content': f"Failed to process document: {str(e)}",
+                'level': 0
+            }]
+            yield error_section
+
     def chunk(self, input_data: InputDataType) -> Section:
         """
         Synchronously chunk a document into sections.
@@ -128,6 +182,30 @@ class Chunker:
                 return root
         
         return asyncio.run(_collect_sections())
+
+    def chunk_flat(self, input_data: InputDataType) -> List[Dict[str, Any]]:
+        """
+        Synchronously chunk a document into flattened sections.
+        
+        Args:
+            input_data: Path to PDF or DOCX file, or file content
+            
+        Returns:
+            List of dictionaries with flattened section data containing:
+            - 'title': The title joined by all parent titles with format "titleA-titleA1-..."
+            - 'content': The content of the section
+            - 'level': The level of the section
+        """
+        async def _collect_flat_sections():
+            all_sections = []
+            async for flattened_sections in self.chunk_flat_async(input_data):
+                # Keep only the latest/most complete version
+                all_sections = flattened_sections
+                logger.info(f"Collected {len(flattened_sections)} flattened sections")
+            
+            return all_sections or []
+        
+        return asyncio.run(_collect_flat_sections())
 
 # python -m models.documents_chunking.chunker
 if __name__ == "__main__":

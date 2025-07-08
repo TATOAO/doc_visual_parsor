@@ -128,6 +128,44 @@ class ChunkDocumentResponse(BaseModel):
             }
         }
 
+class FlattenedSection(BaseModel):
+    """Model for flattened section data"""
+    title: str = Field(..., description="Title joined by all parent titles with format 'titleA-titleA1-...'")
+    content: str = Field(..., description="Content of the section")
+    level: int = Field(..., description="Level of the section")
+
+class ChunkDocumentFlatResponse(BaseModel):
+    """Response model for flattened document chunking"""
+    filename: str = Field(..., description="Original filename")
+    file_type: str = Field(..., description="Detected file type")
+    original_content_type: Optional[str] = Field(None, description="Original content type from upload")
+    success: bool = Field(..., description="Whether the operation was successful")
+    flattened_sections: List[FlattenedSection] = Field(..., description="List of flattened sections")
+    total_sections: int = Field(..., description="Total number of sections")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "filename": "document.pdf",
+                "file_type": "application/pdf",
+                "original_content_type": "application/pdf",
+                "success": True,
+                "flattened_sections": [
+                    {
+                        "title": "Chapter 1",
+                        "content": "Chapter content...",
+                        "level": 0
+                    },
+                    {
+                        "title": "Chapter 1-Section 1.1",
+                        "content": "Section content...",
+                        "level": 1
+                    }
+                ],
+                "total_sections": 2
+            }
+        }
+
 class ErrorResponse(BaseModel):
     """Error response model"""
     detail: str = Field(..., description="Error message")
@@ -676,6 +714,184 @@ async def chunk_document_sse(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error chunking document (SSE): {str(e)}")
 
+
+@router.post(
+    "/api/flatten-document",
+    response_model=ChunkDocumentFlatResponse,
+    summary="Flatten Document",
+    description="Parse and flatten a PDF or DOCX document into a single-level list of sections",
+    responses={
+        200: {"description": "Document flattened successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid file type or file format"},
+        500: {"model": ErrorResponse, "description": "Internal server error during flattening"}
+    },
+    tags=["Document Chunking"]
+)
+async def flatten_document(
+    file: UploadFile = File(..., description="PDF or DOCX file to flatten into sections")
+) -> ChunkDocumentFlatResponse:
+    """
+    Parse and flatten a PDF or DOCX document into a single-level list of sections.
+    
+    This endpoint processes PDF or DOCX files and extracts their content into a
+    single-level list of sections. It uses layout detection and content analysis
+    to identify document structure.
+    
+    Args:
+        file: PDF or DOCX file to process
+        
+    Returns:
+        ChunkDocumentFlatResponse: Flattened section structure with metadata
+        
+    Raises:
+        HTTPException: If file type is not supported or processing fails
+    """
+    try:
+        # Use improved file type detection
+        detected_type = detect_file_type(file)
+        
+        allowed_types = [
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ]
+        if detected_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {detected_type}. Supported types: PDF, DOCX. Original content_type: {file.content_type}"
+            )
+        file_content = await file.read()
+        # Save to a temporary file for compatibility with chunker
+        suffix = ".pdf" if detected_type == "application/pdf" else ".docx"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+            tmp_file.write(file_content)
+            tmp_path = tmp_file.name
+        
+        try:
+            chunker = Chunker()
+            # Use async version to avoid asyncio.run() in existing event loop
+            flattened_sections_list = []
+            async for flattened_sections in chunker.chunk_flat_async(tmp_path):
+                # Keep only the latest/most complete version
+                flattened_sections_list = flattened_sections
+            
+            # Convert to FlattenedSection objects
+            flattened_section_objects = [
+                FlattenedSection(
+                    title=section['title'],
+                    content=section['content'],
+                    level=section['level']
+                )
+                for section in flattened_sections_list
+            ]
+
+            return ChunkDocumentFlatResponse(
+                filename=file.filename,
+                file_type=detected_type,
+                original_content_type=file.content_type,
+                success=True,
+                flattened_sections=flattened_section_objects,
+                total_sections=len(flattened_section_objects)
+            )
+        finally:
+            os.unlink(tmp_path)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error flattening document: {str(e)}")
+
+
+@router.post(
+    "/api/flatten-document-sse",
+    summary="Flatten Document (Server-Sent Events)",
+    description="Parse and flatten a PDF or DOCX document into a single-level list of sections, streaming results as SSE events",
+    responses={
+        200: {
+            "description": "Document flattening stream started successfully",
+            "content": {
+                "text/event-stream": {
+                    "schema": {
+                        "type": "string",
+                        "description": "Server-Sent Events stream containing flattened section data and completion status"
+                    }
+                }
+            }
+        },
+        400: {"model": ErrorResponse, "description": "Invalid file type or file format"},
+        500: {"model": ErrorResponse, "description": "Internal server error during flattening"}
+    },
+    tags=["Document Chunking"],
+    response_class=EventSourceResponse
+)
+async def flatten_document_sse(
+    file: UploadFile = File(..., description="PDF or DOCX file to flatten into sections")
+) -> EventSourceResponse:
+    """
+    Parse and flatten a PDF or DOCX document into a single-level list of sections, streaming results as SSE events.
+    
+    This endpoint processes PDF or DOCX files and streams the extracted sections as
+    Server-Sent Events (SSE). This is useful for real-time progress updates and
+    handling large documents.
+    
+    The SSE stream will emit:
+    - 'section' events containing individual flattened section data
+    - 'end' event when processing is complete
+    
+    Args:
+        file: PDF or DOCX file to process
+        
+    Returns:
+        EventSourceResponse: SSE stream of flattened section data
+        
+    Raises:
+        HTTPException: If file type is not supported or processing fails
+    """
+    try:
+        # Use improved file type detection
+        detected_type = detect_file_type(file)
+        
+        allowed_types = [
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ]
+        if detected_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: {detected_type}. Supported types: PDF, DOCX. Original content_type: {file.content_type}"
+            )
+        file_content = await file.read()
+        suffix = ".pdf" if detected_type == "application/pdf" else ".docx"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+            tmp_file.write(file_content)
+            tmp_path = tmp_file.name
+
+        async def event_generator():
+            try:
+                chunker = Chunker()
+                async for flattened_sections in chunker.chunk_flat_async(tmp_path):
+                    # Send each flattened section as an event
+                    for section in flattened_sections:
+                        yield {
+                            "event": "section",
+                            "data": json.dumps(section, ensure_ascii=False)
+                        }
+                yield {
+                    "event": "end",
+                    "data": json.dumps({"success": True})
+                }
+            except Exception as e:
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"error": str(e), "success": False})
+                }
+            finally:
+                os.unlink(tmp_path)
+
+        return EventSourceResponse(event_generator())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error flattening document (SSE): {str(e)}")
 
 
 app.include_router(router)
