@@ -689,12 +689,21 @@ async def chunk_document_sse(
         async def event_generator():
             try:
                 chunker = Chunker()
-                async for section in chunker.chunk_async(tmp_path):
-                    remove_circular_references(section)
-                    yield {
-                        "event": "section",
-                        "data": json.dumps(section.model_dump(), ensure_ascii=False)
-                    }
+                previous_count = 0  # Track how many sections we've already sent
+                
+                async for flattened_sections in chunker.chunk_flat_async(tmp_path):
+                    # Only send new sections that we haven't sent before
+                    new_sections = flattened_sections[previous_count:]
+                    
+                    for section in new_sections:
+                        yield {
+                            "event": "section",
+                            "data": json.dumps(section, ensure_ascii=False)
+                        }
+                    
+                    # Update the count of sent sections
+                    previous_count = len(flattened_sections)
+                
                 yield {
                     "event": "end",
                     "data": json.dumps({"success": True})
@@ -867,13 +876,21 @@ async def flatten_document_sse(
         async def event_generator():
             try:
                 chunker = Chunker()
+                previous_count = 0  # Track how many sections we've already sent
+                
                 async for flattened_sections in chunker.chunk_flat_async(tmp_path):
-                    # Send each flattened section as an event
-                    for section in flattened_sections:
+                    # Only send new sections that we haven't sent before
+                    new_sections = flattened_sections[previous_count:]
+                    
+                    for section in new_sections:
                         yield {
                             "event": "section",
                             "data": json.dumps(section, ensure_ascii=False)
                         }
+                    
+                    # Update the count of sent sections
+                    previous_count = len(flattened_sections)
+                
                 yield {
                     "event": "end",
                     "data": json.dumps({"success": True})
