@@ -40,7 +40,8 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
                  cv_model_name: str = "docstructbench",
                  cv_image_size: int = 1024,
                  cv_pdf_dpi: int = 150,
-                 device: str = "auto"):
+                 device: str = "auto",
+                 need_initialize: bool = True):
         """
         Initialize the hybrid extractor.
         
@@ -58,7 +59,15 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         self.cv_image_size = cv_image_size
         self.cv_pdf_dpi = cv_pdf_dpi
         self.device = device
-        self._initialize_detector()
+
+        # Initialize PDF extractor for content enrichment
+        self.pdf_extractor = PdfLayoutExtractor(
+            merge_fragments=False,  # We don't need PDF's merging
+            device=self.device
+        )
+        
+        if need_initialize:
+            self._initialize_detector()
 
     def _initialize_detector(self) -> None:
         # Initialize CV detector for primary layout detection
@@ -67,12 +76,6 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
             confidence_threshold=self.cv_confidence_threshold,
             image_size=self.cv_image_size,
             pdf_dpi=self.cv_pdf_dpi,
-            device=self.device
-        )
-        
-        # Initialize PDF extractor for content enrichment
-        self.pdf_extractor = PdfLayoutExtractor(
-            merge_fragments=False,  # We don't need PDF's merging
             device=self.device
         )
         

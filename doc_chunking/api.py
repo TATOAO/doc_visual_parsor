@@ -28,7 +28,7 @@ class HealthCheckResponse(BaseModel):
     status: str = Field(..., description="Current status of the API")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "message": "Document Visual Parser API",
                 "status": "running"
@@ -47,7 +47,7 @@ class ExtractPdfPagesResponse(BaseModel):
     total_pages: int = Field(..., description="Total number of pages extracted")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "filename": "document.pdf",
                 "pages": [
@@ -66,7 +66,7 @@ class ExtractDocxContentResponse(BaseModel):
     content: str = Field(..., description="Extracted text content from DOCX")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "filename": "document.docx",
                 "content": "This is the extracted text content from the DOCX file..."
@@ -88,7 +88,7 @@ class VisualizeLayoutResponse(BaseModel):
     success: bool = Field(..., description="Whether the operation was successful")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "filename": "document.pdf",
                 "model_used": "docstructbench",
@@ -113,7 +113,7 @@ class ChunkDocumentResponse(BaseModel):
     section_tree: Dict[str, Any] = Field(..., description="Hierarchical section structure")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "filename": "document.pdf",
                 "file_type": "application/pdf",
@@ -144,7 +144,7 @@ class ChunkDocumentFlatResponse(BaseModel):
     total_sections: int = Field(..., description="Total number of sections")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "filename": "document.pdf",
                 "file_type": "application/pdf",
@@ -171,7 +171,7 @@ class ErrorResponse(BaseModel):
     detail: str = Field(..., description="Error message")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "detail": "Unsupported file type"
             }

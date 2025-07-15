@@ -138,6 +138,93 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
         else:
             raise ValueError(f"Unsupported input data type: {type(input_data)}")
     
+
+    def _extract_raw_pdf_structure_from_page(self, page: fitz.Page, page_number: int, element_start_id: int) -> List['LayoutElement']:
+        """
+        Extract raw PDF structure from an image.
+        """
+        # Extract text with detailed formatting information
+        text_dict = page.get_text("dict")
+        
+        # Extract drawings (for underlines, etc.)
+        drawings = page.get_drawings()
+
+        element_id = element_start_id 
+        page_elements = []
+        
+        # Process text blocks
+        for block in text_dict["blocks"]:
+            if "lines" not in block:  # Skip image blocks
+                continue
+            
+            # Process lines within the block
+            for line in block["lines"]:
+                # Process spans within the line
+                for span in line["spans"]:
+                    if not span["text"].strip():  # Skip empty spans
+                        continue
+                    
+                    # Extract style information
+                    style_info = self._extract_pdf_style_info(span, block, line)
+                    
+                    # Create bounding box from span coordinates
+                    bbox = BoundingBox(
+                        x1=span["bbox"][0],
+                        y1=span["bbox"][1],
+                        x2=span["bbox"][2],
+                        y2=span["bbox"][3]
+                    )
+                    
+                    # Determine if this might be a heading based on font characteristics
+                    heading_level = self._extract_heading_level_from_pdf_style(span, style_info)
+                    
+                    # Check for nearby underline drawings
+                    nearby_underlines = self._find_nearby_underlines(span, drawings)
+                    
+                    # Create metadata with raw information
+                    metadata = {
+                        'page_number': page_number,  # 1-indexed
+                        'block_number': block.get('number', 0),
+                        'line_number': line.get('number', 0),
+                        'span_flags': span.get('flags', 0),
+                        'heading_level': heading_level,
+                        'is_heading': heading_level > 0,
+                        'extraction_method': 'pdf_native',
+                        'raw_extraction': True,
+                        'nearby_underlines': nearby_underlines,
+                        'has_underlines': len(nearby_underlines) > 0,
+                        'original_span_bbox': span["bbox"],  # For merging purposes
+                        'line_bbox': line.get("bbox", [0, 0, 0, 0]),
+                        'block_bbox': block.get("bbox", [0, 0, 0, 0])
+                    }
+                    
+                    # Add font information to metadata
+                    if style_info and style_info.primary_font:
+                        font = style_info.primary_font
+                        metadata.update({
+                            'font_name': font.name,
+                            'font_size': font.size,
+                            'font_bold': font.bold,
+                            'font_italic': font.italic,
+                            'font_flags': span.get('flags', 0)
+                        })
+                    
+                    # Create layout element with raw information
+                    element = LayoutElement(
+                        id=element_id,
+                        element_type=ElementType.PLAIN_TEXT,  # Default type, classification happens later
+                        confidence=1.0,  # Raw extraction has full confidence in style info
+                        bbox=bbox,
+                        text=span["text"],
+                        style=style_info,
+                        metadata=metadata
+                    )
+                    page_elements.append(element)
+                    element_id += 1
+        
+        return page_elements
+
+
     def _extract_raw_pdf_structure(self, doc: fitz.Document) -> List['LayoutElement']:
         """
         Extract raw PDF structure with style information only.
@@ -149,87 +236,13 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
             List of LayoutElement objects with raw style information
         """
         elements = []
-        element_id = 0
-        
+        last_element_id = 0
         for page_num in range(doc.page_count):
+            element_id = last_element_id + 1
             page = doc[page_num]
-            
-            # Extract text with detailed formatting information
-            text_dict = page.get_text("dict")
-            
-            # Extract drawings (for underlines, etc.)
-            drawings = page.get_drawings()
-            
-            # Process text blocks
-            for block in text_dict["blocks"]:
-                if "lines" not in block:  # Skip image blocks
-                    continue
-                
-                # Process lines within the block
-                for line in block["lines"]:
-                    # Process spans within the line
-                    for span in line["spans"]:
-                        if not span["text"].strip():  # Skip empty spans
-                            continue
-                        
-                        # Extract style information
-                        style_info = self._extract_pdf_style_info(span, block, line)
-                        
-                        # Create bounding box from span coordinates
-                        bbox = BoundingBox(
-                            x1=span["bbox"][0],
-                            y1=span["bbox"][1],
-                            x2=span["bbox"][2],
-                            y2=span["bbox"][3]
-                        )
-                        
-                        # Determine if this might be a heading based on font characteristics
-                        heading_level = self._extract_heading_level_from_pdf_style(span, style_info)
-                        
-                        # Check for nearby underline drawings
-                        nearby_underlines = self._find_nearby_underlines(span, drawings)
-                        
-                        # Create metadata with raw information
-                        metadata = {
-                            'page_number': page_num + 1,  # 1-indexed
-                            'block_number': block.get('number', 0),
-                            'line_number': line.get('number', 0),
-                            'span_flags': span.get('flags', 0),
-                            'heading_level': heading_level,
-                            'is_heading': heading_level > 0,
-                            'extraction_method': 'pdf_native',
-                            'raw_extraction': True,
-                            'nearby_underlines': nearby_underlines,
-                            'has_underlines': len(nearby_underlines) > 0,
-                            'original_span_bbox': span["bbox"],  # For merging purposes
-                            'line_bbox': line.get("bbox", [0, 0, 0, 0]),
-                            'block_bbox': block.get("bbox", [0, 0, 0, 0])
-                        }
-                        
-                        # Add font information to metadata
-                        if style_info and style_info.primary_font:
-                            font = style_info.primary_font
-                            metadata.update({
-                                'font_name': font.name,
-                                'font_size': font.size,
-                                'font_bold': font.bold,
-                                'font_italic': font.italic,
-                                'font_flags': span.get('flags', 0)
-                            })
-                        
-                        # Create layout element with raw information
-                        element = LayoutElement(
-                            id=element_id,
-                            element_type=ElementType.PLAIN_TEXT,  # Default type, classification happens later
-                            confidence=1.0,  # Raw extraction has full confidence in style info
-                            bbox=bbox,
-                            text=span["text"],
-                            style=style_info,
-                            metadata=metadata
-                        )
-                        
-                        elements.append(element)
-                        element_id += 1
+            # page number is 1-indexed
+            elements.extend(self._extract_raw_pdf_structure_from_page(page, page_num + 1, element_id))
+            last_element_id = elements[-1].id
         
         return elements
 
