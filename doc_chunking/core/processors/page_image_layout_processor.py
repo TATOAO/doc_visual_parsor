@@ -40,8 +40,15 @@ if __name__ == "__main__":
     from processor_pipeline import AsyncPipeline
     async def main():
         pipeline = AsyncPipeline([PdfPageImageSplitter(), PageImageLayoutProcessor()])
-        result = await pipeline.run('/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf')
-        print(result[-1])
+        # result = await pipeline.run('/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf')
+        input_data = '/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf'
+        import time
+        async for item in pipeline.astream(input_data=input_data):
+            start_time = time.time()
+            print(item)
+            end_time = time.time()
+            print(f"Time taken: {end_time - start_time} seconds")
+
     
     import asyncio
     asyncio.run(main())

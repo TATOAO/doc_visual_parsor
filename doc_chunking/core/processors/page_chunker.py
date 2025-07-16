@@ -82,7 +82,7 @@ class PdfPageImageSplitter(AsyncProcessor):
             # return np.array(img), 1.0 / zoom  # Return image and inverse scale factor
             ###### Step 2:  Extract the layout ######
             page_layout = extractor._extract_raw_pdf_structure_from_page(page=page, page_number=page_num + 1, element_start_id=0)
-            scale_factor = 1.0 / zoom
+            scale_factor = zoom
             # Scale coordinates back to PDF space
             for element in page_layout:
                 if element.bbox:
@@ -91,8 +91,6 @@ class PdfPageImageSplitter(AsyncProcessor):
                     element.bbox.x2 *= scale_factor
                     element.bbox.y2 *= scale_factor
 
-            import time
-            print('......', time.time())
             await asyncio.sleep(0.01)
             yield img, page_layout
 
@@ -103,7 +101,7 @@ if __name__ == "__main__":
     async def main():
         pipeline = AsyncPipeline([PdfPageImageSplitter()])
         result = await pipeline.run('/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf')
-        # print(result)
+        print(result)
 
     import asyncio
     asyncio.run(main())
