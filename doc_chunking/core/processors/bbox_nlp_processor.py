@@ -16,7 +16,7 @@ class BboxNLPProcessor(AsyncProcessor):
     async def process(self, input_data: AsyncGenerator[List[LayoutElement], None]) -> AsyncGenerator[Tuple[str, LayoutElement], None]:
         async for elements in input_data:
             for element in elements:
-                yield DisplayLine.from_layout_element(element), element
+                yield str(DisplayLine.from_layout_element(element)), element
             await asyncio.sleep(0.001)
             
 
