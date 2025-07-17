@@ -3,6 +3,7 @@ from doc_chunking.schemas.layout_schemas import LayoutExtractionResult, LayoutEl
 from pydantic import BaseModel
 
 
+
 def display_layout(layout_extraction_result: LayoutExtractionResult, 
                    exclude_types: List[ElementType] = []) -> str:
     """

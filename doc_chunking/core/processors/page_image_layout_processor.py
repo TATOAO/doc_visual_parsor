@@ -1,3 +1,4 @@
+import asyncio
 from PIL import Image
 from processor_pipeline import AsyncProcessor
 from typing import Any, AsyncGenerator, Union, List, Tuple
@@ -11,7 +12,7 @@ class PageImageLayoutProcessor(AsyncProcessor):
     meta = {
         "name": "PageImageLayoutProcessor",
         "input_type": Tuple[Image, List[LayoutElement]],
-        "output_type": Any,
+        "output_type": List[LayoutElement],
     }
 
     def __init__(self, **kwargs):
@@ -21,7 +22,7 @@ class PageImageLayoutProcessor(AsyncProcessor):
 
         self.merger = PdfStyleCVMixLayoutExtractor(need_initialize=False)
 
-    async def process(self, input_data: AsyncGenerator[Tuple[Image, List[LayoutElement]], None]) -> AsyncGenerator[Any, None]:
+    async def process(self, input_data: AsyncGenerator[Tuple[Image, List[LayoutElement]], None]) -> AsyncGenerator[List[LayoutElement], None]:
 
         async for item in input_data:
             img, layout = item
@@ -31,6 +32,8 @@ class PageImageLayoutProcessor(AsyncProcessor):
 
             # merge layout
             enriched_layout = self.merger._enrich_cv_elements_with_pdf(cv_elements=layout_result.elements, pdf_elements=layout)
+
+            await asyncio.sleep(0.001)
 
             yield enriched_layout
 
