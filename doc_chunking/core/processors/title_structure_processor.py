@@ -7,6 +7,9 @@ from .bbox_nlp_processor import BboxNLPProcessor
 from doc_chunking.schemas.layout_schemas import LayoutElement
 from doc_chunking.layout_structuring.title_structure_builder_llm.structurer_llm import stream_title_structure_builder_llm_with_plain_text
 
+from doc_chunking.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class TitleStructureProcessor(AsyncProcessor):
     meta = {
@@ -16,39 +19,26 @@ class TitleStructureProcessor(AsyncProcessor):
     }
 
     async def process(self, input_data: AsyncGenerator[Tuple[str, LayoutElement], None]) -> AsyncGenerator[Any, None]:
-        line_window = []
-        line_window_size = 30
-        title_structure = ""
+
+        full_text = ""
         async for line, element in input_data:
-            line_window.append(line)
-
-            # Process when we reach the window size
-            next_title_structure = ""
-            if len(line_window) == line_window_size:
-                async for chunk in stream_title_structure_builder_llm_with_plain_text(title_structure, "\n".join(line_window)):
-                    next_title_structure += chunk
-                    print(chunk)
-                # Clear the window after processing
-                line_window = []
-            title_structure = next_title_structure
-
-            await asyncio.sleep(0.001)
+            full_text += line
+        logger.info(f"TitleStructureProcessor processed full text")
+        logger.debug(f"TitleStructureProcessor processed full text: {full_text}")
         
-        # Process any remaining lines in the window
-        final_result = ""
-        if line_window:
-            async for chunk in stream_title_structure_builder_llm_with_plain_text(title_structure, "\n".join(line_window)):
-                final_result += chunk
-                print(chunk)
+        next_title_structure = ""
+        async for chunk in stream_title_structure_builder_llm_with_plain_text(next_title_structure, full_text):
+            next_title_structure += chunk
+            logger.debug(f"TitleStructureProcessor processed chunk: {chunk}")
+            yield chunk
 
-        yield final_result
-
-        
 
 # python -m doc_chunking.core.processors.title_structure_processor
 if __name__ == "__main__":
     from processor_pipeline import AsyncPipeline
+    import logging
     async def main():
+        logging.getLogger().setLevel(logging.INFO)
         pipeline = AsyncPipeline([
             PdfPageImageSplitterProcessor(), 
             PageImageLayoutProcessor(), 

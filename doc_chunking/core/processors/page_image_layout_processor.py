@@ -7,6 +7,9 @@ from PIL import Image
 from .page_chunker import PdfPageImageSplitterProcessor
 from doc_chunking.layout_detection.visual_detection.cv_detector import CVLayoutDetector
 from doc_chunking.layout_detection.layout_extraction.pdf_style_cv_mix_extractor import PdfStyleCVMixLayoutExtractor
+from doc_chunking.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class PageImageLayoutProcessor(AsyncProcessor):
     meta = {
@@ -24,14 +27,17 @@ class PageImageLayoutProcessor(AsyncProcessor):
 
     async def process(self, input_data: AsyncGenerator[Tuple[Image, List[LayoutElement]], None]) -> AsyncGenerator[List[LayoutElement], None]:
 
+        index = 0
         async for item in input_data:
             img, layout = item
 
             # detect layout
             layout_result = self.detector._detect_layout(input_data=img)
+            logger.info(f"CVLayoutDetector detected layout {index}")
 
             # merge layout
             enriched_layout = self.merger._enrich_cv_elements_with_pdf(cv_elements=layout_result.elements, pdf_elements=layout)
+            logger.info(f"PdfStyleCVMixLayoutExtractor merged layout {index}")
 
             await asyncio.sleep(0.001)
 

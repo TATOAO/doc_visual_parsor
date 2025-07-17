@@ -193,9 +193,9 @@ class PdfLayoutExtractor(BaseLayoutExtractor):
                         'raw_extraction': True,
                         'nearby_underlines': nearby_underlines,
                         'has_underlines': len(nearby_underlines) > 0,
-                        'original_span_bbox': span["bbox"],  # For merging purposes
-                        'line_bbox': line.get("bbox", [0, 0, 0, 0]),
-                        'block_bbox': block.get("bbox", [0, 0, 0, 0])
+                        'original_span_bbox': BoundingBox(x1=span["bbox"][0], y1=span["bbox"][1], x2=span["bbox"][2], y2=span["bbox"][3]),  # For merging purposes
+                        'line_bbox': BoundingBox(x1=line.get("bbox", [0, 0, 0, 0])[0], y1=line.get("bbox", [0, 0, 0, 0])[1], x2=line.get("bbox", [0, 0, 0, 0])[2], y2=line.get("bbox", [0, 0, 0, 0])[3]),
+                        'block_bbox': BoundingBox(x1=block.get("bbox", [0, 0, 0, 0])[0], y1=block.get("bbox", [0, 0, 0, 0])[1], x2=block.get("bbox", [0, 0, 0, 0])[2], y2=block.get("bbox", [0, 0, 0, 0])[3])
                     }
                     
                     # Add font information to metadata

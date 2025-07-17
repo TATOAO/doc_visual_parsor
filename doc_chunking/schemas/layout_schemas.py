@@ -242,6 +242,51 @@ class BoundingBox(BaseModel):
         validate_assignment = True
         extra = "ignore"
 
+class LayoutElementMetadata(BaseModel):
+    """Metadata for layout elements."""
+    page_number: Optional[int] = Field(None, description="Page number of the element")
+    block_number: Optional[int] = Field(None, description="Block number of the element")
+    line_number: Optional[int] = Field(None, description="Line number of the element")
+    span_flags: Optional[int] = Field(None, description="Span flags of the element")
+    heading_level: Optional[int] = Field(None, description="Heading level of the element")
+    is_heading: Optional[bool] = Field(None, description="Whether the element is a heading")
+    extraction_method: Optional[str] = Field(None, description="Extraction method")
+    raw_extraction: Optional[bool] = Field(None, description="Whether the element is extracted from the raw PDF")
+    nearby_underlines: Optional[List[Dict[str, Any]]] = Field(None, description="Nearby underlines of the element")
+    has_underlines: Optional[bool] = Field(None, description="Whether the element has underlines")
+    original_span_bbox: Optional[BoundingBox] = Field(None, description="Original span bounding box of the element")
+    line_bbox: Optional[BoundingBox] = Field(None, description="Line bounding box of the element")
+    block_bbox: Optional[BoundingBox] = Field(None, description="Block bounding box of the element")
+
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a value from the metadata."""
+        return getattr(self, key, default)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        super().__setattr__(name, value)
+    
+    def __getitem__(self, key: str) -> Any:
+        """Get a value from the metadata."""
+        return self.get(key)
+    
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Set a value in the metadata."""
+        self.__setattr__(key, value)
+    
+    def update(self, new_dict: Dict[str, Any]) -> None:
+        """Update the metadata."""
+        for key, value in new_dict.items():
+            self.__setattr__(key, value)
+    
+    class Config:
+        """Pydantic config."""
+        validate_assignment = True
+        extra = "allow"
+    
+
+
+
 
 class LayoutElement(BaseModel):
     """Standardized layout element representation."""
@@ -251,7 +296,7 @@ class LayoutElement(BaseModel):
     bbox: Optional[BoundingBox] = Field(None, description="Bounding box coordinates")
     text: Optional[str] = Field(None, description="Text content of the element")
     style: Optional[StyleInfo] = Field(StyleInfo(runs=[]), description="Style information")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
+    metadata: Optional[LayoutElementMetadata] = Field(None, description="Additional metadata")
     
     @field_validator('text')
     @classmethod

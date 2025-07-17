@@ -8,6 +8,10 @@ from PIL import Image
 import fitz
 import io
 import fitz  # PyMuPDF
+from doc_chunking.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class PdfPageImageSplitterProcessor(AsyncProcessor):
     meta = {
@@ -79,9 +83,13 @@ class PdfPageImageSplitterProcessor(AsyncProcessor):
             # Convert to numpy array
             img = Image.open(io.BytesIO(img_data))
 
+            logger.info(f"Pymupdf processed page {page_num + 1} into image")
+
             # return np.array(img), 1.0 / zoom  # Return image and inverse scale factor
             ###### Step 2:  Extract the layout ######
             page_layout = extractor._extract_raw_pdf_structure_from_page(page=page, page_number=page_num + 1, element_start_id=0)
+
+            logger.info(f"Pymupdf processed page {page_num + 1} into layout")
             scale_factor = zoom
             # Scale coordinates back to PDF space
             for element in page_layout:

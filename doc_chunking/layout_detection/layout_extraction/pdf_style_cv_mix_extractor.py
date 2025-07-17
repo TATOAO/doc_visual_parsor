@@ -167,8 +167,8 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
         """Get unique page numbers from result elements."""
         page_numbers = set()
         for element in result.elements:
-            if element.metadata and 'page_number' in element.metadata:
-                page_numbers.add(element.metadata['page_number'])
+            if element.metadata and element.metadata.page_number:
+                page_numbers.add(element.metadata.page_number)
             else:
                 logger.warning(f"Element {element.id} has no page_number in metadata: {element.metadata}")
         
@@ -577,7 +577,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
 
 
 # Unit test
-# python -m models.layout_detection.layout_extraction.pdf_style_cv_mix_extractor
+# python -m doc_chunking.layout_detection.layout_extraction.pdf_style_cv_mix_extractor
 if __name__ == "__main__":
     extractor = PdfStyleCVMixLayoutExtractor(
         cv_confidence_threshold=0.1,

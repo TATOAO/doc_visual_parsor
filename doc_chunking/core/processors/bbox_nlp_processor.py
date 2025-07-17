@@ -5,6 +5,9 @@ from .page_chunker import PdfPageImageSplitterProcessor
 from .page_image_layout_processor import PageImageLayoutProcessor
 from doc_chunking.schemas.layout_schemas import LayoutElement
 from doc_chunking.layout_structuring.title_structure_builder_llm.layout_displayer import DisplayLine
+from doc_chunking.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class BboxNLPProcessor(AsyncProcessor):
     meta = {
@@ -14,9 +17,12 @@ class BboxNLPProcessor(AsyncProcessor):
     }
 
     async def process(self, input_data: AsyncGenerator[List[LayoutElement], None]) -> AsyncGenerator[Tuple[str, LayoutElement], None]:
+        index = 0
         async for elements in input_data:
+            logger.debug(f"BboxNLPProcessor processed element {index}")
             for element in elements:
                 yield str(DisplayLine.from_layout_element(element)), element
+                index += 1
             await asyncio.sleep(0.001)
             
 
