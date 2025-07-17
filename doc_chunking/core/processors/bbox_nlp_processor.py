@@ -1,6 +1,7 @@
+import asyncio
 from typing import Any, List, AsyncGenerator
 from processor_pipeline import AsyncProcessor
-from .page_chunker import PdfPageImageSplitter
+from .page_chunker import PdfPageImageSplitterProcessor
 from .page_image_layout_processor import PageImageLayoutProcessor
 from doc_chunking.schemas.layout_schemas import LayoutElement
 from doc_chunking.layout_structuring.title_structure_builder_llm.layout_displayer import DisplayLine
@@ -16,6 +17,7 @@ class BboxNLPProcessor(AsyncProcessor):
         async for elements in input_data:
             for element in elements:
                 yield DisplayLine.from_layout_element(element)
+            await asyncio.sleep(0.001)
             
 
 # python -m doc_chunking.core.processors.bbox_nlp_processor
@@ -23,7 +25,7 @@ if __name__ == "__main__":
     from processor_pipeline import AsyncPipeline
     async def main():
         pipeline = AsyncPipeline([
-            PdfPageImageSplitter(), 
+            PdfPageImageSplitterProcessor(), 
             PageImageLayoutProcessor(), 
             BboxNLPProcessor()
             ]

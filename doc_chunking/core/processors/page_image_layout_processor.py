@@ -4,7 +4,7 @@ from processor_pipeline import AsyncProcessor
 from typing import Any, AsyncGenerator, Union, List, Tuple
 from doc_chunking.schemas.layout_schemas import LayoutElement
 from PIL import Image
-from .page_chunker import PdfPageImageSplitter
+from .page_chunker import PdfPageImageSplitterProcessor
 from doc_chunking.layout_detection.visual_detection.cv_detector import CVLayoutDetector
 from doc_chunking.layout_detection.layout_extraction.pdf_style_cv_mix_extractor import PdfStyleCVMixLayoutExtractor
 
@@ -42,7 +42,7 @@ class PageImageLayoutProcessor(AsyncProcessor):
 if __name__ == "__main__":
     from processor_pipeline import AsyncPipeline
     async def main():
-        pipeline = AsyncPipeline([PdfPageImageSplitter(), PageImageLayoutProcessor()])
+        pipeline = AsyncPipeline([PdfPageImageSplitterProcessor(), PageImageLayoutProcessor()])
         # result = await pipeline.run('/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf')
         input_data = '/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf'
         import time

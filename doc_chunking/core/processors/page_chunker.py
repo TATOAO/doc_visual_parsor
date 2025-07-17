@@ -9,7 +9,7 @@ import fitz
 import io
 import fitz  # PyMuPDF
 
-class PdfPageImageSplitter(AsyncProcessor):
+class PdfPageImageSplitterProcessor(AsyncProcessor):
     meta = {
         "name": "PdfPageImageSplitter",
         "description": "Split a page into images.",
@@ -99,7 +99,7 @@ class PdfPageImageSplitter(AsyncProcessor):
 if __name__ == "__main__":
     from processor_pipeline import AsyncPipeline
     async def main():
-        pipeline = AsyncPipeline([PdfPageImageSplitter()])
+        pipeline = AsyncPipeline([PdfPageImageSplitterProcessor()])
         result = await pipeline.run('/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf')
         print(result)
 

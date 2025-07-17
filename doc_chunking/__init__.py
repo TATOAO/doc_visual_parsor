@@ -26,6 +26,11 @@ from .api import app as fastapi_app, router as chunking_router
 # Import processors
 from .processors import extract_pdf_pages_into_images, extract_docx_content
 
+
+from .core.processors.bbox_nlp_processor import BboxNLPProcessor
+from .core.processors.page_chunker import PdfPageImageSplitterProcessor
+from .core.processors.page_image_layout_processor import PageImageLayoutProcessor
+
 # Make commonly used classes and functions available at package level
 __all__ = [
     # Version info
@@ -62,6 +67,12 @@ __all__ = [
     "validate_input",
     "normalize_input",
     "get_document_type",
+
+
+    ## processors
+    "BboxNLPProcessor",
+    "PdfPageImageSplitterProcessor",
+    "PageImageLayoutProcessor",
 ]
 
 # For backward compatibility and easy access
