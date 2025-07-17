@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, List, AsyncGenerator
+from typing import Any, List, AsyncGenerator, Tuple
 from processor_pipeline import AsyncProcessor
 from .page_chunker import PdfPageImageSplitterProcessor
 from .page_image_layout_processor import PageImageLayoutProcessor
@@ -10,13 +10,13 @@ class BboxNLPProcessor(AsyncProcessor):
     meta = {
         "name": "BboxNLPProcessor",
         "input_type": List[LayoutElement],
-        "output_type": Any,
+        "output_type": Tuple[str, LayoutElement],
     }
 
-    async def process(self, input_data: AsyncGenerator[List[LayoutElement], None]) -> Any:
+    async def process(self, input_data: AsyncGenerator[List[LayoutElement], None]) -> AsyncGenerator[Tuple[str, LayoutElement], None]:
         async for elements in input_data:
             for element in elements:
-                yield DisplayLine.from_layout_element(element)
+                yield DisplayLine.from_layout_element(element), element
             await asyncio.sleep(0.001)
             
 
