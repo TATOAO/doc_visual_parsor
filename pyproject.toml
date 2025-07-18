@@ -30,7 +30,7 @@ classifiers = [
 
 dependencies = [
     "streamlit>=1.28.0",
-    "PyMuPDF>=1.26.4",
+    "PyMuPDF<=1.26.4",
     "python-docx>=0.8.11",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
