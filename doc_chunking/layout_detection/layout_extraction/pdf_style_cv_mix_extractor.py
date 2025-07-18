@@ -148,7 +148,8 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
                 
                 logger.info(f"Page {page_num}: {len(page_enriched)} enriched elements")
                 enriched_elements.extend(page_enriched)
-            
+
+
             logger.info(f"Total enriched elements before post-processing: {len(enriched_elements)}")
             
             # Step 4: Post-process elements
@@ -487,7 +488,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
             # Clean up metadata
             if elem.metadata:
                 original_metadata_count = len(elem.metadata)
-                elem.metadata = self._clean_metadata(elem.metadata)
+                # elem.metadata = self._clean_metadata(elem.metadata)
                 if len(elem.metadata) != original_metadata_count:
                     logger.debug(f"Metadata cleaned for element {elem.id}: {original_metadata_count} -> {len(elem.metadata)} keys")
             

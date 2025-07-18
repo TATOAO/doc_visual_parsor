@@ -278,6 +278,10 @@ class LayoutElementMetadata(BaseModel):
         """Update the metadata."""
         for key, value in new_dict.items():
             self.__setattr__(key, value)
+
+    def __len__(self) -> int:
+        """Get the number of keys in the metadata."""
+        return len(self.__dict__)
     
     class Config:
         """Pydantic config."""
