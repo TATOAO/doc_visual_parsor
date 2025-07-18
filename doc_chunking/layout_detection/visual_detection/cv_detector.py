@@ -380,13 +380,18 @@ class CVLayoutDetector(BaseLayoutExtractor):
                     )
                     
                     elements.append(element)
-                    element_id += 1
             
             # Filter out redundant boxes
             elements = filter_redundant_boxes(elements)
             
             # Sort elements in natural reading order
             elements = sort_elements_by_position(elements)
+
+            # assign id to elements
+            element_id = 0
+            for i, element in enumerate(elements):
+                element.id = element_id
+                element_id += 1
             
             return LayoutExtractionResult(elements=elements)
             

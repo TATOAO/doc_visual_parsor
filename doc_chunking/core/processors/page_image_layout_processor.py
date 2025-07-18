@@ -48,15 +48,36 @@ class PageImageLayoutProcessor(AsyncProcessor):
 if __name__ == "__main__":
     from processor_pipeline import AsyncPipeline
     async def main():
-        pipeline = AsyncPipeline([PdfPageImageSplitterProcessor(), PageImageLayoutProcessor()])
+        pipeline = AsyncPipeline([
+            PdfPageImageSplitterProcessor(), 
+            PageImageLayoutProcessor()])
         # result = await pipeline.run('/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf')
         input_data = '/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf'
         import time
-        async for item in pipeline.astream(input_data=input_data):
-            start_time = time.time()
-            print(item)
-            end_time = time.time()
-            print(f"Time taken: {end_time - start_time} seconds")
+        # async for item in pipeline.astream(input_data=input_data):
+        #     start_time = time.time()
+        #     print(item)
+        #     for layout in item:
+        #         result.append(layout.model_dump(mode='json'))
+        #     end_time = time.time()
+        #     print(f"Time taken: {end_time - start_time} seconds")
+
+        # import json
+        # with open('result.json', 'w') as f:
+        #     json.dump(result, f, ensure_ascii=False, indent=4)
+
+        result = await pipeline.run(input_data=input_data)
+
+        import json
+        with open('result_run.json', 'w') as f:
+            json_result = []
+            for layouts in result:
+                for l in layouts:
+                    json_result.append(l.model_dump(mode='json'))
+            json.dump(json_result, f, ensure_ascii=False, indent=4)
+
+        return result
+
 
     
     import asyncio
