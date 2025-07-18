@@ -286,6 +286,7 @@ class CVLayoutDetector(BaseLayoutExtractor):
                     
                     element.id = element_id
                     element.metadata = element.metadata or {}
+
                     element.metadata['page_number'] = page_num + 1
                     element.metadata['source_type'] = 'pdf_page'
                     element.metadata['scale_factor'] = scale_factor

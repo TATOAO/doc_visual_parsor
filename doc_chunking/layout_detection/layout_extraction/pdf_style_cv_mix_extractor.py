@@ -368,6 +368,15 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
             'enrichment_method': 'cv_first_pdf_enriched',
             'runs_count': len(all_runs)
         })
+
+
+        enriched.metadata.update({
+            'source_pdf_elements': [e.id for e in pdf_elements],
+            'enrichment_method': 'cv_first_pdf_enriched',
+            'runs_count': len(all_runs),
+            'page_number': pdf_elements[-1].metadata.page_number
+        })
+
         
         return enriched
     
