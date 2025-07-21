@@ -6,6 +6,7 @@ from pathlib import Path
 from io import BytesIO
 import tempfile
 import subprocess
+from doc_chunking.utils.helper import detect_file_type
 
 logger = get_logger(__name__)
 
@@ -29,7 +30,7 @@ def convert_doc_to_pdf(file_content: FileInputData) -> bytes:
         output_dir = Path(tmpdir)
         # Use LibreOffice to convert DOCX to PDF
         subprocess.run([
-            'libreoffice', '--headless', '--convert-to', 'pdf', '--outdir', str(output_dir), str(docx_path)
+            'soffice', '--headless', '--convert-to', 'pdf', '--outdir', str(output_dir), str(docx_path)
         ], check=True)
         # Find the output PDF
         pdf_path = output_dir / (docx_path.stem + '.pdf')
@@ -48,19 +49,23 @@ class WordToPdfProcessor(AsyncProcessor):
     async def process(self, data: AsyncGenerator[FileInputData, None]) -> AsyncGenerator[FileInputData, None]:
         async for item in data:
 
-            if item.file_type == 'docx' or item.file_type == 'doc':
-                file_content = item.file_content
-                pdf_content = convert_doc_to_pdf(file_content)
-                yield FileInputData(file_content=pdf_content, file_type='pdf')
+            if detect_file_type(item) == 'docx' or detect_file_type(item) == 'doc':
+                pdf_content = convert_doc_to_pdf(item)
+                yield pdf_content
 
-            elif item.file_type == 'pdf':
+            elif detect_file_type(item) == 'pdf':
                 yield item
 
 
-# python -m app.rag.core.processor.word_to_pdf_processor
+# python -m doc_chunking.core.processors.doc_to_pdf_processor
 if __name__ == "__main__":
     async def main():
-        pass
+        from processor_pipeline import AsyncPipeline    
+        pipeline = AsyncPipeline([WordToPdfProcessor()])
+        async for item in pipeline.astream('/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.docx'):
+            # saved to pdf result into test.pdf
+            with open('test.pdf', 'wb') as f:
+                f.write(item)
 
     import asyncio
 

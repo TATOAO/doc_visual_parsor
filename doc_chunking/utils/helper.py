@@ -37,3 +37,31 @@ def remove_circular_references(section: Section):
     section.parent_section = None
     for sub_section in section.sub_sections:
         remove_circular_references(sub_section)
+
+
+def detect_file_type(file_input):
+    """
+    Detect if the file is a PDF or DOCX based on magic number.
+    Accepts file path (str or Path) or bytes.
+    Returns 'pdf', 'docx', or None.
+    """
+    from pathlib import Path
+    import os
+
+    def _get_first_bytes(f, n=8):
+        if isinstance(f, (str, Path)):
+            with open(f, 'rb') as file:
+                return file.read(n)
+        elif isinstance(f, bytes):
+            return f[:n]
+        else:
+            raise ValueError("Unsupported input type for detect_file_type")
+
+    first_bytes = _get_first_bytes(file_input)
+    # PDF: %PDF-
+    if first_bytes.startswith(b'%PDF-'):
+        return 'pdf'
+    # DOCX: PK\x03\x04 (zip file)
+    if first_bytes.startswith(b'PK\x03\x04'):
+        return 'docx'
+    return None
