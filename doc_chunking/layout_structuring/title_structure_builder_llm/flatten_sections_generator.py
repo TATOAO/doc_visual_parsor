@@ -26,6 +26,7 @@ def _flatten_section_tree(section: Section, parent_title: str = "") -> List[Sect
     
     # Add current section to flattened list (only if it has content or title)
     if section.title or section.content:
+        section.title = full_title
         flattened_sections.append(section)
     
     # Recursively flatten sub-sections
