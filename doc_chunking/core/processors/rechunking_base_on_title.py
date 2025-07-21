@@ -1,6 +1,7 @@
 from processor_pipeline import AsyncProcessor
 from doc_chunking.schemas.layout_schemas import LayoutElement
 from doc_chunking.layout_structuring.title_structure_builder_llm.section_reconstructor import section_reconstructor
+from doc_chunking.layout_structuring.title_structure_builder_llm.flatten_sections_generator import _flatten_section_tree
 from doc_chunking.schemas import Section
 from doc_chunking.utils.logging_config import get_logger
 from typing import AsyncGenerator, Any
@@ -22,7 +23,11 @@ class RechunkingBaseOnTitleProcessor(AsyncProcessor):
         
         if 'layout_extraction_result' in self.session:
             sections = section_reconstructor(title_structure, self.session['layout_extraction_result'])
-            yield sections
+
+            flattened_sections = _flatten_section_tree(sections)
+
+            for section in flattened_sections:
+                yield section
         else:
             logger.error("layout_extraction_result not found in session, skipping rechunking")
             yield "layout_extraction_result not found in session, skipping rechunking"
@@ -48,6 +53,7 @@ if __name__ == "__main__":
         ])
 
         async for section in pipeline.astream(input_data='/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf'):
+            print('-'*100)
             print(section)
     
     import asyncio
