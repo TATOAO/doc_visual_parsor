@@ -28,19 +28,22 @@ def run_command(cmd, description):
         return False
 
 def clean_build():
-    """Clean build artifacts."""
+    """Clean build artifacts... skipping virtual environments."""
     print("Cleaning build artifacts...")
-    
+
     # Directories to clean
     clean_dirs = ['build', 'dist', 'doc_chunking.egg-info', '__pycache__']
-    
+    venv_dirs = {'.venv', 'venv', 'env', '.env', '__pypackages__'}
+
     for dir_name in clean_dirs:
         if os.path.exists(dir_name):
             shutil.rmtree(dir_name)
             print(f"Removed {dir_name}")
-    
-    # Clean __pycache__ directories recursively
-    for root, dirs, files in os.walk('.'):
+
+    # Clean __pycache__ directories recursively, but skip virtual environments
+    for root, dirs, files in os.walk('.', topdown=True):
+        # Skip virtual environment directories
+        dirs[:] = [d for d in dirs if d not in venv_dirs]
         for dir_name in dirs:
             if dir_name == '__pycache__':
                 full_path = os.path.join(root, dir_name)
