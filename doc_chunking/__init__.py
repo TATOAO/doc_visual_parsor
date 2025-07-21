@@ -30,6 +30,8 @@ from .processors import extract_pdf_pages_into_images, extract_docx_content
 from .core.processors.bbox_nlp_processor import BboxNLPProcessor
 from .core.processors.page_chunker import PdfPageImageSplitterProcessor
 from .core.processors.page_image_layout_processor import PageImageLayoutProcessor
+from .core.processors.title_structure_processor import TitleStructureProcessor
+from .core.processors.rechunking_base_on_title import RechunkingBaseOnTitleProcessor
 
 # Make commonly used classes and functions available at package level
 __all__ = [
@@ -73,6 +75,8 @@ __all__ = [
     "BboxNLPProcessor",
     "PdfPageImageSplitterProcessor",
     "PageImageLayoutProcessor",
+    "TitleStructureProcessor",
+    "RechunkingBaseOnTitleProcessor",
 ]
 
 # For backward compatibility and easy access
