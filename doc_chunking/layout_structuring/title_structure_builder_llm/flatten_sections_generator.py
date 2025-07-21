@@ -4,7 +4,7 @@ from doc_chunking.schemas.schemas import Section
 from doc_chunking.layout_structuring.title_structure_builder_llm.section_reconstructor import _build_section_tree_from_structure
 
 
-def _flatten_section_tree(section: Section, parent_title: str = "") -> List[Dict[str, Any]]:
+def _flatten_section_tree(section: Section, parent_title: str = "") -> List[Section]:
     """
     Helper function to flatten a hierarchical section tree into a list of dictionaries.
     
@@ -23,13 +23,10 @@ def _flatten_section_tree(section: Section, parent_title: str = "") -> List[Dict
     else:
         full_title = section.title
     
+    
     # Add current section to flattened list (only if it has content or title)
     if section.title or section.content:
-        flattened_sections.append({
-            'title': full_title,
-            'content': section.content,
-            'level': section.level
-        })
+        flattened_sections.append(section)
     
     # Recursively flatten sub-sections
     for sub_section in section.sub_sections:
@@ -41,7 +38,7 @@ def _flatten_section_tree(section: Section, parent_title: str = "") -> List[Dict
 async def streaming_flatten_sections_generator(
     title_structure_stream: AsyncGenerator[str, None], 
     layout_extraction_result: LayoutExtractionResult
-) -> AsyncGenerator[List[Dict[str, Any]], None]:
+) -> AsyncGenerator[List[Section], None]:
     """
     Async streaming version that processes title structure chunks as they arrive
     and yields flattened section dictionaries with joined parent titles.
