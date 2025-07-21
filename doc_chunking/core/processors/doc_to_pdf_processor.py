@@ -61,11 +61,14 @@ class WordToPdfProcessor(AsyncProcessor):
 if __name__ == "__main__":
     async def main():
         from processor_pipeline import AsyncPipeline    
-        pipeline = AsyncPipeline([WordToPdfProcessor()])
+        from doc_chunking.core.processors.page_chunker import PdfPageImageSplitterProcessor
+        pipeline = AsyncPipeline([
+            WordToPdfProcessor(),
+            PdfPageImageSplitterProcessor()
+        ])
         async for item in pipeline.astream('/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.docx'):
             # saved to pdf result into test.pdf
-            with open('test.pdf', 'wb') as f:
-                f.write(item)
+            print(item)
 
     import asyncio
 
