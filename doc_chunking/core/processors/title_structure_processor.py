@@ -24,7 +24,6 @@ class TitleStructureProcessor(AsyncProcessor):
         elements_result = []
         async for line, element in input_data:
             full_text += line
-            print('x'*100)
             logger.info(f'collecting elements: {element}')
             elements_result.append(element)
         
