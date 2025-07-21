@@ -12,10 +12,10 @@ class RechunkingBaseOnTitleProcessor(AsyncProcessor):
     meta = {
         "name": "RechunkingBaseOnTitleProcessor",
         "input_type": str,
-        "output_type": Any,
+        "output_type": Section,
     }
 
-    async def process(self, chunk_generator: AsyncGenerator[str, None]) -> AsyncGenerator[Any, None]:
+    async def process(self, chunk_generator: AsyncGenerator[str, None]) -> AsyncGenerator[Section, None]:
 
         title_structure = ""
         async for chunk in chunk_generator:
