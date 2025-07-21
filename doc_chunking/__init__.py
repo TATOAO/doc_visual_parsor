@@ -32,6 +32,7 @@ from .core.processors.page_chunker import PdfPageImageSplitterProcessor
 from .core.processors.page_image_layout_processor import PageImageLayoutProcessor
 from .core.processors.title_structure_processor import TitleStructureProcessor
 from .core.processors.rechunking_base_on_title import RechunkingBaseOnTitleProcessor
+from .core.processors.doc_to_pdf_processor import WordToPdfProcessor
 
 # Make commonly used classes and functions available at package level
 __all__ = [
@@ -77,6 +78,7 @@ __all__ = [
     "PageImageLayoutProcessor",
     "TitleStructureProcessor",
     "RechunkingBaseOnTitleProcessor",
+    "WordToPdfProcessor",
 ]
 
 # For backward compatibility and easy access
