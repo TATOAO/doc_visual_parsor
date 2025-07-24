@@ -31,6 +31,18 @@ def enhanced_fuzzy_match_title(title_text: str, element_text: str) -> bool:
     if title_clean in element_clean:
         return True
     
+    # Special handling for Chinese parenthetical titles like "丁方（担保方）"
+    if "（" in title_text and "）" in title_text:
+        # Try without parentheses
+        title_no_parens = title_text.replace("（", "").replace("）", "")
+        if title_no_parens in element_text:
+            return True
+        
+        # Try with different parentheses styles
+        title_with_regular_parens = title_text.replace("（", "(").replace("）", ")")
+        if title_with_regular_parens in element_text:
+            return True
+    
     # Calculate minimum similarity threshold based on title length
     title_len = len(title_clean)
     if title_len <= 2:
@@ -71,6 +83,58 @@ def enhanced_fuzzy_match_title(title_text: str, element_text: str) -> bool:
     return False
 
 
+def _extract_content_from_shared_element(element_text: str, title_text: str, next_title_text: str = None) -> str:
+    """
+    Extract content for a specific title from a shared element containing multiple titles.
+    
+    Args:
+        element_text: The full text of the element
+        title_text: The current title to extract content for
+        next_title_text: The next title (if any) to determine where to stop
+        
+    Returns:
+        The extracted content portion for this title
+    """
+    if not element_text or not title_text:
+        return ""
+    
+    # Find the position of the current title in the element text
+    title_start = element_text.find(title_text)
+    if title_start == -1:
+        # Try fuzzy matching to find approximate position
+        # Remove special characters and try to match pattern
+        title_clean = re.sub(r'[（）]', '', title_text)
+        title_start = element_text.find(title_clean)
+        if title_start == -1:
+            return ""
+    
+    # Find where the content for this title starts (after the title)
+    content_start = title_start + len(title_text)
+    
+    # Find where the content for this title ends
+    content_end = len(element_text)
+    
+    if next_title_text:
+        # Find the next title position
+        next_title_start = element_text.find(next_title_text, content_start)
+        if next_title_start == -1:
+            # Try fuzzy matching for next title
+            next_title_clean = re.sub(r'[（）]', '', next_title_text)
+            next_title_start = element_text.find(next_title_clean, content_start)
+        
+        if next_title_start != -1:
+            content_end = next_title_start
+    
+    # Extract the content portion
+    content = element_text[content_start:content_end].strip()
+    
+    # Clean up the content (remove leading/trailing colons, etc.)
+    content = re.sub(r'^[：:]+', '', content)
+    content = re.sub(r'^[：:]+', '', content)
+    
+    return content.strip()
+
+
 def _build_section_tree_from_structure(title_structure: list, layout_extraction_result: LayoutExtractionResult) -> Section:
     """
     Helper function to build section tree from parsed title structure.
@@ -96,39 +160,42 @@ def _build_section_tree_from_structure(title_structure: list, layout_extraction_
     # Get layout elements in reading order
     sorted_elements = layout_extraction_result.elements
     
-    # Map titles to elements
+    # Map titles to elements with robust matching
     title_elements = []
-    current_element_idx = 0  # Keep track of where we are in sorted_elements
+    last_matched_idx = -1  # Track the last successfully matched element index
     
-    for _, title_text, _ in title_structure:
+    for title_idx, (_, title_text, _) in enumerate(title_structure):
         found_element = None
-        # Search from current position to end
-        while current_element_idx < len(sorted_elements):
-            element = sorted_elements[current_element_idx]
-            # Clean and compare the text using enhanced fuzzy matching
+        found_idx = -1
+        
+        # Search for the title starting from the current position
+        # Allow searching from the same element as we may have multiple titles in one element
+        search_start = max(0, last_matched_idx)
+        
+        for element_idx in range(search_start, len(sorted_elements)):
+            element = sorted_elements[element_idx]
             element_text = element.text.strip() if element.text else ""
 
             if enhanced_fuzzy_match_title(title_text, element_text):
                 found_element = element
-                current_element_idx += 1  # Move to next element for next search
+                found_idx = element_idx
                 break
-            current_element_idx += 1
-            
+        
         if found_element:
             title_elements.append(found_element)
+            # Update last_matched_idx to this element's index
+            # This allows subsequent titles to be found in the same element or later elements
+            last_matched_idx = found_idx
+            print(f"Matched title '{title_text}' with element at index {found_idx}")
+        else:
+            # Title not found - append None to maintain alignment with title_structure
+            title_elements.append(None)
+            print(f"Warning: Title '{title_text}' not found in layout elements")
     
-    if len(title_elements) != len(title_structure):
-        print(f"Warning: Found {len(title_elements)} matching elements for {len(title_structure)} titles")
-        # Print debug information to help identify matching issues
-        for i, (_, title_text, _) in enumerate(title_structure):
-            if i < len(title_elements):
-                matched_text = title_elements[i].text[:100] + "..." if len(title_elements[i].text) > 100 else title_elements[i].text
-                print(f"  Title '{title_text}' matched with: '{matched_text}'")
-            else:
-                print(f"  Title '{title_text}' had no match")
-        return root_section
+    # Verify we have the same number of elements as titles (including None entries)
+    assert len(title_elements) == len(title_structure), f"Mismatch: {len(title_elements)} elements vs {len(title_structure)} titles"
     
-    # Build section tree
+    # Build section tree - now handles None elements gracefully
     for idx, ((level, title_text, number), matching_element) in enumerate(zip(title_structure, title_elements)):
         # Create new section
         section = Section(
@@ -151,30 +218,65 @@ def _build_section_tree_from_structure(title_structure: list, layout_extraction_
         # Update level_sections map
         level_sections[level] = section
         
-        # Extract content between this title and the next
+        # Extract content for this section
         if matching_element:
-            # Find the next title element's index in sorted_elements
-            current_element_index = sorted_elements.index(matching_element)
-            next_title_index = len(sorted_elements)
+            # Check if the next title is in the same element
+            next_title_text = None
+            next_element = None
             
-            if idx + 1 < len(title_elements):
-                next_title = title_elements[idx + 1]
-                try:
-                    next_title_index = sorted_elements.index(next_title)
-                except ValueError:
-                    pass
+            # Find the next title and its element
+            for next_idx in range(idx + 1, len(title_elements)):
+                next_element = title_elements[next_idx]
+                if next_element is not None:
+                    next_title_text = title_structure[next_idx][1]  # Get title text
+                    break
             
-            # Collect content elements between this title and the next
-            content_elements = []
-            for i in range(current_element_index + 1, next_title_index):
-                element = sorted_elements[i]
-                # Skip if this element is a title
-                if element in title_elements:
-                    continue
-                if element.text:
-                    content_elements.append(element.text)
+            # Case 1: Next title is in the same element - extract content within this element
+            if next_element is not None and next_element == matching_element:
+                element_text = matching_element.text.strip() if matching_element.text else ""
+                section.content = _extract_content_from_shared_element(element_text, title_text, next_title_text)
             
-            section.content = "\n".join(content_elements)
+            # Case 2: Next title is in a different element or no next title - use original logic
+            else:
+                # Find the next title element's index in sorted_elements
+                current_element_index = sorted_elements.index(matching_element)
+                next_title_index = len(sorted_elements)
+                
+                # Look for the next matched title element (skip None entries)
+                for next_idx in range(idx + 1, len(title_elements)):
+                    next_title = title_elements[next_idx]
+                    if next_title is not None:
+                        try:
+                            next_title_index = sorted_elements.index(next_title)
+                            break
+                        except ValueError:
+                            continue
+                
+                # If this is the last title in the current element, extract remaining content from the element
+                if next_title_index > current_element_index:
+                    # First, try to extract content from the current element itself
+                    element_text = matching_element.text.strip() if matching_element.text else ""
+                    element_content = _extract_content_from_shared_element(element_text, title_text, None)
+                    
+                    # Then collect content from subsequent elements
+                    content_elements = [element_content] if element_content else []
+                    
+                    for i in range(current_element_index + 1, next_title_index):
+                        element = sorted_elements[i]
+                        # Skip if this element is a matched title (not None)
+                        if element in [te for te in title_elements if te is not None]:
+                            continue
+                        if element.text:
+                            content_elements.append(element.text)
+                    
+                    section.content = "\n".join(content_elements)
+                else:
+                    # Same element case - extract portion within element
+                    element_text = matching_element.text.strip() if matching_element.text else ""
+                    section.content = _extract_content_from_shared_element(element_text, title_text, next_title_text)
+        else:
+            # For unmatched titles, we can't extract content reliably
+            section.content = ""
     
     return root_section
 

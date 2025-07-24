@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "doc-chunking"
-version = "0.2.3"
+version = "0.2.4"
 description = "A powerful document analysis and chunking library for PDF and DOCX files using AI-powered processing"
 authors = [
     {name = "Tatoao Liang", email = "tatoao@126.com"}

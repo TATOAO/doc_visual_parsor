@@ -1,3 +1,4 @@
+import json
 from processor_pipeline import AsyncProcessor
 from doc_chunking.schemas.layout_schemas import LayoutElement
 from doc_chunking.layout_structuring.title_structure_builder_llm.section_reconstructor import section_reconstructor
@@ -41,9 +42,10 @@ if __name__ == "__main__":
     from doc_chunking.core.processors.page_image_layout_processor import PageImageLayoutProcessor
     from doc_chunking.core.processors.bbox_nlp_processor import BboxNLPProcessor
     from doc_chunking.core.processors.title_structure_processor import TitleStructureProcessor
-
+    from doc_chunking.utils.logging_config import configure_for_development
+    configure_for_development()
+    
     async def main():
-        logging.getLogger().setLevel(logging.DEBUG)
         pipeline = AsyncPipeline([
             PdfPageImageSplitterProcessor(), 
             PageImageLayoutProcessor(), 
@@ -52,9 +54,20 @@ if __name__ == "__main__":
             RechunkingBaseOnTitleProcessor(),
         ])
 
-        async for section in pipeline.astream(input_data='/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf'):
+        input_data = '/Users/tatoao_mini/Work/Kindee/ai_contract/合同样例/智能设备采购及运维合作合同.docx'
+        index = 0
+
+        from doc_chunking.utils.helper import remove_circular_references
+        async for section in pipeline.astream(input_data=input_data):
             print('-'*100)
-            print(section)
+            index += 1
+            if section:
+                with open(f'result_{index}.json', 'w', encoding='utf-8') as f:
+                    remove_circular_references(section)
+                    json.dump(section.model_dump(), f, indent=4, ensure_ascii=False)  
+        
+        print(f"Processing completed. Generated {index} result files.")
     
     import asyncio
     asyncio.run(main())
+    import json
