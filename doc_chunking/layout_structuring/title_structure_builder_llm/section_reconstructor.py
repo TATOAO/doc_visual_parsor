@@ -436,6 +436,65 @@ if __name__ == "__main__":
             1.1.5.25 第十四条  其他约定  
             1.1.5.26 附件：
     """
+
+    title_structure = """
+1. 合同名称：智能设备采及运合作合同购维XX
+2. 日期：2025年月日签订0708
+3. 甲方（采购方）：购
+    3.1. 甲方户名：科技有限公司账称XX
+    3.2. 甲方纳税人识别号：91110101XXXXXXXXXX
+    3.3. 甲方开户银行：中国工商银行支行开XX
+    3.4. 甲方联系地址：北京市朝阳街道号区XXXX
+    3.5. 甲方邮政编码：100000
+    3.6. 甲方联系电话：010-XXXXXXXX
+    3.7. 甲方联系邮箱：contact@jiafang.com
+    3.8. 甲方联系人：李四
+    3.9. 甲方传真：010-XXXXXXXX
+4. 乙方（供货方）：货
+    4.1. 乙方户名：电子设备有限公司账称XX
+    4.2. 乙方纳税人识别号：91310101XXXXXXXXXX
+    4.3. 乙方开户银行：中国建设银行支行开XX
+    4.4. 乙方银行账号：账621700XXXXXXXXXXXX
+    4.5. 乙方联系地址：上海市浦东新街道号区XXXX
+    4.6. 乙方邮政编码：200000
+    4.7. 乙方联系电话：021-XXXXXXXX
+    4.8. 乙方联系邮箱：contact@yifang.com
+    4.9. 乙方联系人：王五
+    4.10. 乙方传真：021-XXXXXXXX
+5. 丙方（运输方）：维
+    5.1. 丙方户名：设备维护有限公司账称维XX
+    5.2. 丙方纳税人识别号：91440101XXXXXXXXXX
+    5.3. 丙方开户银行：中国银行支行开XX
+    5.4. 丙方银行账号：账621661XXXXXXXXXXXX
+    5.5. 丙方联系地址：广州市天河街道号区XXXX
+    5.6. 丙方邮政编码：510000
+    5.7. 丙方联系电话：020-XXXXXXXX
+    5.8. 丙方联系邮箱：contact@sanfang.com
+    5.9. 丙方联系人：六赵
+    5.10. 丙方传真：020-XXXXXXXX
+6. 丁方（担保方）：丁方户名：担保有限公司账称XX
+    6.1. 丁方纳税人识别号：91510101XXXXXXXXXX
+    6.2. 丁方开户银行：中国农业银行支行开XX
+    6.3. 丁方银行账号：账622848XXXXXXXXXXXX
+    6.4. 丁方联系地址：成都市江街道号锦区XXXX
+    6.5. 丁方邮政编码：610000
+    6.6. 丁方联系电话：028-XXXXXXXX
+    6.7. 丁方联系邮箱：contact@dingfang.com
+    6.8. 丁方联系人：六赵
+    6.9. 丁方传真：028-XXXXXXXX
+7. 一、项目概况
+8. 二、产品信息及金额
+9. 三、付款与结算
+10. 四、履行约定
+11. 五、税费相关
+12. 六、保密义务
+13. 七、违约责任
+14. 八、不可抗力
+15. 九、争议解决
+16. 十、通知送达
+17. 十一、合同生效与终止
+18. 十二、其他
+"""
     
     # Test regular section reconstructor
     print("=== Testing Regular Section Reconstructor ===")
@@ -443,7 +502,7 @@ if __name__ == "__main__":
     from doc_chunking.utils.helper import remove_circular_references
     remove_circular_references(section_tree)
     
-    json.dump(section_tree.model_dump(), open("./section_tree_0617.json", "w"), indent=4, ensure_ascii=False)
+    json.dump(section_tree.model_dump(), open("./section_tree_0724.json", "w"), indent=4, ensure_ascii=False)
     
     # Test streaming section reconstructor
     print("\n=== Testing Streaming Section Reconstructor ===")

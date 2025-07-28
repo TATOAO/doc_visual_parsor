@@ -596,7 +596,10 @@ if __name__ == "__main__":
         cv_pdf_dpi=150
     )
     
-    result = extractor._detect_layout("tests/test_data/1-1 买卖合同（通用版）.pdf")
+    # result = extractor._detect_layout("tests/test_data/1-1 买卖合同（通用版）.pdf")
+    input_data = '/Users/tatoao_mini/Work/Kindee/ai_contract/合同样例/智能设备.pdf'
+    # soffice --headless --convert-to pdf --outdir /Users/tatoao_mini/Work/Kindee/ai_contract/合同样例/ /Users/tatoao_mini/Work/Kindee/ai_contract/合同样例/智能设备采购及运维合作合同.docx
+    result = extractor._detect_layout(input_data)
     
     import json
     json.dump(result.model_dump(), open("hybrid_extraction_result.json", "w"), indent=2, ensure_ascii=False)
