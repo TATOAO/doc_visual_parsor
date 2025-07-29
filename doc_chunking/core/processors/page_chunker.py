@@ -89,6 +89,7 @@ class PdfPageImageSplitterProcessor(AsyncProcessor):
                 # Default PDF DPI is 72, so zoom = desired_dpi / 72
                 ###### Step 1: Convert to image with high resolution ######
                 zoom = self.pdf_dpi / 72.0
+                self.session['zoom_factor'] = zoom
                 mat = fitz.Matrix(zoom, zoom)
                 
                 # Render page as image

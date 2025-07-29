@@ -46,13 +46,22 @@ class TableProcessor(AsyncProcessor):
         
         for char in cell_chars:
             # Create font info for this character
+            # Convert color tuple to hex string if needed
+            color_value = char.get("non_stroking_color", "#000000")
+            if isinstance(color_value, tuple):
+                # Convert RGB tuple to hex string
+                r, g, b = [int(c * 255) for c in color_value]
+                color_value = f"#{r:02x}{g:02x}{b:02x}"
+            elif not isinstance(color_value, str):
+                color_value = "#000000"
+            
             font_info = FontInfo(
                 name=char.get("fontname", "Unknown"),
                 size=char.get("size", 0.0),
                 bold=char.get("fontname", "").lower().find("bold") != -1,
                 italic=char.get("fontname", "").lower().find("italic") != -1,
                 underline=False,  # PDF doesn't easily provide this info
-                color=char.get("non_stroking_color", "#000000")
+                color=color_value
             )
             
             # Check if this character has the same style as the current run
@@ -89,7 +98,7 @@ class TableProcessor(AsyncProcessor):
         
         return text, style_info
 
-    def _reconstruct_table_into_table_element(self, table: pdfplumber.Table) -> TableElement:
+    def _reconstruct_table_into_table_element(self, table: pdfplumber.table) -> TableElement:
         """Convert a pdfplumber Table into a TableElement."""
         chars = table.page.chars
         
@@ -109,9 +118,10 @@ class TableProcessor(AsyncProcessor):
             row_cells = []
             for cell_bbox in row.cells:
                 if cell_bbox is None:
-                    # Create empty cell
+                    # Create empty cell with valid bounding box
+                    # Use a small valid bounding box for empty cells
                     empty_cell = TableCell(
-                        bbox=BoundingBox(x1=0, y1=0, x2=0, y2=0),
+                        bbox=BoundingBox(x1=0, y1=0, x2=1, y2=1),
                         text="",
                         style=StyleInfo(runs=[])
                     )
@@ -159,6 +169,7 @@ class TableProcessor(AsyncProcessor):
             PageImageLayoutProcessor():
                 self.session['plumber_pages'] = plumber_pages
                 self.session['plumber_page_map'] = { f'plumber_page_{i}': page for i, page in enumerate(plumber_pages.pages) }
+                self.session['zoom_factor'] = zoom
         """
         async for page_layout_list in layout_list_generator:
             if not page_layout_list:
@@ -178,13 +189,16 @@ class TableProcessor(AsyncProcessor):
                     # match the table with the element
                     for table in table_list:
                         # Convert table.bbox tuple to BoundingBox object
+
+                        zoom_factor = self.session['zoom_factor']
                         table_bbox = BoundingBox(
-                            x1=table.bbox[0],
-                            y1=table.bbox[1],
-                            x2=table.bbox[2],
-                            y2=table.bbox[3]
+                            x1=table.bbox[0] * zoom_factor,
+                            y1=table.bbox[1] * zoom_factor,
+                            x2=table.bbox[2] * zoom_factor,
+                            y2=table.bbox[3] * zoom_factor
                         )
                         if element.bbox.contains(table_bbox):
+
                             table_element = self._reconstruct_table_into_table_element(table)
                             element.metadata.table_element = table_element
                             continue
@@ -206,7 +220,7 @@ if __name__ == "__main__":
             PageImageLayoutProcessor(),
             TableProcessor()
         ])
-        async for result in pipeline.astream('tests/test_data/table_test.pdf'):
+        async for result in pipeline.astream('tests/test_data/table_test2.pdf'):
             print(result)
 
     asyncio.run(main())
