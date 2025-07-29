@@ -71,6 +71,7 @@ class PdfPageImageSplitterProcessor(AsyncProcessor):
 
             plumber_pages = pdfplumber.open(io.BytesIO(pdf_content))
             self.session['plumber_pages'] = plumber_pages
+            self.session['plumber_page_map'] = { f'plumber_page_{i}': page for i, page in enumerate(plumber_pages.pages) }
 
             # load the pdf
             pdf_doc = fitz.open(stream=pdf_content, filetype="pdf")
@@ -78,6 +79,7 @@ class PdfPageImageSplitterProcessor(AsyncProcessor):
             extractor = PdfLayoutExtractor(merge_fragments=True)
 
             for page_num in range(len(pdf_doc)):
+
                 # logger.debug(f"Processing page {page_num + 1}")
                 
                 # Get page

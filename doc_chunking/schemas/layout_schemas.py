@@ -237,6 +237,13 @@ class BoundingBox(BaseModel):
         """Calculate area of the bounding box."""
         return self.width * self.height
     
+    def contains(self, other_bbox: 'BoundingBox') -> bool:
+        """Check if this bounding box contains another bounding box."""
+        return (other_bbox.x1 >= self.x1 and 
+                other_bbox.y1 >= self.y1 and
+                other_bbox.x2 <= self.x2 and 
+                other_bbox.y2 <= self.y2)
+    
     class Config:
         """Pydantic config."""
         validate_assignment = True
@@ -257,6 +264,7 @@ class LayoutElementMetadata(BaseModel):
     original_span_bbox: Optional[BoundingBox] = Field(None, description="Original span bounding box of the element")
     line_bbox: Optional[BoundingBox] = Field(None, description="Line bounding box of the element")
     block_bbox: Optional[BoundingBox] = Field(None, description="Block bounding box of the element")
+    table_element: Optional["TableElement"] = Field(None, description="Table element of the element")
 
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -288,6 +296,80 @@ class LayoutElementMetadata(BaseModel):
         validate_assignment = True
         extra = "allow"
     
+
+
+class ImageElement(BaseModel):
+    """Image element representation."""
+    bbox: BoundingBox = Field(..., description="Bounding box of the image")
+    image: str = Field(..., description="Image of the element, base64 encoded")
+    metadata: Optional[LayoutElementMetadata] = Field(None, description="Metadata of the image")
+
+class TableCell(BaseModel):
+    """Table cell representation."""
+    bbox: BoundingBox = Field(..., description="Bounding box of the cell")
+    text: str = Field(..., description="Text content of the cell")
+    style: StyleInfo = Field(..., description="Style information of the cell")
+
+class TableElement(BaseModel):
+    """Table element representation."""
+    bbox: BoundingBox = Field(..., description="Bounding box of the table")
+    cells: List[TableCell] = Field(..., description="Cells of the table")
+    rows: List[List[TableCell]] = Field(..., description="Rows of the table")
+    image: Optional[str] = Field(None, description="Image of the table, base64 encoded")
+    metadata: Optional[LayoutElementMetadata] = Field(None, description="Metadata of the table")
+
+    @computed_field
+    @property
+    def markdown_table(self) -> str:
+        """Get the markdown table of the table."""
+        if not self.rows:
+            return ""
+        
+        # Build markdown table
+        lines = []
+        
+        # Add header row
+        if self.rows:
+            header_cells = [cell.text.strip() if cell.text else "" for cell in self.rows[0]]
+            lines.append("| " + " | ".join(header_cells) + " |")
+            
+            # Add separator row
+            separator_cells = ["---"] * len(header_cells)
+            lines.append("| " + " | ".join(separator_cells) + " |")
+            
+            # Add data rows
+            for row in self.rows[1:]:
+                row_cells = [cell.text.strip() if cell.text else "" for cell in row]
+                lines.append("| " + " | ".join(row_cells) + " |")
+        
+        return "\n".join(lines)
+    
+    @computed_field
+    @property
+    def nlp_record(self) -> str:
+        """Get the nlp record of the table."""
+        if not self.rows:
+            return ""
+        
+        # Create a structured representation for NLP processing
+        record_parts = []
+        
+        # Add table structure info
+        record_parts.append(f"Table with {len(self.rows)} rows and {len(self.rows[0]) if self.rows else 0} columns")
+        
+        # Add cell contents
+        for i, row in enumerate(self.rows):
+            row_texts = []
+            for j, cell in enumerate(row):
+                if cell.text and cell.text.strip():
+                    row_texts.append(f"Cell[{i},{j}]: {cell.text.strip()}")
+            
+            if row_texts:
+                record_parts.append(f"Row {i}: {'; '.join(row_texts)}")
+        
+        return "\n".join(record_parts)
+
+
 
 
 
