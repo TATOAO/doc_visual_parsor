@@ -1,14 +1,15 @@
+import pdfplumber
+import asyncio
+import fitz
+import io
+import fitz  # PyMuPDF
 from processor_pipeline import AsyncProcessor
 from pathlib import Path
 from typing import Any, AsyncGenerator, Union, List, Tuple
 from doc_chunking.schemas import FileInputData
 from doc_chunking.layout_detection.layout_extraction.pdf_layout_extractor import PdfLayoutExtractor
 from doc_chunking.schemas.layout_schemas import LayoutElement
-import asyncio
 from PIL import Image
-import fitz
-import io
-import fitz  # PyMuPDF
 from doc_chunking.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -68,6 +69,9 @@ class PdfPageImageSplitterProcessor(AsyncProcessor):
             else:
                 pdf_content = mock_file
 
+            plumber_pages = pdfplumber.open(io.BytesIO(pdf_content))
+            self.session['plumber_pages'] = plumber_pages
+
             # load the pdf
             pdf_doc = fitz.open(stream=pdf_content, filetype="pdf")
 
@@ -117,7 +121,7 @@ if __name__ == "__main__":
     from processor_pipeline import AsyncPipeline
     async def main():
         pipeline = AsyncPipeline([PdfPageImageSplitterProcessor()])
-        result = await pipeline.run('/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf')
+        result = await pipeline.run('tests/test_data/1-1 买卖合同（通用版）.pdf')
         print(result)
 
     import asyncio

@@ -15,6 +15,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 import io
 import tempfile
+from PIL import Image
 from doc_chunking.schemas.layout_schemas import LayoutExtractionResult, LayoutElement, BoundingBox, ElementType
 
 logger = logging.getLogger(__name__)
@@ -52,16 +53,40 @@ class PdfLayoutVisualizer:
     Visualizer for PDF layout elements with bounding box highlighting.
     """
     
-    # Color scheme for different element types and statuses
+    # Enhanced color scheme for different element types and statuses
     COLORS = {
-        'text': (0, 0, 1),           # Blue
-        'title': (1, 0, 0),          # Red
-        'heading': (1, 0.5, 0),      # Orange
-        'table': (0, 1, 0),          # Green
-        'figure': (1, 0, 1),         # Magenta
-        'merged': (0.8, 0.2, 0.8),   # Purple for merged elements
-        'original': (0.3, 0.3, 0.3), # Gray for original fragments
-        'default': (0, 0, 0)         # Black default
+        # Text elements - Blue family
+        'Plain Text': (0.2, 0.6, 1.0),      # Bright blue
+        'Paragraph': (0.4, 0.7, 1.0),       # Light blue
+        
+        # Title and heading elements - Red/Orange family  
+        'Title': (1.0, 0.2, 0.2),           # Bright red
+        'Heading': (1.0, 0.5, 0.0),         # Orange
+        
+        # Table elements - Green family
+        'Table': (0.0, 0.8, 0.4),           # Bright green
+        'Table Caption': (0.2, 0.9, 0.6),   # Light green
+        'Table Footnote': (0.0, 0.6, 0.3),  # Dark green
+        
+        # Figure elements - Purple/Magenta family
+        'Figure': (0.8, 0.2, 0.8),          # Magenta
+        'Figure Caption': (0.9, 0.4, 0.9),  # Light magenta
+        
+        # Formula elements - Yellow/Orange family
+        'Isolate Formula': (1.0, 0.8, 0.0), # Bright yellow
+        'Formula Caption': (1.0, 0.9, 0.3), # Light yellow
+        
+        # List elements - Teal family
+        'List': (0.0, 0.7, 0.7),            # Teal
+        
+        # Special status elements
+        'merged': (0.6, 0.2, 0.8),          # Purple for merged elements
+        'original': (0.5, 0.5, 0.5),        # Gray for original fragments
+        'Unknown': (0.7, 0.7, 0.7),         # Light gray for unknown
+        'Abandon': (0.8, 0.3, 0.3),         # Reddish brown for abandoned
+        
+        # Default fallback
+        'default': (0.3, 0.3, 0.3)          # Dark gray default
     }
     
     def __init__(self, 
@@ -129,6 +154,19 @@ class PdfLayoutVisualizer:
                     # Get page dimensions
                     page = doc[page_num - 1]  # Convert to 0-indexed
                     page_rect = page.rect
+                    
+                    # Render PDF page as background image
+                    zoom = self.dpi / 72.0  # Convert DPI to zoom factor
+                    mat = fitz.Matrix(zoom, zoom)
+                    pix = page.get_pixmap(matrix=mat)
+                    img_data = pix.tobytes("png")
+                    
+                    # Load image and display as background
+                    img = Image.open(io.BytesIO(img_data))
+                    img_array = np.array(img)
+                    
+                    # Display the PDF page as background
+                    ax.imshow(img_array, extent=[0, page_rect.width, page_rect.height, 0])
                     
                     # Set up the plot
                     ax.set_xlim(0, page_rect.width)
@@ -217,30 +255,48 @@ class PdfLayoutVisualizer:
     
     def _draw_element(self, ax: plt.Axes, element: LayoutElement) -> None:
         """
-        Draw a single layout element on the plot.
+        Draw a single layout element on the plot with enhanced visual styling.
         
         Args:
             ax: Matplotlib Axes object
             element: Layout element to draw
         """
         bbox = element.bbox
+        element_color = self.colors.get(element.element_type, self.COLORS['default'])
         
-        # Create rectangle for bounding box
+        # Create rectangle for bounding box with enhanced styling
         rect = patches.Rectangle(
             (bbox.x1, bbox.y1),
             bbox.x2 - bbox.x1,
             bbox.y2 - bbox.y1,
-            linewidth=self.line_width,
-            edgecolor=self.colors.get(element.element_type, self.COLORS['default']),
-            facecolor='none'
+            linewidth=self.line_width + 0.5,  # Slightly thicker lines
+            edgecolor=element_color,
+            facecolor=element_color,
+            alpha=0.15,  # Light fill color
+            linestyle='-',
+            capstyle='round',
+            joinstyle='round'
         )
         
-        # Draw bounding box
+        # Add a second rectangle for border emphasis
+        border_rect = patches.Rectangle(
+            (bbox.x1, bbox.y1),
+            bbox.x2 - bbox.x1,
+            bbox.y2 - bbox.y1,
+            linewidth=self.line_width,
+            edgecolor=element_color,
+            facecolor='none',
+            alpha=0.8,
+            linestyle='-'
+        )
+        
+        # Draw both rectangles
         ax.add_patch(rect)
+        ax.add_patch(border_rect)
         
         # Add element information if enabled
         if self.show_labels or self.show_element_ids:
-            self._add_element_label(ax, element, rect)
+            self._add_element_label(ax, element, border_rect)
     
     def _add_element_label(self, ax: plt.Axes, element: LayoutElement, rect: patches.Rectangle) -> None:
         """
@@ -299,17 +355,53 @@ class PdfLayoutVisualizer:
     
     def _add_legend(self, ax: plt.Axes, elements: List[LayoutElement]) -> None:
         """
-        Add a legend to the plot.
+        Add a comprehensive legend to the plot.
         
         Args:
             ax: Matplotlib Axes object
             elements: List of layout elements
         """
-        handles = [
-            patches.Patch(facecolor=self.colors.get(element.element_type, self.COLORS['default']), label=element.element_type)
-            for element in elements
-        ]
-        ax.legend(handles=handles, loc='upper right')
+        # Get unique element types present in the elements
+        element_types = list(set(element.element_type for element in elements))
+        
+        # Create handles for each unique element type
+        handles = []
+        labels = []
+        
+        for element_type in sorted(element_types):
+            color = self.colors.get(element_type, self.COLORS['default'])
+            # Count elements of this type
+            count = sum(1 for element in elements if element.element_type == element_type)
+            
+            # Create patch with the element type color
+            patch = patches.Patch(
+                facecolor=color,
+                edgecolor='black',
+                linewidth=1,
+                alpha=0.8
+            )
+            
+            handles.append(patch)
+            labels.append(f"{element_type} ({count})")
+        
+        # Add legend with better formatting
+        if handles:
+            legend = ax.legend(
+                handles=handles,
+                labels=labels,
+                loc='upper right',
+                bbox_to_anchor=(1.02, 1.0),
+                fontsize=self.font_size - 1,
+                frameon=True,
+                fancybox=True,
+                shadow=True,
+                title="Element Types",
+                title_fontsize=self.font_size
+            )
+            
+            # Make legend background more visible
+            legend.get_frame().set_facecolor('white')
+            legend.get_frame().set_alpha(0.9)
     
     def _create_side_by_side_comparison(self, 
                                       pdf_input: InputDataType,
@@ -334,8 +426,20 @@ class PdfLayoutVisualizer:
                 page = doc[page_num - 1]
                 page_rect = page.rect
                 
-                # Set up both plots
+                # Render PDF page as background image for both plots
+                zoom = self.dpi / 72.0  # Convert DPI to zoom factor
+                mat = fitz.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=mat)
+                img_data = pix.tobytes("png")
+                
+                # Load image and display as background
+                img = Image.open(io.BytesIO(img_data))
+                img_array = np.array(img)
+                
+                # Set up both plots with background
                 for ax in [ax1, ax2]:
+                    # Display the PDF page as background
+                    ax.imshow(img_array, extent=[0, page_rect.width, page_rect.height, 0])
                     ax.set_xlim(0, page_rect.width)
                     ax.set_ylim(0, page_rect.height)
                     ax.invert_yaxis()
@@ -361,6 +465,75 @@ class PdfLayoutVisualizer:
                 plt.close(fig)
         
         doc.close()
+    
+    def create_color_palette_overview(self, output_path: Union[str, Path]) -> bool:
+        """
+        Create a visual overview of the color palette used for different element types.
+        
+        Args:
+            output_path: Output path for the color palette image
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            fig, ax = plt.subplots(figsize=(12, 8))
+            
+            # Create color swatches
+            y_pos = 0
+            for element_type, color in self.COLORS.items():
+                # Create color swatch
+                rect = patches.Rectangle(
+                    (0.1, y_pos),
+                    0.3,
+                    0.8,
+                    facecolor=color,
+                    edgecolor='black',
+                    linewidth=1,
+                    alpha=0.8
+                )
+                ax.add_patch(rect)
+                
+                # Add element type label
+                ax.text(
+                    0.45,
+                    y_pos + 0.4,
+                    element_type,
+                    fontsize=12,
+                    va='center',
+                    ha='left',
+                    fontweight='bold'
+                )
+                
+                # Add RGB values
+                rgb_text = f"RGB: {color[0]:.2f}, {color[1]:.2f}, {color[2]:.2f}"
+                ax.text(
+                    0.45,
+                    y_pos + 0.2,
+                    rgb_text,
+                    fontsize=10,
+                    va='center',
+                    ha='left',
+                    color='gray'
+                )
+                
+                y_pos += 1.2
+            
+            # Set up the plot
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, y_pos)
+            ax.set_title('Layout Element Color Palette', fontsize=16, fontweight='bold', pad=20)
+            ax.axis('off')
+            
+            plt.tight_layout()
+            plt.savefig(output_path, dpi=150, bbox_inches='tight')
+            plt.close(fig)
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error creating color palette overview: {str(e)}")
+            return False
 
 
 def visualize_pdf_layout(pdf_input: InputDataType,
@@ -405,40 +578,95 @@ def compare_layout_results(pdf_input: InputDataType,
     return visualizer.compare_before_after(pdf_input, before_result, after_result, output_dir)
 
 
+def create_color_palette_overview(output_path: Union[str, Path], **kwargs) -> bool:
+    """
+    Convenience function to create a color palette overview.
+    
+    Args:
+        output_path: Output path for the color palette image
+        **kwargs: Additional arguments for PdfLayoutVisualizer
+        
+    Returns:
+        True if successful
+    """
+    visualizer = PdfLayoutVisualizer(**kwargs)
+    return visualizer.create_color_palette_overview(output_path)
+
+
 # Example usage
-# python -m models.layout_detection.utils.visualiza_layout_elements
+# python -m doc_chunking.layout_detection.utils.visualiza_layout_elements
 if __name__ == "__main__":
     # This would be used in conjunction with the PDF extractor
     from doc_chunking.layout_detection.layout_extraction.pdf_layout_extractor import PdfLayoutExtractor
     from doc_chunking.layout_detection.layout_extraction.pdf_style_cv_mix_extractor import PdfStyleCVMixLayoutExtractor
     
     # Test file path
-    test_pdf = "tests/test_data/1-1 买卖合同（通用版）.pdf"
+    # test_pdf = "tests/test_data/1-1 买卖合同（通用版）.pdf"
+    test_pdf = "tests/test_data/-ST傲农_603363.SH_2024-12-31_年报.pdf"
     
     if Path(test_pdf).exists():
-        # Extract with merging
-        extractor_with_merge = PdfLayoutExtractor(merge_fragments=True)
-        result_after = extractor_with_merge._detect_layout(test_pdf)
-
-        reulst_mix = PdfStyleCVMixLayoutExtractor(merge_fragments=True)._detect_layout(test_pdf)
-        
-        # Create comparison visualization
+        # Create output directory
         output_dir = Path("visualization_output")
         output_dir.mkdir(exist_ok=True)
         
-        success = compare_layout_results(
+        # First, create a color palette overview
+        palette_path = output_dir / "color_palette_overview.png"
+        palette_success = create_color_palette_overview(palette_path)
+        
+        if palette_success:
+            print("✅ Color palette overview created successfully!")
+            print(f"Check: {palette_path}")
+        
+        # Extract with different methods
+        result_after = PdfLayoutExtractor()._detect_layout(test_pdf)
+        result_mix = PdfStyleCVMixLayoutExtractor()._detect_layout(test_pdf)
+        
+        # Create individual visualizations with enhanced colors
+        after_path = output_dir / "after_layout_colorful.pdf"
+        mix_path = output_dir / "mix_layout_colorful.pdf"
+        
+        # Create individual visualizations
+        after_success = visualize_pdf_layout(
             test_pdf,
             result_after,
-            reulst_mix,
-            output_dir,
+            after_path,
             show_labels=True,
-            show_element_ids=True
+            show_element_ids=True,
+            line_width=2.0,  # Thicker lines for better visibility
+            font_size=9
         )
         
-        if success:
-            print("✅ Visualization completed successfully!")
+        mix_success = visualize_pdf_layout(
+            test_pdf,
+            result_mix,
+            mix_path,
+            show_labels=True,
+            show_element_ids=True,
+            line_width=2.0,
+            font_size=9
+        )
+        
+        # Create comparison visualization
+        comparison_success = compare_layout_results(
+            test_pdf,
+            result_after,
+            result_mix,
+            output_dir,
+            show_labels=True,
+            show_element_ids=True,
+            line_width=2.0,
+            font_size=9
+        )
+        
+        if after_success and mix_success and comparison_success:
+            print("✅ All visualizations completed successfully!")
             print(f"Check the files in: {output_dir}")
+            print("  - color_palette_overview.png: Color scheme reference")
+            print("  - after_layout_colorful.pdf: Standard layout extraction")
+            print("  - mix_layout_colorful.pdf: Mixed layout extraction")
+            print("  - comparison.pdf: Side-by-side comparison")
         else:
-            print("❌ Visualization failed!")
+            print("❌ Some visualizations failed!")
     else:
         print(f"Test file not found: {test_pdf}")
+        print("Please ensure the test PDF file exists in the specified path.")
