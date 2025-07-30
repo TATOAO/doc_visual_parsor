@@ -33,6 +33,7 @@ from .core.processors.page_image_layout_processor import PageImageLayoutProcesso
 from .core.processors.title_structure_processor import TitleStructureProcessor
 from .core.processors.rechunking_base_on_title import RechunkingBaseOnTitleProcessor
 from .core.processors.doc_to_pdf_processor import WordToPdfProcessor
+from .core.processors.table_processor import TableProcessor
 
 # Make commonly used classes and functions available at package level
 __all__ = [
@@ -79,6 +80,7 @@ __all__ = [
     "TitleStructureProcessor",
     "RechunkingBaseOnTitleProcessor",
     "WordToPdfProcessor",
+    "TableProcessor",
 ]
 
 # For backward compatibility and easy access
