@@ -213,14 +213,16 @@ if __name__ == "__main__":
     from processor_pipeline import AsyncPipeline
     from doc_chunking.core.processors.page_chunker import PdfPageImageSplitterProcessor
     from doc_chunking.core.processors.page_image_layout_processor import PageImageLayoutProcessor
+    from doc_chunking.core.processors.bbox_nlp_processor import BboxNLPProcessor
     import asyncio
     async def main():
         pipeline = AsyncPipeline([
             PdfPageImageSplitterProcessor(), 
             PageImageLayoutProcessor(),
-            TableProcessor()
+            TableProcessor(),
+            BboxNLPProcessor()
         ])
-        async for result in pipeline.astream('tests/test_data/table_test2.pdf'):
-            print(result)
+        async for nlp, layout_element in pipeline.astream('tests/test_data/table_test2.pdf'):
+            print(nlp)
 
     asyncio.run(main())

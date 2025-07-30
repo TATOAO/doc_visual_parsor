@@ -1,5 +1,5 @@
 from typing import List, Optional
-from doc_chunking.schemas.layout_schemas import LayoutExtractionResult, LayoutElement, ElementType
+from doc_chunking.schemas.layout_schemas import LayoutExtractionResult, LayoutElement, ElementType, LayoutElementMetadata
 from pydantic import BaseModel
 
 
@@ -41,6 +41,7 @@ class DisplayLine(BaseModel):
     font_underline: Optional[bool] = None
     font_bold: Optional[bool] = None
     alignment: Optional[str] = None
+    metadata: Optional[LayoutElementMetadata] = None
 
     @classmethod
     def from_layout_element(cls, layout_element: LayoutElement) -> "DisplayLine":
@@ -65,11 +66,34 @@ class DisplayLine(BaseModel):
             font_italic=layout_element.style.runs[0].font.italic if layout_element.style.runs else None,
             font_underline=layout_element.style.runs[0].font.underline,
             font_bold=layout_element.style.runs[0].font.bold if layout_element.style.runs else None,
-            alignment=layout_element.style.paragraph_format.alignment.value if layout_element.style.paragraph_format else None
+            alignment=layout_element.style.paragraph_format.alignment.value if layout_element.style.paragraph_format else None,
+            metadata=layout_element.metadata
         )
 
     
     def __str__(self) -> str:
+
+        if self.element_type == ElementType.TABLE:
+
+            table_element = self.metadata.table_element
+            table_element_str = self.element_text
+
+            if table_element:
+                table_element_str = table_element.markdown_table
+
+            return f"[id:{self.element_id}]" + \
+                (f"[page:{self.page_number}]" if self.page_number else "") + \
+                f"[type:{self.element_type}]" + \
+                (f"[pos:{self.element_bbox}]" if False else "") + \
+                f"[{self.font_name} {self.font_size}pt]" + \
+                (f"[color:{self.font_color}]" if self.font_color else "") + \
+                (f"[italic:{self.font_italic}]" if self.font_italic else "") + \
+                (f"[bold:{self.font_bold}]" if self.font_bold else "") + \
+                (f"[underline:{self.font_underline}]" if self.font_underline else "") + \
+                (f"[alignment:{self.alignment}]" if self.alignment else "") + \
+                f"{table_element_str}"
+
+
         return f"[id:{self.element_id}]" + \
             (f"[page:{self.page_number}]" if self.page_number else "") + \
             f"[type:{self.element_type}]" + \

@@ -36,8 +36,8 @@ if __name__ == "__main__":
             BboxNLPProcessor()
             ]
         )
-        async for item in pipeline.astream(input_data='/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf'):
-            print(item)
+        async for nlp, laytout_element in pipeline.astream(input_data='/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf'):
+            print(nlp)
 
         # result = await pipeline.run('/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf')
         # print(result)
