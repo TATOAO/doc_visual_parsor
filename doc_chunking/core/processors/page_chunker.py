@@ -39,6 +39,7 @@ class PdfPageImageSplitterProcessor(AsyncProcessor):
 
         async for item in input_data:
 
+
             if isinstance(item, str):
                 file = open(item, 'rb')
             elif isinstance(item, bytes):
