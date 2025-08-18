@@ -52,7 +52,7 @@ dependencies = [
     "rapidfuzz",
     "fuzzysearch",
     "sse-starlette",
-    "processor-pipeline @ git+https://github.com/TATOAO/processor_architecture.git@dev",
+    "processor-pipeline @ git+https://github.com/TATOAO/processor_architecture.git@main",
     "docx2pdf",
 ]
 
