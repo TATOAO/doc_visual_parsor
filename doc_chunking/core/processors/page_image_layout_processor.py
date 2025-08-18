@@ -52,7 +52,8 @@ if __name__ == "__main__":
             PdfPageImageSplitterProcessor(), 
             PageImageLayoutProcessor()])
         # result = await pipeline.run('/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf')
-        input_data = '/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf'
+        # input_data = '/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf'
+        input_data = '/Users/tatoao_mini/Work/Kindee/ESG/金蝶ESG报告2024.pdf'
         import time
         # async for item in pipeline.astream(input_data=input_data):
         #     start_time = time.time()

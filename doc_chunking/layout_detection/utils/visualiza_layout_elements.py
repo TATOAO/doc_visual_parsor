@@ -602,7 +602,8 @@ if __name__ == "__main__":
     
     # Test file path
     # test_pdf = "tests/test_data/1-1 买卖合同（通用版）.pdf"
-    test_pdf = "tests/test_data/-ST傲农_603363.SH_2024-12-31_年报.pdf"
+    # test_pdf = "tests/test_data/-ST傲农_603363.SH_2024-12-31_年报.pdf"
+    test_pdf = '/Users/tatoao_mini/Work/Kindee/ESG/金蝶ESG报告2024.pdf'
     
     if Path(test_pdf).exists():
         # Create output directory

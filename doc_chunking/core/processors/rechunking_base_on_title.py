@@ -54,17 +54,23 @@ if __name__ == "__main__":
             RechunkingBaseOnTitleProcessor(),
         ])
 
-        input_data = '/Users/tatoao_mini/Work/Kindee/ai_contract/合同样例/智能设备采购及运维合作合同.docx'
+        # input_data = '/Users/tatoao_mini/Work/Kindee/ai_contract/合同样例/智能设备采购及运维合作合同.docx'
+        input_data = '/Users/tatoao_mini/Work/Kindee/ESG/金蝶ESG报告2024.pdf'
         index = 0
 
         from doc_chunking.utils.helper import remove_circular_references
-        async for section in pipeline.astream(input_data=input_data):
-            print('-'*100)
-            index += 1
-            if section:
-                with open(f'result_{index}.json', 'w', encoding='utf-8') as f:
-                    remove_circular_references(section)
-                    json.dump(section.model_dump(), f, indent=4, ensure_ascii=False)  
+        # async for section in pipeline.astream(input_data=input_data):
+            # print('-'*100)
+            # index += 1
+            # if section:
+            #     with open(f'result_{index}.json', 'w', encoding='utf-8') as f:
+                    # remove_circular_references(section)
+                    # json.dump(section.model_dump(), f, indent=4, ensure_ascii=False)  
+        result = await pipeline.run(input_data=input_data)
+        with open(f'result_esg.json', 'w', encoding='utf-8') as f:
+            remove_circular_references(result)
+            json.dump(result.model_dump(), f, indent=4, ensure_ascii=False)  
+        
         
         print(f"Processing completed. Generated {index} result files.")
     

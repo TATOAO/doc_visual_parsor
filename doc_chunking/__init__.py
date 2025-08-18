@@ -34,6 +34,7 @@ from .core.processors.title_structure_processor import TitleStructureProcessor
 from .core.processors.rechunking_base_on_title import RechunkingBaseOnTitleProcessor
 from .core.processors.doc_to_pdf_processor import WordToPdfProcessor
 from .core.processors.table_processor import TableProcessor
+from .new_core import *
 
 # Make commonly used classes and functions available at package level
 __all__ = [
