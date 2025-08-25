@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Union, List, Tuple
 from doc_chunking.schemas import FileInputData
 from doc_chunking.layout_detection.layout_extraction.pdf_layout_extractor import PdfLayoutExtractor
-from doc_chunking.schemas.layout_schemas import LayoutElement
+from doc_chunking.schemas.layout_schemas import LayoutElement, FileMetadata
+from doc_chunking.schemas.schemas import FileLayoutElementCollection
 from PIL import Image
 from doc_chunking.utils.logging_config import get_logger
 from loguru import logger
@@ -46,12 +47,16 @@ class PdfPageImageSplitterProcessor(AsyncProcessor):
         # Handle the input data - it's a single file path/bytes/Path, not an async generator
         item = data
 
+        # Extract filename based on input type
         if isinstance(item, str):
             file = open(item, 'rb')
+            file_name = os.path.basename(item)
         elif isinstance(item, bytes):
             file = io.BytesIO(item)
+            file_name = "file.pdf"  # Default name for bytes input
         elif isinstance(item, Path):
             file = open(item, 'rb')
+            file_name = item.name
         else:
             raise ValueError(f"Unsupported file type: {type(item)}")
 
@@ -66,7 +71,7 @@ class PdfPageImageSplitterProcessor(AsyncProcessor):
             def getvalue(self):
                 return self.content
 
-        mock_file = MockUploadedFile(file_content, 'application/pdf', "file.pdf")
+        mock_file = MockUploadedFile(file_content, 'application/pdf', file_name)
 
 
         if hasattr(mock_file, 'getvalue'):
@@ -123,7 +128,14 @@ class PdfPageImageSplitterProcessor(AsyncProcessor):
                     element.bbox.y2 *= scale_factor
 
             await asyncio.sleep(0.01)
-            yield img, page_layout
+
+            file_layout_element_collection = FileLayoutElementCollection(
+                elements=page_layout,
+                metadata=FileMetadata(
+                    file_name=file_name
+                )
+            )
+            yield img, file_layout_element_collection
 
 
 # python -m doc_chunking.new_core.page_chunker
