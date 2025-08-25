@@ -9,6 +9,7 @@ and type checking capabilities.
 from pydantic import BaseModel, Field, field_validator, computed_field
 from typing import List, Optional, Dict, Any, Tuple, Union
 from enum import Enum
+import hashlib
 
 
 class ElementType(str, Enum):
@@ -248,6 +249,16 @@ class BoundingBox(BaseModel):
         """Pydantic config."""
         validate_assignment = True
         extra = "ignore"
+
+class FileMetadata(BaseModel):
+    file_name: Optional[str] = Field(None, description="Name of the file")
+
+    @computed_field
+    @property
+    def file_md5(self) -> str:
+        """Get the md5 hash of the file."""
+        return hashlib.md5(self.file_name.encode()).hexdigest()
+
 
 class LayoutElementMetadata(BaseModel):
     """Metadata for layout elements."""

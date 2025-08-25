@@ -4,7 +4,7 @@ from typing_extensions import Self
 from pathlib import Path
 from enum import Enum
 import hashlib
-from doc_chunking.schemas.layout_schemas import BoundingBox
+from doc_chunking.schemas.layout_schemas import BoundingBox, FileMetadata, LayoutElement
 
 import numpy as np
 from PIL import Image
@@ -132,7 +132,10 @@ class Positions(BaseModel):
             metadata=metadata
         )
 
-
+class FileLayoutElementCollection(BaseModel):
+    """A collection of layout elements."""
+    elements: List[LayoutElement] = Field(description="The layout elements in the collection")
+    metadata: Optional[FileMetadata] = Field(description="The metadata of the collection", default=None)
 
 class Section(BaseModel):
     title: str = Field(description="The title of the section", default="")
