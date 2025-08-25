@@ -30,7 +30,7 @@ class PageImageLayoutProcessor(AsyncProcessor):
 
         self.merger = PdfStyleCVMixLayoutExtractor(need_initialize=False)
 
-    async def process(self, input_data: Tuple[Image, FileLayoutElementCollection], *args, **kwargs) -> List[LayoutElement]:
+    async def process(self, input_data: Tuple[Image, FileLayoutElementCollection], *args, **kwargs) -> FileLayoutElementCollection:
         img, file_layout_element_collection = input_data
         # List[LayoutElement]]
         layout = file_layout_element_collection.elements
@@ -41,12 +41,9 @@ class PageImageLayoutProcessor(AsyncProcessor):
         # merge layout
         enriched_layout = self.merger._enrich_cv_elements_with_pdf(cv_elements=layout_result.elements, pdf_elements=layout)
 
+        file_layout_element_collection.elements = enriched_layout
 
-        import random
-        s = random.random()
-
-        await asyncio.sleep(s)
-        return enriched_layout
+        return file_layout_element_collection
 
 
 # python -m doc_chunking.core.processors.page_image_layout_processor
