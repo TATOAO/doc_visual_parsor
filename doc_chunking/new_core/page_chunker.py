@@ -5,7 +5,7 @@ import io
 import fitz  # PyMuPDF
 import os
 
-from processor_pipeline.new_core import AsyncProcessor
+from processor_pipeline.core import AsyncProcessor
 from pathlib import Path
 from typing import Any, AsyncGenerator, Union, List, Tuple
 from doc_chunking.schemas import FileInputData
@@ -140,8 +140,8 @@ class PdfPageImageSplitterProcessor(AsyncProcessor):
 
 # python -m doc_chunking.new_core.page_chunker
 if __name__ == "__main__":
-    from processor_pipeline.new_core import GraphBase
-    from processor_pipeline.new_core.graph_model import Node, Edge
+    from processor_pipeline.core import GraphBase
+    from processor_pipeline.core.graph_model import Node, Edge
     import os
     async def main():
         graph = GraphBase(
@@ -157,7 +157,7 @@ if __name__ == "__main__":
         result = await graph.execute(['tests/test_data/1-1 买卖合同（通用版）.pdf'])
         print(result)
     
-    from processor_pipeline.new_core.pipe import AsyncPipe
+    from processor_pipeline.core.pipe import AsyncPipe
     async def process_main():
         processor = PdfPageImageSplitterProcessor()
         input_pipe = AsyncPipe()

@@ -48,7 +48,7 @@ if __name__ == "__main__":
     from doc_chunking.new_core.page_image_layout_processor import PageImageLayoutProcessor
 
 
-    from processor_pipeline.new_core.graph import Graph, Node
+    from processor_pipeline.core.graph import Graph, Node
 
 
     async def main():

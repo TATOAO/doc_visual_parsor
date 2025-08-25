@@ -200,7 +200,7 @@ class PdfStyleCVMixLayoutExtractor(BaseLayoutExtractor):
             pdf_elements: PDF elements for the same page
             
         Returns:
-            List of enriched elements
+            List of enriched elements in a page
         """
         enriched_elements = []
         

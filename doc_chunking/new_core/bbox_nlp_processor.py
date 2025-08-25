@@ -1,6 +1,6 @@
 import asyncio
 from typing import Any, List, AsyncGenerator, Tuple
-from processor_pipeline.new_core import AsyncProcessor
+from processor_pipeline.core import AsyncProcessor
 from doc_chunking.new_core.page_chunker import PdfPageImageSplitterProcessor
 from doc_chunking.new_core.page_image_layout_processor import PageImageLayoutProcessor
 from doc_chunking.schemas.layout_schemas import LayoutElement
@@ -30,8 +30,8 @@ class BboxNLPProcessor(AsyncProcessor):
 
 # python -m doc_chunking.new_core.bbox_nlp_processor
 if __name__ == "__main__":
-    from processor_pipeline.new_core import GraphBase
-    from processor_pipeline.new_core.graph_model import Node, Edge
+    from processor_pipeline.core import GraphBase
+    from processor_pipeline.core.graph_model import Node, Edge
     async def main():
         graph = GraphBase(
             nodes=[
