@@ -44,8 +44,8 @@ class FigureTableImageExtractor(AsyncProcessor):
 
 
 if __name__ == "__main__":
-    from doc_chunking.new_core.page_chunker import PdfPageImageSplitterProcessor
-    from doc_chunking.new_core.page_image_layout_processor import PageImageLayoutProcessor
+    from doc_chunking.core.page_chunker import PdfPageImageSplitterProcessor
+    from doc_chunking.core.page_image_layout_processor import PageImageLayoutProcessor
 
 
     from processor_pipeline.core.graph import Graph, Node

@@ -46,22 +46,21 @@ class WordToPdfProcessor(AsyncProcessor):
         "output_type": FileInputData,
     }
 
-    async def process(self, data: AsyncGenerator[FileInputData, None]) -> AsyncGenerator[FileInputData, None]:
-        async for item in data:
+    async def process(self, item: FileInputData, *args, **kwargs) -> FileInputData:
 
-            if detect_file_type(item) == 'docx' or detect_file_type(item) == 'doc':
-                pdf_content = convert_doc_to_pdf(item)
-                yield pdf_content
+        if detect_file_type(item) == 'docx' or detect_file_type(item) == 'doc':
+            pdf_content = convert_doc_to_pdf(item)
+            yield pdf_content
 
-            elif detect_file_type(item) == 'pdf':
-                yield item
+        elif detect_file_type(item) == 'pdf':
+            yield item
 
 
 # python -m doc_chunking.core.processors.doc_to_pdf_processor
 if __name__ == "__main__":
     async def main():
         from processor_pipeline import AsyncPipeline    
-        from doc_chunking.core.processors.page_chunker import PdfPageImageSplitterProcessor
+        from doc_chunking.core.page_chunker import PdfPageImageSplitterProcessor
         pipeline = AsyncPipeline([
             WordToPdfProcessor(),
             PdfPageImageSplitterProcessor()

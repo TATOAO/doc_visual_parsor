@@ -26,15 +26,7 @@ from .api import app as fastapi_app, router as chunking_router
 # Import processors
 from .processors import extract_pdf_pages_into_images, extract_docx_content
 
-
-from .core.processors.bbox_nlp_processor import BboxNLPProcessor
-from .core.processors.page_chunker import PdfPageImageSplitterProcessor
-from .core.processors.page_image_layout_processor import PageImageLayoutProcessor
-from .core.processors.title_structure_processor import TitleStructureProcessor
-from .core.processors.rechunking_base_on_title import RechunkingBaseOnTitleProcessor
-from .core.processors.doc_to_pdf_processor import WordToPdfProcessor
-from .core.processors.table_processor import TableProcessor
-from .new_core import *
+from .core import *
 
 # Make commonly used classes and functions available at package level
 __all__ = [

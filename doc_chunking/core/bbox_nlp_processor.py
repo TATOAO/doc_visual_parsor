@@ -1,8 +1,8 @@
 import asyncio
 from typing import Any, List, AsyncGenerator, Tuple
 from processor_pipeline.core import AsyncProcessor
-from doc_chunking.new_core.page_chunker import PdfPageImageSplitterProcessor
-from doc_chunking.new_core.page_image_layout_processor import PageImageLayoutProcessor
+from doc_chunking.core.page_chunker import PdfPageImageSplitterProcessor
+from doc_chunking.core.page_image_layout_processor import PageImageLayoutProcessor
 from doc_chunking.schemas.layout_schemas import LayoutElement
 from doc_chunking.layout_structuring.title_structure_builder_llm.layout_displayer import DisplayLine
 from doc_chunking.utils.logging_config import get_logger
@@ -20,12 +20,8 @@ class BboxNLPProcessor(AsyncProcessor):
         "output_strategy": "ordered",
     }
 
-    async def process(self, input_data: List[LayoutElement], *args, **kwargs) -> AsyncGenerator[Tuple[str, LayoutElement], None]:
-        index = 0
-        for element in input_data:
-            logger.info(f"BboxNLPProcessor: {index}")
-            yield str(DisplayLine.from_layout_element(element)), element
-            index += 1
+    async def process(self, element: LayoutElement, *args, **kwargs) -> Tuple[str, LayoutElement]:
+        yield (str(DisplayLine.from_layout_element(element)), element)
             
 
 # python -m doc_chunking.new_core.bbox_nlp_processor
