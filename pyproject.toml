@@ -54,10 +54,10 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/doc-chunking"
-Documentation = "https://github.com/yourusername/doc-chunking#readme"
-Repository = "https://github.com/yourusername/doc-chunking"
-"Bug Tracker" = "https://github.com/yourusername/doc-chunking/issues"
+Homepage = "https://github.com/TATOAO/doc_visual_parsor"
+Documentation = "https://github.com/TATOAO/doc_visual_parsor#readme"
+Repository = "https://github.com/TATOAO/doc_visual_parsor"
+"Bug Tracker" = "https://github.com/TATOAO/doc_visual_parsor/issues"
 
 [project.scripts]
 doc-chunking-detect = "doc_chunking.src.example:main"

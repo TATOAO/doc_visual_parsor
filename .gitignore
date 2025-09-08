@@ -8,5 +8,6 @@ layout_displayer.txt
 **/*.pyc
 playground/
 doc_chunking.egg-info/
+model_parameters/layout_detection/
 .vscode/
 logs/
