@@ -1,1 +1,0 @@
-# Tests package for Document Visual Parser backend 
