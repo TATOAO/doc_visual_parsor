@@ -5,7 +5,7 @@ This package provides a clean, lightweight implementation for document layout de
 using ONNX models and merging with PyMuPDF content extraction.
 """
 
-from .detection import ONNXLayoutDetector
+from .onnx_layout_detector import ONNXDocLayoutYOLO
 from .merging import PdfStyleCVMixLayoutExtractor
 from .schemas import LayoutElement, LayoutExtractionResult, BoundingBox, ElementType
 

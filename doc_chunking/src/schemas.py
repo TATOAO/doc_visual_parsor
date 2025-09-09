@@ -141,12 +141,18 @@ class BoundingBox(BaseModel):
     x2: float = Field(..., description="Right coordinate", ge=0)
     y2: float = Field(..., description="Bottom coordinate", ge=0)
     
-    @field_validator('x2', 'y2')
+    @field_validator('x2')
     @classmethod
     def validate_coordinates(cls, v, info):
-        """Validate that x2 > x1 and y2 > y1."""
+        """Validate that x2 > x1."""
         if 'x1' in info.data and info.data['x1'] is not None and v <= info.data['x1']:
             raise ValueError("x2 must be greater than x1")
+        return v
+    
+    @field_validator('y2')
+    @classmethod
+    def validate_coordinates(cls, v, info):
+        """Validate that y2 > y1."""
         if 'y1' in info.data and info.data['y1'] is not None and v <= info.data['y1']:
             raise ValueError("y2 must be greater than y1")
         return v

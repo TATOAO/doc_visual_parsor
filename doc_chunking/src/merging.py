@@ -6,11 +6,20 @@ with PDF-native content enrichment for improved document analysis.
 """
 
 import logging
+import os
+import tempfile
+import io
 from pathlib import Path
 from typing import Union, List, Dict, Any, Optional, Tuple
 from copy import deepcopy
+from PIL import Image
 
-from .detection import ONNXLayoutDetector
+try:
+    import fitz  # PyMuPDF for PDF support
+except ImportError:
+    fitz = None
+
+from .onnx_layout_detector import ONNXDocLayoutYOLO
 from .schemas import (
     LayoutExtractionResult,
     LayoutElement,
@@ -201,30 +210,57 @@ class PdfStyleCVMixLayoutExtractor:
         self.device = device
 
         # Initialize ONNX detector for primary layout detection
-        self.cv_detector = ONNXLayoutDetector(
+        self.cv_detector = ONNXDocLayoutYOLO(
             model_path=model_path,
-            confidence_threshold=cv_confidence_threshold,
-            image_size=cv_image_size,
-            pdf_dpi=cv_pdf_dpi,
             device=device
         )
         
         # Initialize PDF extractor for content enrichment
         self.pdf_extractor = PdfLayoutExtractor(device=device)
         
-        if need_initialize:
-            self._initialize_detector()
-
-    def _initialize_detector(self) -> None:
-        """Initialize the component detectors."""
+    def _pdf_to_image(self, pdf_path: str, page_num: int = 0, dpi: int = 150) -> str:
+        """
+        Convert a PDF page to image for ONNX analysis.
+        
+        Args:
+            pdf_path (str): Path to the PDF file
+            page_num (int): Page number to convert (0-indexed)
+            dpi (int): DPI for the conversion
+            
+        Returns:
+            str: Path to the temporary image file
+        """
+        if fitz is None:
+            raise ImportError("PyMuPDF is required for PDF processing. Install with: pip install PyMuPDF")
+        
         try:
-            self.cv_detector._initialize_detector()
-            logger.info("ONNX detector initialized successfully")
-            logger.info("PDF extractor initialized successfully")
+            doc = fitz.open(pdf_path)
+            page = doc[page_num]
+            
+            # Calculate zoom factor based on desired DPI
+            zoom = dpi / 72.0
+            mat = fitz.Matrix(zoom, zoom)
+            
+            # Render page as image
+            pix = page.get_pixmap(matrix=mat)
+            img_data = pix.tobytes("png")
+            
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+                tmp_file.write(img_data)
+                temp_path = tmp_file.name
+            
+            doc.close()
+            return temp_path
             
         except Exception as e:
-            logger.error(f"Failed to initialize components: {str(e)}")
-            raise
+            raise ValueError(f"Could not convert PDF page to image: {e}")
+    
+    def _is_pdf_file(self, input_data: InputDataType) -> bool:
+        """Check if input data is a PDF file."""
+        if isinstance(input_data, (str, Path)):
+            return str(input_data).lower().endswith('.pdf')
+        return False
     
     def detect_layout(self, 
                       input_data: InputDataType,
@@ -241,8 +277,6 @@ class PdfStyleCVMixLayoutExtractor:
         Returns:
             LayoutExtractionResult containing detected and enriched elements
         """
-        if not self.cv_detector.is_initialized:
-            self._initialize_detector()
         
         # Use provided threshold or default
         threshold = confidence_threshold if confidence_threshold is not None else self.cv_confidence_threshold
@@ -255,8 +289,21 @@ class PdfStyleCVMixLayoutExtractor:
             
             # Step 2: Detect layout using ONNX model
             logger.info("Detecting layout with ONNX model...")
-            cv_result = self.cv_detector.detect_layout(input_data, threshold, **kwargs)
+            
+            # Convert PDF to image if needed
+            cv_input = input_data
+            temp_image_path = None
+            if self._is_pdf_file(input_data):
+                logger.info("Converting PDF to image for ONNX processing...")
+                temp_image_path = self._pdf_to_image(str(input_data))
+                cv_input = temp_image_path
+            
+            cv_result = self.cv_detector.detect_layout(cv_input, threshold, **kwargs)
             logger.info(f"Detected {len(cv_result.elements)} CV elements")
+            
+            # Clean up temporary image file
+            if temp_image_path and os.path.exists(temp_image_path):
+                os.unlink(temp_image_path)
             
             # Step 3: Enrich CV elements with PDF content
             logger.info("Enriching CV elements with PDF content...")
@@ -439,3 +486,14 @@ class PdfStyleCVMixLayoutExtractor:
         )
         
         return enriched_style
+
+# python -m doc_chunking.src.merging 
+if __name__ == "__main__":
+    # pdf_layout_extractor = PdfLayoutExtractor()
+    # result = pdf_layout_extractor.extract_layout("3800.pdf")
+
+    pdf_style_cv_mix_layout_extractor = PdfStyleCVMixLayoutExtractor(
+        model_path="model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx"
+    )
+    result = pdf_style_cv_mix_layout_extractor.detect_layout("3800.pdf")
+    print(result)

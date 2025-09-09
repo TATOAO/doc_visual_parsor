@@ -1,261 +1,131 @@
 """
 Convert DocLayout-YOLO PyTorch models to ONNX format.
 
+Require torch and DocLayout-YOLO.
+
+pip install doclayout-yolo
+
 This script converts the downloaded PyTorch models to ONNX format for use with
 the lightweight ONNX-based detection system.
 """
-
 import os
-import logging
-import torch
-import torch.onnx
-from pathlib import Path
 import argparse
-from typing import Optional
+from doclayout_yolo import YOLOv10
 
-logger = logging.getLogger(__name__)
 
-def convert_pytorch_to_onnx(
-    pytorch_model_path: str,
-    output_path: Optional[str] = None,
-    input_size: int = 1024,
-    batch_size: int = 1,
-    device: str = "cpu"
-) -> str:
+def export_to_onnx(model_path, output_path, imgsz=1024, opset=11, simplify=True, dynamic=False):
     """
-    Convert a PyTorch DocLayout-YOLO model to ONNX format.
+    Export a DocLayout-YOLO model to ONNX format.
     
     Args:
-        pytorch_model_path: Path to the PyTorch model file (.pt)
-        output_path: Output path for ONNX model (optional)
-        input_size: Input image size (default: 1024)
-        batch_size: Batch size for conversion (default: 1)
-        device: Device to use for conversion ('cpu' or 'cuda')
-        
-    Returns:
-        Path to the converted ONNX model
+        model_path (str): Path to the PyTorch model file (.pt)
+        output_path (str): Output path for the ONNX model (.onnx)
+        imgsz (int): Input image size for the model
+        opset (int): ONNX opset version
+        simplify (bool): Whether to simplify the ONNX model
+        dynamic (bool): Whether to use dynamic axes for batch size and image dimensions
     """
-    pytorch_path = Path(pytorch_model_path)
-    if not pytorch_path.exists():
-        raise FileNotFoundError(f"PyTorch model not found: {pytorch_model_path}")
+    print(f"Loading model from: {model_path}")
     
-    # Set output path if not provided
-    if output_path is None:
-        output_path = pytorch_path.parent / f"{pytorch_path.stem}.onnx"
-    else:
-        output_path = Path(output_path)
+    # Load the model
+    model = YOLOv10(model_path, task='detect')
     
-    logger.info(f"Converting PyTorch model: {pytorch_path}")
-    logger.info(f"Output ONNX model: {output_path}")
-    logger.info(f"Input size: {input_size}x{input_size}")
-    logger.info(f"Device: {device}")
+    print(f"Model loaded successfully. Exporting to ONNX format...")
+    print(f"Input image size: {imgsz}")
+    print(f"ONNX opset version: {opset}")
+    print(f"Simplify model: {simplify}")
+    print(f"Dynamic axes: {dynamic}")
     
+    # Export to ONNX
     try:
-        # Load the PyTorch model
-        logger.info("Loading PyTorch model...")
-        model = torch.load(pytorch_model_path, map_location=device, weights_only=False)
-        
-        # Handle different model formats
-        if isinstance(model, dict):
-            # If it's a state dict, we need to reconstruct the model
-            if 'model' in model:
-                model = model['model']
-            elif 'state_dict' in model:
-                # This is a state dict, we need the model architecture
-                logger.warning("Model appears to be a state dict. You may need to provide the model architecture.")
-                # For YOLO models, we'll try to use the model directly
-                model = model
-            else:
-                # Try to use the model directly
-                model = model
-        
-        # Set model to evaluation mode
-        if hasattr(model, 'eval'):
-            model.eval()
-        
-        # Convert model to float32 if it's in half precision
-        if hasattr(model, 'half') and next(model.parameters()).dtype == torch.float16:
-            logger.info("Converting model from half precision to float32...")
-            model = model.float()
-        
-        # Create dummy input tensor
-        dummy_input = torch.randn(batch_size, 3, input_size, input_size, device=device, dtype=torch.float32)
-        
-        # Convert to ONNX
-        logger.info("Converting to ONNX format...")
-        torch.onnx.export(
-            model,
-            dummy_input,
-            str(output_path),
-            export_params=True,
-            opset_version=11,  # Use ONNX opset 11 for better compatibility
-            do_constant_folding=True,
-            input_names=['input'],
-            output_names=['output'],
-            dynamic_axes={
-                'input': {0: 'batch_size'},
-                'output': {0: 'batch_size'}
-            }
+        exported_model = model.export(
+            format='onnx',
+            imgsz=imgsz,
+            opset=opset,
+            simplify=simplify,
+            dynamic=dynamic,
+            verbose=True
         )
         
-        logger.info(f"Successfully converted model to ONNX: {output_path}")
-        return str(output_path)
+        print(f"✅ Model successfully exported to: {exported_model}")
+        
+        # Verify the exported model
+        if os.path.exists(exported_model):
+            file_size = os.path.getsize(exported_model) / (1024 * 1024)  # MB
+            print(f"📁 Exported ONNX model size: {file_size:.2f} MB")
+            
+            # Test loading the ONNX model
+            try:
+                import onnx
+                onnx_model = onnx.load(exported_model)
+                print(f"✅ ONNX model validation passed")
+                print(f"📊 Model inputs: {[input.name for input in onnx_model.graph.input]}")
+                print(f"📊 Model outputs: {[output.name for output in onnx_model.graph.output]}")
+            except ImportError:
+                print("⚠️  ONNX package not available for validation")
+            except Exception as e:
+                print(f"⚠️  ONNX model validation failed: {e}")
+        
+        return exported_model
         
     except Exception as e:
-        logger.error(f"Failed to convert model: {str(e)}")
+        print(f"❌ Export failed: {e}")
         raise
 
-def convert_doclayout_yolo_specific(
-    pytorch_model_path: str,
-    output_path: Optional[str] = None,
-    input_size: int = 1024
-) -> str:
-    """
-    Convert DocLayout-YOLO model with specific handling for YOLO architecture.
-    
-    Args:
-        pytorch_model_path: Path to the PyTorch model file
-        output_path: Output path for ONNX model
-        input_size: Input image size
-        
-    Returns:
-        Path to the converted ONNX model
-    """
-    pytorch_path = Path(pytorch_model_path)
-    if output_path is None:
-        output_path = pytorch_path.parent / f"{pytorch_path.stem}.onnx"
-    else:
-        output_path = Path(output_path)
-    
-    logger.info(f"Converting DocLayout-YOLO model: {pytorch_path}")
-    
-    try:
-        # Load the model
-        model = torch.load(pytorch_model_path, map_location='cpu', weights_only=False)
-        
-        # Handle YOLO model structure
-        if isinstance(model, dict):
-            if 'model' in model:
-                yolo_model = model['model']
-            else:
-                # Try to extract the model from the checkpoint
-                yolo_model = model
-        else:
-            yolo_model = model
-        
-        # Set to evaluation mode
-        if hasattr(yolo_model, 'eval'):
-            yolo_model.eval()
-        
-        # Convert model to float32 if it's in half precision
-        if hasattr(yolo_model, 'half') and next(yolo_model.parameters()).dtype == torch.float16:
-            logger.info("Converting YOLO model from half precision to float32...")
-            yolo_model = yolo_model.float()
-        
-        # Create dummy input
-        dummy_input = torch.randn(1, 3, input_size, input_size, dtype=torch.float32)
-        
-        # Export to ONNX with YOLO-specific settings
-        torch.onnx.export(
-            yolo_model,
-            dummy_input,
-            str(output_path),
-            export_params=True,
-            opset_version=11,
-            do_constant_folding=True,
-            input_names=['images'],
-            output_names=['output'],
-            dynamic_axes={
-                'images': {0: 'batch_size'},
-                'output': {0: 'batch_size'}
-            }
-        )
-        
-        logger.info(f"Successfully converted DocLayout-YOLO to ONNX: {output_path}")
-        return str(output_path)
-        
-    except Exception as e:
-        logger.error(f"Failed to convert DocLayout-YOLO model: {str(e)}")
-        logger.info("Trying alternative conversion method...")
-        
-        # Try the generic conversion as fallback
-        return convert_pytorch_to_onnx(pytorch_model_path, str(output_path), input_size)
 
 def main():
-    """Main function for command-line usage."""
-    parser = argparse.ArgumentParser(description="Convert PyTorch models to ONNX format")
-    parser.add_argument("--input", "-i", required=True,
-                       help="Path to input PyTorch model (.pt file)")
-    parser.add_argument("--output", "-o",
-                       help="Path to output ONNX model (.onnx file)")
-    parser.add_argument("--input-size", type=int, default=1024,
-                       help="Input image size (default: 1024)")
-    parser.add_argument("--device", default="cpu",
-                       choices=["cpu", "cuda"],
-                       help="Device to use for conversion (default: cpu)")
-    parser.add_argument("--model-type", default="doclayout_yolo",
-                       choices=["doclayout_yolo", "generic"],
-                       help="Type of model to convert (default: doclayout_yolo)")
+    parser = argparse.ArgumentParser(description='Export DocLayout-YOLO model to ONNX format')
+    parser.add_argument('--model', required=True, type=str, 
+                       help='Path to the PyTorch model file (.pt)')
+    parser.add_argument('--output', default=None, type=str,
+                       help='Output path for the ONNX model (.onnx). If not specified, will use model name with .onnx extension')
+    parser.add_argument('--imgsz', default=1024, type=int,
+                       help='Input image size (default: 1024)')
+    parser.add_argument('--opset', default=11, type=int,
+                       help='ONNX opset version (default: 11)')
+    parser.add_argument('--simplify', action='store_true', default=True,
+                       help='Simplify the ONNX model (default: True)')
+    parser.add_argument('--no-simplify', dest='simplify', action='store_false',
+                       help='Disable ONNX model simplification')
+    parser.add_argument('--dynamic', action='store_true', default=False,
+                       help='Use dynamic axes for batch size and image dimensions (default: False)')
     
     args = parser.parse_args()
     
-    # Set up logging
-    logging.basicConfig(level=logging.INFO)
-    
-    try:
-        if args.model_type == "doclayout_yolo":
-            output_path = convert_doclayout_yolo_specific(
-                args.input,
-                args.output,
-                args.input_size
-            )
-        else:
-            output_path = convert_pytorch_to_onnx(
-                args.input,
-                args.output,
-                args.input_size,
-                device=args.device
-            )
-        
-        print(f"Conversion successful! ONNX model saved to: {output_path}")
-        
-    except Exception as e:
-        logger.error(f"Conversion failed: {str(e)}")
+    # Validate model path
+    if not os.path.exists(args.model):
+        print(f"❌ Model file not found: {args.model}")
         return 1
     
-    return 0
-
-def exam_output(onnx_model_path: str, pt_model_path: str):
-    """Exam the output of the ONNX model."""
-
-    # onnx model
-    import onnxruntime
-    ort_session = onnxruntime.InferenceSession(onnx_model_path)
-    input_name = ort_session.get_inputs()[0].name
-    output_name = ort_session.get_outputs()[0].name
-    dummy_input = torch.randn(1, 3, 1024, 1024, dtype=torch.float32)
-    output_onnx = ort_session.run(None, {input_name: dummy_input.numpy()})
+    # Set output path if not provided
+    if args.output is None:
+        model_name = os.path.splitext(os.path.basename(args.model))[0]
+        args.output = f"{model_name}.onnx"
     
-    # original model
-    from doclayout_yolo import YOLOv10
-    model = YOLOv10(pt_model_path)
+    # Ensure output directory exists
+    output_dir = os.path.dirname(args.output)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    try:
+        exported_path = export_to_onnx(
+            model_path=args.model,
+            output_path=args.output,
+            imgsz=args.imgsz,
+            opset=args.opset,
+            simplify=args.simplify,
+            dynamic=args.dynamic
+        )
+        
+        print(f"\n🎉 Export completed successfully!")
+        print(f"📁 ONNX model saved to: {exported_path}")
+        
+        return 0
+        
+    except Exception as e:
+        print(f"\n❌ Export failed with error: {e}")
+        return 1
 
-    output_pt = model.predict(dummy_input)
 
-    # compare the output
-    print(f"Output shape: {output_onnx.shape}")
-    print(f"Output shape: {output_pt.shape}")
-
-    # compare the output
-    print(f"Output difference: {output_onnx - output_pt}")
-
-
-# python scripts/convert_to_onnx.py --input model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.pt --output model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx --model-type doclayout_yolo
-# python -m scripts.convert_to_onnx
 if __name__ == "__main__":
-    # main()
-
-    exam_output(
-        "model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx", 
-        "model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.pt"
-    )
+    exit(main())
