@@ -41,9 +41,9 @@ def remove_circular_references(section: Section):
 
 def detect_file_type(file_input):
     """
-    Detect if the file is a PDF or DOCX based on magic number.
+    Detect if the file is a PDF, DOCX, or DOC based on magic number.
     Accepts file path (str or Path) or bytes.
-    Returns 'pdf', 'docx', or None.
+    Returns 'pdf', 'docx', 'doc', or None.
     """
     from pathlib import Path
     import os
@@ -64,4 +64,7 @@ def detect_file_type(file_input):
     # DOCX: PK\x03\x04 (zip file)
     if first_bytes.startswith(b'PK\x03\x04'):
         return 'docx'
+    # DOC (OLE Compound File): D0 CF 11 E0 A1 B1 1A E1
+    if first_bytes.startswith(b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1'):
+        return 'doc'
     return None
