@@ -181,6 +181,9 @@ class ONNXLayoutDetector:
         if len(outputs) > 0:
             detections = outputs[0]  # Shape: [1, num_detections, 85]
             
+            print(f"Debug: Raw output shape: {detections.shape}")
+            print(f"Debug: First few detections: {detections[:3] if len(detections) > 0 else 'No detections'}")
+            
             if len(detections.shape) == 3:
                 detections = detections[0]  # Remove batch dimension
             
@@ -196,7 +199,11 @@ class ONNXLayoutDetector:
                 # Get class with highest probability
                 class_scores = detection[5:]
                 class_id = np.argmax(class_scores)
-                class_confidence = class_scores[class_id]
+                
+                # Apply softmax to normalize class scores to probabilities
+                class_scores_exp = np.exp(class_scores - np.max(class_scores))  # Subtract max for numerical stability
+                class_probabilities = class_scores_exp / np.sum(class_scores_exp)
+                class_confidence = class_probabilities[class_id]
                 
                 # Skip if class confidence is too low
                 if class_confidence < self.confidence_threshold:
@@ -211,17 +218,42 @@ class ONNXLayoutDetector:
                 x2 = (x_center + width / 2) * orig_w
                 y2 = (y_center + height / 2) * orig_h
                 
+                # Clamp coordinates to image boundaries to prevent negative values
+                x1 = max(0, min(x1, orig_w))
+                y1 = max(0, min(y1, orig_h))
+                x2 = max(0, min(x2, orig_w))
+                y2 = max(0, min(y2, orig_h))
+                
+                # Ensure x2 > x1 and y2 > y1
+                if x2 <= x1:
+                    x2 = x1 + 1
+                if y2 <= y1:
+                    y2 = y1 + 1
+                
+                # Final validation - ensure coordinates are within image bounds
+                x1 = max(0, min(x1, orig_w - 1))
+                y1 = max(0, min(y1, orig_h - 1))
+                x2 = max(x1 + 1, min(x2, orig_w))
+                y2 = max(y1 + 1, min(y2, orig_h))
+                
+                # Debug output
+                print(f"Debug coordinates: x1={x1}, y1={y1}, x2={x2}, y2={y2}, orig_w={orig_w}, orig_h={orig_h}")
+                
                 # Map class ID to element type
                 element_type = DOCLAYOUT_CLASS_MAPPING.get(class_id, ElementType.UNKNOWN)
                 
                 # Create bounding box
                 bbox = BoundingBox(x1=x1, y1=y1, x2=x2, y2=y2)
                 
+                # Calculate final confidence and clamp to valid range
+                final_confidence = float(confidence * class_confidence)
+                final_confidence = max(0.0, min(1.0, final_confidence))  # Clamp to [0, 1]
+                
                 # Create layout element
                 element = LayoutElement(
                     id=element_id,
                     element_type=element_type,
-                    confidence=float(confidence * class_confidence),
+                    confidence=final_confidence,
                     bbox=bbox,
                     metadata={
                         'model_class_id': int(class_id),
@@ -412,3 +444,11 @@ class ONNXLayoutDetector:
         """Cleanup resources."""
         if hasattr(self, 'session') and self.session is not None:
             del self.session
+
+
+# python -m doc_chunking.src.detection
+if __name__ == "__main__":
+    detector = ONNXLayoutDetector(model_path="model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx")
+    detector._initialize_detector()
+    result = detector.detect_layout("/Users/tatoao_mini/Work/Kindee/合同/合同脱敏AI测试/3800.pdf")
+    print(result)
