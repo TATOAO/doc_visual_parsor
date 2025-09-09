@@ -146,6 +146,11 @@ class PdfLayoutExtractor:
         except Exception as e:
             logger.error(f"PDF extraction failed: {str(e)}")
             raise
+
+    # Backward compatibility for older scripts
+    def _detect_layout(self, input_data: InputDataType, *_, **__) -> LayoutExtractionResult:
+        """Alias for legacy API compatibility. Delegates to extract_layout."""
+        return self.extract_layout(input_data)
     
     def _sort_elements_by_reading_order(self, elements: List[LayoutElement]) -> List[LayoutElement]:
         """
@@ -187,7 +192,7 @@ class PdfStyleCVMixLayoutExtractor:
     """
 
     def __init__(self, 
-                 model_path: str,
+                 model_path: Optional[str] = None,
                  cv_confidence_threshold: float = 0.25,
                  cv_image_size: int = 1024,
                  cv_pdf_dpi: int = 150,
@@ -209,9 +214,23 @@ class PdfStyleCVMixLayoutExtractor:
         self.cv_pdf_dpi = cv_pdf_dpi
         self.device = device
 
+        # Resolve default model path if not provided
+        resolved_model_path = model_path
+        if resolved_model_path is None:
+            # Default to repo model path
+            default_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                'model_parameters', 'layout_detection',
+                'docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx'
+            )
+            # Fallback to relative if absolute resolution fails
+            if not os.path.exists(default_path):
+                default_path = 'model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx'
+            resolved_model_path = default_path
+
         # Initialize ONNX detector for primary layout detection
         self.cv_detector = ONNXDocLayoutYOLO(
-            model_path=model_path,
+            model_path=resolved_model_path,
             device=device
         )
         
@@ -486,6 +505,11 @@ class PdfStyleCVMixLayoutExtractor:
         )
         
         return enriched_style
+
+    # Backward compatibility for older scripts
+    def _detect_layout(self, input_data: InputDataType, *_, **kwargs) -> LayoutExtractionResult:
+        """Alias for legacy API compatibility. Delegates to detect_layout."""
+        return self.detect_layout(input_data, **kwargs)
 
 # python -m doc_chunking.src.merging 
 if __name__ == "__main__":
