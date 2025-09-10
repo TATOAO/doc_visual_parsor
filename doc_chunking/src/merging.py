@@ -12,7 +12,7 @@ import io
 from pathlib import Path
 from typing import Union, List, Dict, Any, Optional, Tuple
 from copy import deepcopy
-from PIL import Image
+from PIL import Image, ImageDraw
 
 try:
     import fitz  # PyMuPDF for PDF support
@@ -61,12 +61,14 @@ class PdfLayoutExtractor:
         except ImportError:
             raise ImportError("PyMuPDF is required for PDF processing")
     
-    def extract_layout(self, input_data: InputDataType) -> LayoutExtractionResult:
+    def extract_layout(self, input_data: InputDataType, max_pages: Optional[int] = None, target_dpi: int = 150) -> LayoutExtractionResult:
         """
         Extract layout elements from PDF document.
         
         Args:
             input_data: PDF input data
+            max_pages: Maximum number of pages to process (None for all pages)
+            target_dpi: Target DPI for coordinate scaling (should match CV detection DPI)
             
         Returns:
             LayoutExtractionResult containing extracted elements
@@ -82,8 +84,15 @@ class PdfLayoutExtractor:
             all_elements = []
             element_id = 0
             
+            # Calculate scaling factor from PDF coordinates (72 DPI) to target DPI
+            scale_factor = target_dpi / 72.0
+            
             # Process each page
-            for page_num in range(len(doc)):
+            num_pages = len(doc)
+            if max_pages is not None:
+                num_pages = min(num_pages, max_pages)
+            
+            for page_num in range(num_pages):
                 page = doc[page_num]
                 
                 # Extract text blocks with formatting
@@ -93,12 +102,20 @@ class PdfLayoutExtractor:
                     if "lines" in block:  # Text block
                         for line in block["lines"]:
                             for span in line["spans"]:
+                                # Scale coordinates from PDF coordinate system (72 DPI) to target DPI
+                                scaled_bbox = [
+                                    span["bbox"][0] * scale_factor,
+                                    span["bbox"][1] * scale_factor,
+                                    span["bbox"][2] * scale_factor,
+                                    span["bbox"][3] * scale_factor
+                                ]
+                                
                                 # Create layout element for each text span
                                 bbox = BoundingBox(
-                                    x1=span["bbox"][0],
-                                    y1=span["bbox"][1], 
-                                    x2=span["bbox"][2],
-                                    y2=span["bbox"][3]
+                                    x1=scaled_bbox[0],
+                                    y1=scaled_bbox[1], 
+                                    x2=scaled_bbox[2],
+                                    y2=scaled_bbox[3]
                                 )
                                 
                                 # Extract font information
@@ -193,7 +210,7 @@ class PdfStyleCVMixLayoutExtractor:
 
     def __init__(self, 
                  model_path: Optional[str] = None,
-                 cv_confidence_threshold: float = 0.25,
+                 cv_confidence_threshold: float = 0.1,  # Lowered from 0.25 to capture more detections
                  cv_image_size: int = 1024,
                  cv_pdf_dpi: int = 150,
                  device: str = "auto",
@@ -284,6 +301,7 @@ class PdfStyleCVMixLayoutExtractor:
     def detect_layout(self, 
                       input_data: InputDataType,
                       confidence_threshold: Optional[float] = None,
+                      max_pages: Optional[int] = None,
                       **kwargs) -> LayoutExtractionResult:
         """
         Detect layout using hybrid CV + PDF approach.
@@ -291,6 +309,7 @@ class PdfStyleCVMixLayoutExtractor:
         Args:
             input_data: Input data (PDF file path or bytes)
             confidence_threshold: Override default confidence threshold
+            max_pages: Maximum number of pages to process (None for all pages)
             **kwargs: Additional detection parameters
             
         Returns:
@@ -303,42 +322,82 @@ class PdfStyleCVMixLayoutExtractor:
         try:
             # Step 1: Extract PDF content using PyMuPDF
             logger.info("Extracting PDF content...")
-            pdf_result = self.pdf_extractor.extract_layout(input_data)
+            # Use same DPI as CV detection for coordinate alignment
+            pdf_result = self.pdf_extractor.extract_layout(input_data, max_pages, target_dpi=150)
             logger.info(f"Extracted {len(pdf_result.elements)} PDF elements")
             
-            # Step 2: Detect layout using ONNX model
+            # Step 2: Detect layout using ONNX model for each page
             logger.info("Detecting layout with ONNX model...")
             
-            # Convert PDF to image if needed
-            cv_input = input_data
-            temp_image_path = None
+            all_cv_elements = []
+            temp_image_paths = []
+            
             if self._is_pdf_file(input_data):
-                logger.info("Converting PDF to image for ONNX processing...")
-                temp_image_path = self._pdf_to_image(str(input_data))
-                cv_input = temp_image_path
+                # Process multiple pages
+                doc = fitz.open(str(input_data))
+                num_pages = len(doc)
+                if max_pages is not None:
+                    num_pages = min(num_pages, max_pages)
+                
+                logger.info(f"Processing {num_pages} pages...")
+                
+                for page_num in range(num_pages):
+                    logger.info(f"Processing page {page_num + 1}/{num_pages}...")
+                    
+                    # Convert PDF page to image
+                    temp_image_path = self._pdf_to_image(str(input_data), page_num)
+                    temp_image_paths.append(temp_image_path)
+                    
+                    # Run ONNX detection on this page
+                    cv_result = self.cv_detector.detect_layout(temp_image_path, threshold, **kwargs)
+
+                    # display layout for debug 
+                    """
+                    image = self.display_layout(temp_image_path, cv_result)
+                    image.save(f"cv_result_{page_num}.png")
+                    """
+                    
+                    # Update element IDs and add page metadata
+                    for element in cv_result.elements:
+                        element.id = len(all_cv_elements)
+                        if element.metadata is None:
+                            element.metadata = {}
+                        element.metadata['page_number'] = page_num
+                        element.metadata['source_page'] = page_num
+                    
+                    all_cv_elements.extend(cv_result.elements)
+                    logger.info(f"Page {page_num + 1}: detected {len(cv_result.elements)} elements")
+                
+                doc.close()
+                    
+            else:
+                # Non-PDF input, process directly
+                raise Exception("Non-PDF input, process directly")
             
-            cv_result = self.cv_detector.detect_layout(cv_input, threshold, **kwargs)
-            logger.info(f"Detected {len(cv_result.elements)} CV elements")
+            logger.info(f"Total detected {len(all_cv_elements)} CV elements across all pages")
             
-            # Clean up temporary image file
-            if temp_image_path and os.path.exists(temp_image_path):
-                os.unlink(temp_image_path)
+            # Clean up temporary image files
+            for temp_path in temp_image_paths:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
             
             # Step 3: Enrich CV elements with PDF content
             logger.info("Enriching CV elements with PDF content...")
             enriched_elements = self._enrich_cv_elements_with_pdf(
-                cv_elements=cv_result.elements,
+                cv_elements=all_cv_elements,
                 pdf_elements=pdf_result.elements
             )
+            import ipdb; ipdb.set_trace()
             logger.info(f"Created {len(enriched_elements)} enriched elements")
             
             return LayoutExtractionResult(
                 elements=enriched_elements,
                 metadata={
                     'extraction_method': 'hybrid_cv_pdf',
-                    'cv_elements_count': len(cv_result.elements),
+                    'cv_elements_count': len(all_cv_elements),
                     'pdf_elements_count': len(pdf_result.elements),
-                    'enriched_elements_count': len(enriched_elements)
+                    'enriched_elements_count': len(enriched_elements),
+                    'pages_processed': num_pages if self._is_pdf_file(input_data) else 1
                 }
             )
             
@@ -510,6 +569,104 @@ class PdfStyleCVMixLayoutExtractor:
     def _detect_layout(self, input_data: InputDataType, *_, **kwargs) -> LayoutExtractionResult:
         """Alias for legacy API compatibility. Delegates to detect_layout."""
         return self.detect_layout(input_data, **kwargs)
+    
+    def display_layout(self, image_path: str, result: LayoutExtractionResult):
+        image = Image.open(image_path)
+        draw = ImageDraw.Draw(image)
+        
+        # Color mapping for different element types
+        color_map = {
+            "Title": "red",
+            "Heading": "orange", 
+            "Plain Text": "blue",
+            "Paragraph": "green",
+            "Figure": "purple",
+            "Figure Caption": "pink",
+            "Table": "brown",
+            "Table Caption": "yellow",
+            "List": "cyan",
+            "Isolate Formula": "magenta",
+            "Formula Caption": "lime",
+            "Table Footnote": "navy",
+            "Unknown": "gray",
+            "Abandon": "black"
+        }
+        
+        # Track used label positions to avoid overlaps
+        used_positions = []
+        
+        for idx, element in enumerate(result.elements):
+            # Convert BoundingBox object to tuple format expected by draw.rectangle
+            if element.bbox:
+                bbox_coords = (element.bbox.x1, element.bbox.y1, element.bbox.x2, element.bbox.y2)
+                # Get color for this element type, default to red if not found
+                color = color_map.get(element.element_type.value, "red")
+                draw.rectangle(bbox_coords, outline=color, width=2)
+                
+                # Add text label for element type with index and confidence
+                confidence = element.confidence if element.confidence is not None else 0.0
+                label = f"{element.element_type.value} #{idx} ({confidence:.2f})"
+                
+                # Calculate text dimensions
+                text_bbox = draw.textbbox((0, 0), label)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_height = text_bbox[3] - text_bbox[1]
+                
+                # Find a good position for the label (avoid overlaps)
+                base_x = element.bbox.x1
+                base_y = element.bbox.y1 - text_height - 2
+                
+                # Try different positions to avoid overlaps
+                label_x, label_y = self._find_label_position(
+                    base_x, base_y, text_width, text_height, used_positions, image.size
+                )
+                
+                # Draw background rectangle for text
+                text_bg_coords = (label_x, label_y, label_x + text_width + 4, label_y + text_height + 2)
+                draw.rectangle(text_bg_coords, fill=color)
+                
+                # Draw text label
+                draw.text((label_x + 2, label_y), label, fill="white")
+                
+                # Record this position as used
+                used_positions.append((label_x, label_y, label_x + text_width + 4, label_y + text_height + 2))
+        
+        return image
+    
+    def _find_label_position(self, base_x, base_y, text_width, text_height, used_positions, image_size):
+        """Find a position for the label that doesn't overlap with existing labels."""
+        # Try positions in order of preference
+        positions_to_try = [
+            (base_x, base_y),  # Top-left of bbox
+            (base_x, base_y - text_height - 5),  # Above bbox
+            (base_x + text_width + 10, base_y),  # Right of bbox
+            (base_x, base_y + text_height + 5),  # Below bbox
+            (base_x - text_width - 10, base_y),  # Left of bbox
+        ]
+        
+        for pos_x, pos_y in positions_to_try:
+            # Check if position is within image bounds
+            if (pos_x >= 0 and pos_y >= 0 and 
+                pos_x + text_width + 4 <= image_size[0] and 
+                pos_y + text_height + 2 <= image_size[1]):
+                
+                # Check for overlaps with existing labels
+                new_rect = (pos_x, pos_y, pos_x + text_width + 4, pos_y + text_height + 2)
+                if not self._rectangles_overlap(new_rect, used_positions):
+                    return pos_x, pos_y
+        
+        # If no good position found, use the base position
+        return base_x, base_y
+    
+    def _rectangles_overlap(self, rect1, rect_list):
+        """Check if rect1 overlaps with any rectangle in rect_list."""
+        x1, y1, x2, y2 = rect1
+        for other_rect in rect_list:
+            ox1, oy1, ox2, oy2 = other_rect
+            # Check if rectangles overlap
+            if not (x2 <= ox1 or ox2 <= x1 or y2 <= oy1 or oy2 <= y1):
+                return True
+        return False
 
 # python -m doc_chunking.src.merging 
 if __name__ == "__main__":
@@ -517,7 +674,9 @@ if __name__ == "__main__":
     # result = pdf_layout_extractor.extract_layout("3800.pdf")
 
     pdf_style_cv_mix_layout_extractor = PdfStyleCVMixLayoutExtractor(
-        model_path="model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx"
+        model_path="model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx",
+        cv_confidence_threshold=0.1  # Use lower threshold for better detection
     )
-    result = pdf_style_cv_mix_layout_extractor.detect_layout("3800.pdf")
-    print(result)
+    result = pdf_style_cv_mix_layout_extractor.detect_layout("3800.pdf", max_pages=3)  # Test with first 3 pages
+    import json
+    json.dump(result.model_dump(), open("result.json", "w"), indent=4, ensure_ascii=False)

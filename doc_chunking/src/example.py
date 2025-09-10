@@ -104,7 +104,7 @@ def example_image_detection():
         
         # Print detected elements
         for element in result.elements:
-            logger.info(f"Element {element.id}: {element.element_type} "
+            logger.info(f"Element {element.element_type} "
                        f"at ({element.bbox.x1:.1f}, {element.bbox.y1:.1f}, "
                        f"{element.bbox.x2:.1f}, {element.bbox.y2:.1f})")
     
