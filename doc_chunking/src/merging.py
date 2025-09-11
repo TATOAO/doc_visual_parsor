@@ -20,6 +20,7 @@ except ImportError:
     fitz = None
 
 from .onnx_layout_detector import ONNXDocLayoutYOLO
+from .utils import sort_elements_by_position
 from .schemas import (
     LayoutExtractionResult,
     LayoutElement,
@@ -61,6 +62,88 @@ class PdfLayoutExtractor:
         except ImportError:
             raise ImportError("PyMuPDF is required for PDF processing")
     
+    def extract_layout_for_page(self, page, page_num: int, element_id_start: int, target_dpi: int = 150) -> Tuple[List[LayoutElement], int]:
+        """
+        Extract layout elements from a single PDF page.
+        
+        Args:
+            page: PyMuPDF page object
+            page_num: Page number (0-indexed)
+            element_id_start: Starting element ID for this page
+            target_dpi: Target DPI for coordinate scaling (should match CV detection DPI)
+            
+        Returns:
+            Tuple of (list of layout elements, next element ID)
+        """
+        page_elements = []
+        element_id = element_id_start
+        
+        # Calculate scaling factor from PDF coordinates (72 DPI) to target DPI
+        scale_factor = target_dpi / 72.0
+        
+        # Extract text blocks with formatting
+        blocks = page.get_text("dict")
+        
+        for block in blocks.get("blocks", []):
+            if "lines" in block:  # Text block
+                for line in block["lines"]:
+                    for span in line["spans"]:
+                        # Scale coordinates from PDF coordinate system (72 DPI) to target DPI
+                        scaled_bbox = [
+                            span["bbox"][0] * scale_factor,
+                            span["bbox"][1] * scale_factor,
+                            span["bbox"][2] * scale_factor,
+                            span["bbox"][3] * scale_factor
+                        ]
+                        
+                        # Create layout element for each text span
+                        bbox = BoundingBox(
+                            x1=scaled_bbox[0],
+                            y1=scaled_bbox[1], 
+                            x2=scaled_bbox[2],
+                            y2=scaled_bbox[3]
+                        )
+                        
+                        # Extract font information
+                        font_info = FontInfo(
+                            name=span.get("font"),
+                            size=span.get("size"),
+                            bold=span.get("flags", 0) & 2**4 != 0,  # Bold flag
+                            italic=span.get("flags", 0) & 2**1 != 0,  # Italic flag
+                            color=f"#{span.get('color', 0):06x}" if span.get('color') else None
+                        )
+                        
+                        # Create style information
+                        style_info = StyleInfo(
+                            font=font_info,
+                            runs=[RunInfo(
+                                text=span["text"],
+                                start_index=0,
+                                end_index=len(span["text"]),
+                                font=font_info
+                            )]
+                        )
+                        
+                        element = LayoutElement(
+                            id=element_id,
+                            element_type=ElementType.PLAIN_TEXT,  # Default type
+                            text=span["text"],
+                            bbox=bbox,
+                            confidence=1.0,  # PDF extraction is deterministic
+                            style=style_info,
+                            metadata={
+                                'page_number': page_num,
+                                'source_type': 'pdf_extraction',
+                                'block_id': block.get("number", -1),
+                                'line_id': line.get("number", -1)
+                            }
+                        )
+                        
+                        page_elements.append(element)
+                        element_id += 1
+        
+        return page_elements, element_id
+
     def extract_layout(self, input_data: InputDataType, max_pages: Optional[int] = None, target_dpi: int = 150) -> LayoutExtractionResult:
         """
         Extract layout elements from PDF document.
@@ -84,9 +167,6 @@ class PdfLayoutExtractor:
             all_elements = []
             element_id = 0
             
-            # Calculate scaling factor from PDF coordinates (72 DPI) to target DPI
-            scale_factor = target_dpi / 72.0
-            
             # Process each page
             num_pages = len(doc)
             if max_pages is not None:
@@ -95,66 +175,13 @@ class PdfLayoutExtractor:
             for page_num in range(num_pages):
                 page = doc[page_num]
                 
-                # Extract text blocks with formatting
-                blocks = page.get_text("dict")
+                # Extract elements for this page
+                page_elements, element_id = self.extract_layout_for_page(
+                    page, page_num, element_id, target_dpi
+                )
                 
-                for block in blocks.get("blocks", []):
-                    if "lines" in block:  # Text block
-                        for line in block["lines"]:
-                            for span in line["spans"]:
-                                # Scale coordinates from PDF coordinate system (72 DPI) to target DPI
-                                scaled_bbox = [
-                                    span["bbox"][0] * scale_factor,
-                                    span["bbox"][1] * scale_factor,
-                                    span["bbox"][2] * scale_factor,
-                                    span["bbox"][3] * scale_factor
-                                ]
-                                
-                                # Create layout element for each text span
-                                bbox = BoundingBox(
-                                    x1=scaled_bbox[0],
-                                    y1=scaled_bbox[1], 
-                                    x2=scaled_bbox[2],
-                                    y2=scaled_bbox[3]
-                                )
-                                
-                                # Extract font information
-                                font_info = FontInfo(
-                                    name=span.get("font"),
-                                    size=span.get("size"),
-                                    bold=span.get("flags", 0) & 2**4 != 0,  # Bold flag
-                                    italic=span.get("flags", 0) & 2**1 != 0,  # Italic flag
-                                    color=f"#{span.get('color', 0):06x}" if span.get('color') else None
-                                )
-                                
-                                # Create style information
-                                style_info = StyleInfo(
-                                    font=font_info,
-                                    runs=[RunInfo(
-                                        text=span["text"],
-                                        start_index=0,
-                                        end_index=len(span["text"]),
-                                        font=font_info
-                                    )]
-                                )
-                                
-                                element = LayoutElement(
-                                    id=element_id,
-                                    element_type=ElementType.PLAIN_TEXT,  # Default type
-                                    text=span["text"],
-                                    bbox=bbox,
-                                    confidence=1.0,  # PDF extraction is deterministic
-                                    style=style_info,
-                                    metadata={
-                                        'page_number': page_num,
-                                        'source_type': 'pdf_extraction',
-                                        'block_id': block.get("number", -1),
-                                        'line_id': line.get("number", -1)
-                                    }
-                                )
-                                
-                                all_elements.append(element)
-                                element_id += 1
+                all_elements.extend(page_elements)
+                logger.info(f"Page {page_num + 1}: extracted {len(page_elements)} elements")
             
             doc.close()
             
@@ -323,13 +350,13 @@ class PdfStyleCVMixLayoutExtractor:
             # Step 1: Extract PDF content using PyMuPDF
             logger.info("Extracting PDF content...")
             # Use same DPI as CV detection for coordinate alignment
-            pdf_result = self.pdf_extractor.extract_layout(input_data, max_pages, target_dpi=150)
-            logger.info(f"Extracted {len(pdf_result.elements)} PDF elements")
             
             # Step 2: Detect layout using ONNX model for each page
             logger.info("Detecting layout with ONNX model...")
             
             all_cv_elements = []
+            all_pdf_elements = []
+            all_enriched_elements = []
             temp_image_paths = []
             
             if self._is_pdf_file(input_data):
@@ -344,18 +371,28 @@ class PdfStyleCVMixLayoutExtractor:
                 for page_num in range(num_pages):
                     logger.info(f"Processing page {page_num + 1}/{num_pages}...")
                     
-                    # Convert PDF page to image
+                    # Convert PDF page to image first
                     temp_image_path = self._pdf_to_image(str(input_data), page_num)
                     temp_image_paths.append(temp_image_path)
+                    
+                    pdf_elements, next_id = self.pdf_extractor.extract_layout_for_page(doc[page_num], page_num, 0, 150)
+                    logger.info(f"Extracted {len(pdf_elements)} PDF elements")
+                    pdf_result = LayoutExtractionResult(elements=pdf_elements)
+                    image = self.display_layout(temp_image_path, pdf_result)
+                    image.save(f"pdf_result_{page_num}.png")
+
+                    all_pdf_elements.extend(pdf_result.elements)
+
                     
                     # Run ONNX detection on this page
                     cv_result = self.cv_detector.detect_layout(temp_image_path, threshold, **kwargs)
 
+                    # Sort CV elements by reading order (top-to-bottom, left-to-right)
+                    cv_result.elements = sort_elements_by_position(cv_result.elements)
+
                     # display layout for debug 
-                    """
                     image = self.display_layout(temp_image_path, cv_result)
                     image.save(f"cv_result_{page_num}.png")
-                    """
                     
                     # Update element IDs and add page metadata
                     for element in cv_result.elements:
@@ -367,6 +404,29 @@ class PdfStyleCVMixLayoutExtractor:
                     
                     all_cv_elements.extend(cv_result.elements)
                     logger.info(f"Page {page_num + 1}: detected {len(cv_result.elements)} elements")
+
+
+                    enriched_elements = self._enrich_cv_elements_with_pdf(
+                        cv_elements=cv_result.elements,
+                        pdf_elements=pdf_elements
+                    )
+                    
+                    # Update IDs for enriched elements to be unique across all pages
+                    for enriched_element in enriched_elements:
+                        enriched_element.id = len(all_enriched_elements)
+                        if enriched_element.metadata is None:
+                            enriched_element.metadata = {}
+                        enriched_element.metadata['page_number'] = page_num
+                        enriched_element.metadata['source_page'] = page_num
+                        all_enriched_elements.append(enriched_element)
+                    
+                    import json
+                    json.dump([enriched_element.model_dump() for enriched_element in enriched_elements], open(f"enriched_elements_{page_num}.json", "w"), indent=4, ensure_ascii=False)
+
+                    enriched_result = LayoutExtractionResult(elements=enriched_elements)
+                    image = self.display_layout(temp_image_path, enriched_result)
+                    image.save(f"enriched_elements_{page_num}.png")
+
                 
                 doc.close()
                     
@@ -375,20 +435,18 @@ class PdfStyleCVMixLayoutExtractor:
                 raise Exception("Non-PDF input, process directly")
             
             logger.info(f"Total detected {len(all_cv_elements)} CV elements across all pages")
+            logger.info(f"Total created {len(all_enriched_elements)} enriched elements across all pages")
             
             # Clean up temporary image files
             for temp_path in temp_image_paths:
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
             
-            # Step 3: Enrich CV elements with PDF content
-            logger.info("Enriching CV elements with PDF content...")
-            enriched_elements = self._enrich_cv_elements_with_pdf(
-                cv_elements=all_cv_elements,
-                pdf_elements=pdf_result.elements
-            )
-            import ipdb; ipdb.set_trace()
-            logger.info(f"Created {len(enriched_elements)} enriched elements")
+            # Use the enriched elements from page-by-page processing
+            enriched_elements = all_enriched_elements
+            logger.info(f"Using {len(enriched_elements)} enriched elements from page-by-page processing")
+
+            
             
             return LayoutExtractionResult(
                 elements=enriched_elements,

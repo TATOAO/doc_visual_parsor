@@ -74,7 +74,7 @@ def sort_elements_by_position(elements: List[LayoutElement]) -> List[LayoutEleme
     return sorted_elements
 
 
-def filter_redundant_boxes(elements: List[LayoutElement], overlap_threshold: float = 0.9) -> List[LayoutElement]:
+def filter_redundant_boxes(elements: List[LayoutElement], overlap_threshold: float = 0.5) -> List[LayoutElement]:
     """
     Filter out redundant boxes that have significant overlap.
     
@@ -86,7 +86,7 @@ def filter_redundant_boxes(elements: List[LayoutElement], overlap_threshold: flo
         Filtered list of elements with redundant boxes removed
     """
     def calculate_area_overlap(box1: BoundingBox, box2: BoundingBox) -> float:
-        """Calculate area overlap ratio between two boxes."""
+        """Calculate area overlap ratio between two boxes using IoU (Intersection over Union)."""
         # Calculate intersection area
         x1 = max(box1.x1, box2.x1)
         y1 = max(box1.y1, box2.y1)
@@ -98,17 +98,20 @@ def filter_redundant_boxes(elements: List[LayoutElement], overlap_threshold: flo
             
         intersection_area = (x2 - x1) * (y2 - y1)
         
-        # Calculate area of smaller box
+        # Calculate areas of both boxes
         box1_area = (box1.x2 - box1.x1) * (box1.y2 - box1.y1)
         box2_area = (box2.x2 - box2.x1) * (box2.y2 - box2.y1)
-        smaller_area = min(box1_area, box2_area)
         
-        return intersection_area / smaller_area if smaller_area > 0 else 0.0
+        # Calculate union area
+        union_area = box1_area + box2_area - intersection_area
+        
+        # Return IoU (Intersection over Union)
+        return intersection_area / union_area if union_area > 0 else 0.0
     
-    # Sort elements by area (larger to smaller)
+    # Sort elements by confidence and area (higher confidence and larger area first)
     sorted_elements = sorted(
         elements,
-        key=lambda e: (e.bbox.x2 - e.bbox.x1) * (e.bbox.y2 - e.bbox.y1),
+        key=lambda e: (e.confidence or 0, (e.bbox.x2 - e.bbox.x1) * (e.bbox.y2 - e.bbox.y1)),
         reverse=True
     )
     
@@ -117,9 +120,21 @@ def filter_redundant_boxes(elements: List[LayoutElement], overlap_threshold: flo
         # Check if this element overlaps significantly with any already accepted element
         is_redundant = False
         for accepted in filtered_elements:
-            if calculate_area_overlap(element.bbox, accepted.bbox) > overlap_threshold:
-                is_redundant = True
-                break
+            overlap_ratio = calculate_area_overlap(element.bbox, accepted.bbox)
+            
+            # If overlap is significant, decide which element to keep
+            if overlap_ratio > overlap_threshold:
+                # Keep the element with higher confidence, or if same confidence, keep the larger one
+                element_score = (element.confidence or 0) * (element.bbox.x2 - element.bbox.x1) * (element.bbox.y2 - element.bbox.y1)
+                accepted_score = (accepted.confidence or 0) * (accepted.bbox.x2 - accepted.bbox.x1) * (accepted.bbox.y2 - accepted.bbox.y1)
+                
+                if element_score <= accepted_score:
+                    is_redundant = True
+                    break
+                else:
+                    # Remove the accepted element and keep this one
+                    filtered_elements.remove(accepted)
+                    break
         
         if not is_redundant:
             filtered_elements.append(element)

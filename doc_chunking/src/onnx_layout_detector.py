@@ -22,6 +22,7 @@ from typing import List, Tuple, Optional
 import onnxruntime as ort
 
 from .schemas import ElementType, LayoutExtractionResult, LayoutElement, BoundingBox
+from .utils import filter_redundant_boxes
 
 # Mapping from DocLayout-YOLO class IDs to our standardized ElementType
 DOCLAYOUT_CLASS_MAPPING = {
@@ -267,12 +268,20 @@ class ONNXDocLayoutYOLO:
             )
             elements.append(element)
         
+        # Filter out redundant overlapping boxes
+        elements = filter_redundant_boxes(elements, overlap_threshold=0.5)
+        
+        # Reassign IDs after filtering
+        for i, element in enumerate(elements):
+            element.id = i
+        
         return LayoutExtractionResult(
             elements=elements,
             metadata={
                 'model': 'ONNXDocLayoutYOLO',
                 'confidence_threshold': confidence_threshold,
-                'total_detections': len(detections)
+                'total_detections': len(detections),
+                'filtered_detections': len(elements)
             }
         )
     
