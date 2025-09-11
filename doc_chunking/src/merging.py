@@ -378,8 +378,10 @@ class PdfStyleCVMixLayoutExtractor:
                     pdf_elements, next_id = self.pdf_extractor.extract_layout_for_page(doc[page_num], page_num, 0, 150)
                     logger.info(f"Extracted {len(pdf_elements)} PDF elements")
                     pdf_result = LayoutExtractionResult(elements=pdf_elements)
+                    """
                     image = self.display_layout(temp_image_path, pdf_result)
                     image.save(f"pdf_result_{page_num}.png")
+                    """
 
                     all_pdf_elements.extend(pdf_result.elements)
 
@@ -391,8 +393,10 @@ class PdfStyleCVMixLayoutExtractor:
                     cv_result.elements = sort_elements_by_position(cv_result.elements)
 
                     # display layout for debug 
+                    """
                     image = self.display_layout(temp_image_path, cv_result)
                     image.save(f"cv_result_{page_num}.png")
+                    """
                     
                     # Update element IDs and add page metadata
                     for element in cv_result.elements:
@@ -420,13 +424,6 @@ class PdfStyleCVMixLayoutExtractor:
                         enriched_element.metadata['source_page'] = page_num
                         all_enriched_elements.append(enriched_element)
                     
-                    import json
-                    json.dump([enriched_element.model_dump() for enriched_element in enriched_elements], open(f"enriched_elements_{page_num}.json", "w"), indent=4, ensure_ascii=False)
-
-                    enriched_result = LayoutExtractionResult(elements=enriched_elements)
-                    image = self.display_layout(temp_image_path, enriched_result)
-                    image.save(f"enriched_elements_{page_num}.png")
-
                 
                 doc.close()
                     
@@ -735,6 +732,6 @@ if __name__ == "__main__":
         model_path="model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx",
         cv_confidence_threshold=0.1  # Use lower threshold for better detection
     )
-    result = pdf_style_cv_mix_layout_extractor.detect_layout("3800.pdf", max_pages=3)  # Test with first 3 pages
+    result = pdf_style_cv_mix_layout_extractor.detect_layout("3800.pdf")  # Test with first 3 pages
     import json
     json.dump(result.model_dump(), open("result.json", "w"), indent=4, ensure_ascii=False)
