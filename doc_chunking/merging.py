@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Union, List, Dict, Any, Optional, Tuple
 from copy import deepcopy
 from PIL import Image, ImageDraw
-
+from typing import AsyncGenerator
 try:
     import fitz  # PyMuPDF for PDF support
 except ImportError:
@@ -324,6 +324,97 @@ class PdfStyleCVMixLayoutExtractor:
         if isinstance(input_data, (str, Path)):
             return str(input_data).lower().endswith('.pdf')
         return False
+
+    
+    async def detect_layout_page_by_page(self, 
+                                         input_data: InputDataType,
+                                         confidence_threshold: Optional[float] = 0.1,
+                                         **kwargs) -> AsyncGenerator[List[LayoutElement], None]:
+        """
+        Detect layout using hybrid CV + PDF approach, but yield elements page by page.
+        """
+        try:
+            # Step 1: Extract PDF content using PyMuPDF
+            logger.info("Extracting PDF content...")
+            # Use same DPI as CV detection for coordinate alignment
+            
+            # Step 2: Detect layout using ONNX model for each page
+            logger.info("Detecting layout with ONNX model...")
+            
+            all_cv_elements = []
+            all_pdf_elements = []
+            all_enriched_elements = []
+            temp_image_paths = []
+            
+            if self._is_pdf_file(input_data):
+                # Process multiple pages
+                doc = fitz.open(str(input_data))
+                num_pages = len(doc)
+                
+                logger.info(f"Processing {num_pages} pages...")
+                
+                for page_num in range(num_pages):
+                    logger.info(f"Processing page {page_num + 1}/{num_pages}...")
+                    
+                    # Convert PDF page to image first
+                    temp_image_path = self._pdf_to_image(str(input_data), page_num)
+                    temp_image_paths.append(temp_image_path)
+                    
+                    pdf_elements, next_id = self.pdf_extractor.extract_layout_for_page(doc[page_num], page_num, 0, 150)
+                    logger.info(f"Extracted {len(pdf_elements)} PDF elements")
+                    pdf_result = LayoutExtractionResult(elements=pdf_elements)
+                    """
+                    image = self.display_layout(temp_image_path, pdf_result)
+                    image.save(f"pdf_result_{page_num}.png")
+                    """
+
+                    all_pdf_elements.extend(pdf_result.elements)
+
+                    
+                    # Run ONNX detection on this page
+                    cv_result = self.cv_detector.detect_layout(temp_image_path, confidence_threshold, **kwargs)
+
+                    # Sort CV elements by reading order (top-to-bottom, left-to-right)
+                    cv_result.elements = sort_elements_by_position(cv_result.elements)
+
+                    # display layout for debug 
+                    """
+                    image = self.display_layout(temp_image_path, cv_result)
+                    image.save(f"cv_result_{page_num}.png")
+                    """
+                    
+                    # Update element IDs and add page metadata
+                    for element in cv_result.elements:
+                        if element.metadata is None:
+                            element.metadata = {}
+                        element.metadata['page_number'] = page_num
+                        element.metadata['source_page'] = page_num
+                    
+                    logger.info(f"Page {page_num + 1}: detected {len(cv_result.elements)} elements")
+
+                    enriched_elements = self._enrich_cv_elements_with_pdf(
+                        cv_elements=cv_result.elements,
+                        pdf_elements=pdf_elements
+                    )
+                    
+                    # Update IDs for enriched elements to be unique across all pages
+                    for enriched_element in enriched_elements:
+                        if enriched_element.metadata is None:
+                            enriched_element.metadata = {}
+                        enriched_element.metadata['page_number'] = page_num
+                        enriched_element.metadata['source_page'] = page_num
+                    
+                    yield enriched_elements
+                    
+                doc.close()
+                
+        except Exception as e:
+            logger.error(f"Hybrid layout detection failed: {str(e)}")
+            raise
+
+
+        
+
     
     def detect_layout(self, 
                       input_data: InputDataType,
@@ -625,6 +716,7 @@ class PdfStyleCVMixLayoutExtractor:
         """Alias for legacy API compatibility. Delegates to detect_layout."""
         return self.detect_layout(input_data, **kwargs)
     
+    
     def display_layout(self, image_path: str, result: LayoutExtractionResult):
         image = Image.open(image_path)
         draw = ImageDraw.Draw(image)
@@ -728,10 +820,27 @@ if __name__ == "__main__":
     # pdf_layout_extractor = PdfLayoutExtractor()
     # result = pdf_layout_extractor.extract_layout("3800.pdf")
 
-    pdf_style_cv_mix_layout_extractor = PdfStyleCVMixLayoutExtractor(
-        model_path="model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx",
-        cv_confidence_threshold=0.1  # Use lower threshold for better detection
-    )
-    result = pdf_style_cv_mix_layout_extractor.detect_layout("3800.pdf")  # Test with first 3 pages
-    import json
-    json.dump(result.model_dump(), open("result.json", "w"), indent=4, ensure_ascii=False)
+    def main():
+        pdf_style_cv_mix_layout_extractor = PdfStyleCVMixLayoutExtractor(
+            model_path="model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx",
+            cv_confidence_threshold=0.1  # Use lower threshold for better detection
+        )
+        result = pdf_style_cv_mix_layout_extractor.detect_layout("3800.pdf")  # Test with first 3 pages
+        import json
+        json.dump(result.model_dump(), open("result.json", "w"), indent=4, ensure_ascii=False)
+
+
+    async def main_page_by_page():
+        pdf_style_cv_mix_layout_extractor = PdfStyleCVMixLayoutExtractor(
+            model_path="model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx",
+            cv_confidence_threshold=0.1  # Use lower threshold for better detection
+        )
+        i = 0
+        async for result in pdf_style_cv_mix_layout_extractor.detect_layout_page_by_page("3800.pdf"):  # Test with first 3 pages
+            print(f"Page {i}: {len(result)} elements")
+            import json
+            json.dump([r.model_dump() for r in result], open(f"result_{i}.json", "w"), indent=4, ensure_ascii=False)
+            i += 1
+
+    import asyncio
+    asyncio.run(main_page_by_page())
