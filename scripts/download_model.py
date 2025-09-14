@@ -25,7 +25,7 @@ MODELS = {
         "repo_id": "juliozhao/DocLayout-YOLO-DocLayNet-Docsynth300K_pretrained", 
         "filename": "best.pt",
         "description": "DocLayNet dataset trained model"
-    }
+    },
 }
 
 def get_model_cache_dir(custom_path: str = None):

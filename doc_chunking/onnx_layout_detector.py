@@ -79,6 +79,14 @@ class ONNXDocLayoutYOLO:
         print(f"Available providers: {available_providers}")
         print(f"Using providers: {self.providers}")
         
+        # if model_path does not exist, download it from modelscope
+        if not os.path.exists(model_path):
+            from doc_chunking.utils.download_onnx import download_onnx
+            model_path = download_onnx()
+        # Verify the downloaded file exists
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Downloaded model file not found: {model_path}")
+    
         # Load the ONNX model
         self.session = ort.InferenceSession(model_path, providers=self.providers)
         
