@@ -16,7 +16,7 @@ import numpy as np
 import io
 import tempfile
 from PIL import Image
-from doc_chunking.src.schemas import LayoutExtractionResult, LayoutElement, BoundingBox, ElementType
+from doc_chunking.schemas import LayoutExtractionResult, LayoutElement, BoundingBox, ElementType
 
 logger = logging.getLogger(__name__)
 
@@ -600,8 +600,8 @@ def create_color_palette_overview(output_path: Union[str, Path], **kwargs) -> bo
 # python -m doc_chunking.utils.visualizer
 if __name__ == "__main__":
     # This would be used in conjunction with the PDF extractor
-    from doc_chunking.src.merging import PdfLayoutExtractor
-    from doc_chunking.src.merging import PdfStyleCVMixLayoutExtractor
+    from doc_chunking.merging import PdfLayoutExtractor
+    from doc_chunking.merging import PdfStyleCVMixLayoutExtractor
     
     # Test file path
     test_pdf = "3800.pdf"
