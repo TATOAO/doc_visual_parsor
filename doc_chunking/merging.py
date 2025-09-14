@@ -723,7 +723,7 @@ class PdfStyleCVMixLayoutExtractor:
                 return True
         return False
 
-# python -m doc_chunking.src.merging 
+# python -m doc_chunking.merging 
 if __name__ == "__main__":
     # pdf_layout_extractor = PdfLayoutExtractor()
     # result = pdf_layout_extractor.extract_layout("3800.pdf")
