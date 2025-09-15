@@ -39,6 +39,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+gpu = [
+    "onnxruntime-gpu>=1.15.0",
+]
 dev = [
     "pytest",
     "pytest-asyncio",
@@ -47,6 +50,7 @@ dev = [
     "mypy",
 ]
 all = [
+    "onnxruntime-gpu>=1.15.0",
     "pytest",
     "pytest-asyncio",
     "black",

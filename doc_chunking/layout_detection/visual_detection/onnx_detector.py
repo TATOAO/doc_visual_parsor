@@ -66,6 +66,8 @@ class ONNXLayoutDetector(BaseLayoutExtractor):
                  confidence_threshold: float = 0.25,
                  image_size: int = 1024,
                  pdf_dpi: int = 150,
+                 cuda_device_id: int = 0,
+                 gpu_mem_limit: Optional[int] = None,
                  **kwargs):
         """
         Initialize the ONNX-based layout detector.
@@ -76,6 +78,8 @@ class ONNXLayoutDetector(BaseLayoutExtractor):
             confidence_threshold: Minimum confidence for detections
             image_size: Input image size for the model
             pdf_dpi: DPI resolution for PDF to image conversion
+            cuda_device_id: CUDA device ID to use (default: 0)
+            gpu_mem_limit: GPU memory limit in bytes (optional)
             **kwargs: Additional parameters
         """
         super().__init__(confidence_threshold=confidence_threshold, device=device, **kwargs)
@@ -83,6 +87,8 @@ class ONNXLayoutDetector(BaseLayoutExtractor):
         self.model_path = model_path
         self.image_size = image_size
         self.pdf_dpi = pdf_dpi
+        self.cuda_device_id = cuda_device_id
+        self.gpu_mem_limit = gpu_mem_limit
         self.session = None
         self.input_name = None
         self.output_names = None
@@ -137,13 +143,28 @@ class ONNXLayoutDetector(BaseLayoutExtractor):
         logger.info(f"Using device: {device}")
         return device
     
-    def _get_onnx_providers(self) -> List[str]:
+    def _get_onnx_providers(self) -> List[Union[str, Tuple[str, Dict]]]:
         """Get ONNX Runtime providers based on device."""
         available_providers = ort.get_available_providers()
         
         if self.device == "cuda" and 'CUDAExecutionProvider' in available_providers:
-            return ['CUDAExecutionProvider', 'CPUExecutionProvider']
+            # CUDA provider with advanced options
+            cuda_options = {'device_id': self.cuda_device_id}
+            if self.gpu_mem_limit is not None:
+                cuda_options['gpu_mem_limit'] = self.gpu_mem_limit
+            
+            return [('CUDAExecutionProvider', cuda_options), 'CPUExecutionProvider']
+        elif self.device == "auto":
+            # Auto-detect: prefer CUDA if available, otherwise CPU
+            if 'CUDAExecutionProvider' in available_providers:
+                cuda_options = {'device_id': self.cuda_device_id}
+                if self.gpu_mem_limit is not None:
+                    cuda_options['gpu_mem_limit'] = self.gpu_mem_limit
+                return [('CUDAExecutionProvider', cuda_options), 'CPUExecutionProvider']
+            else:
+                return ['CPUExecutionProvider']
         else:
+            # CPU only
             return ['CPUExecutionProvider']
     
     def _preprocess_image(self, image: np.ndarray) -> np.ndarray:

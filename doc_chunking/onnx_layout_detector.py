@@ -57,24 +57,28 @@ class ONNXDocLayoutYOLO:
 
         # Set up ONNX Runtime providers
         if providers is None:
+            # Default provider priority: CUDA > CoreML > CPU
             providers = ['CUDAExecutionProvider', 'CoreMLExecutionProvider', 'CPUExecutionProvider']
         
+        # Configure providers based on device preference
         if device == "cuda":
-            providers.append('CUDAExecutionProvider')
+            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
         elif device == "cpu":
-            providers.append('CPUExecutionProvider')
+            providers = ['CPUExecutionProvider']
         elif device == "auto":
-            providers.append('CUDAExecutionProvider')
-            providers.append('CPUExecutionProvider')
+            # Auto-detect: prefer CUDA if available, otherwise CPU
+            available_providers = ort.get_available_providers()
+            if 'CUDAExecutionProvider' in available_providers:
+                providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+            else:
+                providers = ['CPUExecutionProvider']
         else:
             raise ValueError(f"Invalid device: {device}")
 
-        # remove the duplicate providers
+        # Remove duplicate providers and filter by availability
         self.providers = list(set(providers))
-        
-        # Filter available providers
         available_providers = ort.get_available_providers()
-        self.providers = [p for p in providers if p in available_providers]
+        self.providers = [p for p in self.providers if p in available_providers]
         
         print(f"Available providers: {available_providers}")
         print(f"Using providers: {self.providers}")

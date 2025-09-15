@@ -4,6 +4,7 @@ Convert DocLayout-YOLO PyTorch models to ONNX format.
 Require torch and DocLayout-YOLO.
 
 pip install doclayout-yolo
+pip install onnx
 
 This script converts the downloaded PyTorch models to ONNX format for use with
 the lightweight ONNX-based detection system.
@@ -73,6 +74,7 @@ def export_to_onnx(model_path, output_path, imgsz=1024, opset=11, simplify=True,
         raise
 
 
+# python -m scripts.convert_to_onnx --model model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.pt --output model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx
 def main():
     parser = argparse.ArgumentParser(description='Export DocLayout-YOLO model to ONNX format')
     parser.add_argument('--model', required=True, type=str, 
