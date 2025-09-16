@@ -331,7 +331,8 @@ class PdfStyleCVMixLayoutExtractor:
                             page_num: int, 
                             input_data: str, 
                             confidence_threshold: float,
-                            **kwargs) -> Tuple[List[LayoutElement], List[LayoutElement], List[LayoutElement], str]:
+                            element_id_start: int = 0,
+                            **kwargs) -> Tuple[List[LayoutElement], List[LayoutElement], List[LayoutElement], str, int]:
         """
         Process a single page and return CV elements, PDF elements, enriched elements, and temp image path.
         
@@ -340,15 +341,16 @@ class PdfStyleCVMixLayoutExtractor:
             page_num: Page number to process
             input_data: Path to input PDF file
             confidence_threshold: Confidence threshold for CV detection
+            element_id_start: Starting element ID for this page
             **kwargs: Additional detection parameters
             
         Returns:
-            Tuple of (cv_elements, pdf_elements, enriched_elements, temp_image_path)
+            Tuple of (cv_elements, pdf_elements, enriched_elements, temp_image_path, next_element_id)
         """
         # Convert PDF page to image first
         temp_image_path = self._pdf_to_image(input_data, page_num)
         
-        # Extract PDF elements
+        # Extract PDF elements (PDF elements don't need continuous IDs as they're only used for enrichment)
         pdf_elements, next_id = self.pdf_extractor.extract_layout_for_page(doc[page_num], page_num, 0, 150)
         logger.info(f"Extracted {len(pdf_elements)} PDF elements")
         
@@ -359,7 +361,10 @@ class PdfStyleCVMixLayoutExtractor:
         cv_result.elements = sort_elements_by_position(cv_result.elements)
         
         # Update element IDs and add page metadata for CV elements
+        current_element_id = element_id_start
         for element in cv_result.elements:
+            element.id = current_element_id
+            current_element_id += 1
             if element.metadata is None:
                 element.metadata = {}
             element.metadata['page_number'] = page_num
@@ -370,17 +375,21 @@ class PdfStyleCVMixLayoutExtractor:
         # Enrich CV elements with PDF content
         enriched_elements = self._enrich_cv_elements_with_pdf(
             cv_elements=cv_result.elements,
-            pdf_elements=pdf_elements
+            pdf_elements=pdf_elements,
+            element_id_start=element_id_start
         )
         
-        # Update metadata for enriched elements
+        # Update metadata for enriched elements and assign continuous IDs
+        next_enriched_id = element_id_start
         for enriched_element in enriched_elements:
+            enriched_element.id = next_enriched_id
+            next_enriched_id += 1
             if enriched_element.metadata is None:
                 enriched_element.metadata = {}
             enriched_element.metadata['page_number'] = page_num
             enriched_element.metadata['source_page'] = page_num
         
-        return cv_result.elements, pdf_elements, enriched_elements, temp_image_path
+        return cv_result.elements, pdf_elements, enriched_elements, temp_image_path, next_enriched_id
 
     async def detect_layout_page_by_page(self, 
                                          input_data: InputDataType,
@@ -399,12 +408,18 @@ class PdfStyleCVMixLayoutExtractor:
             
             logger.info(f"Processing {num_pages} pages...")
             
+            # Track element ID across pages
+            current_element_id = 0
+            
             for page_num in range(num_pages):
                 logger.info(f"Processing page {page_num + 1}/{num_pages}...")
                 
-                cv_elements, pdf_elements, enriched_elements, temp_image_path = self._process_single_page(
-                    doc, page_num, str(input_data), confidence_threshold, **kwargs
+                cv_elements, pdf_elements, enriched_elements, temp_image_path, next_element_id = self._process_single_page(
+                    doc, page_num, str(input_data), confidence_threshold, current_element_id, **kwargs
                 )
+                
+                # Update current element ID for next page
+                current_element_id = next_element_id
                 
                 yield enriched_elements
                 
@@ -452,26 +467,24 @@ class PdfStyleCVMixLayoutExtractor:
             all_enriched_elements = []
             temp_image_paths = []
             
+            element_id_counter = 0
+            
             for page_num in range(num_pages):
                 logger.info(f"Processing page {page_num + 1}/{num_pages}...")
                 
-                cv_elements, pdf_elements, enriched_elements, temp_image_path = self._process_single_page(
-                    doc, page_num, str(input_data), threshold, **kwargs
+                cv_elements, pdf_elements, enriched_elements, temp_image_path, next_element_id = self._process_single_page(
+                    doc, page_num, str(input_data), threshold, element_id_counter, **kwargs
                 )
+                
+                # Update element ID counter for next page
+                element_id_counter = next_element_id
                 
                 # Collect temp image paths for cleanup
                 temp_image_paths.append(temp_image_path)
                 
-                # Update element IDs to be unique across all pages
-                for element in cv_elements:
-                    element.id = len(all_cv_elements)
                 all_cv_elements.extend(cv_elements)
-                
                 all_pdf_elements.extend(pdf_elements)
-                
-                for enriched_element in enriched_elements:
-                    enriched_element.id = len(all_enriched_elements)
-                    all_enriched_elements.append(enriched_element)
+                all_enriched_elements.extend(enriched_elements)
             
             doc.close()
             
@@ -500,7 +513,8 @@ class PdfStyleCVMixLayoutExtractor:
     
     def _enrich_cv_elements_with_pdf(self,
                                    cv_elements: List[LayoutElement],
-                                   pdf_elements: List[LayoutElement]) -> List[LayoutElement]:
+                                   pdf_elements: List[LayoutElement],
+                                   element_id_start: int = 0) -> List[LayoutElement]:
         """
         Enrich CV-detected elements with PDF content and formatting.
         
@@ -792,6 +806,6 @@ if __name__ == "__main__":
             # if i == 2:
             #     break
 
-    # import asyncio
-    # asyncio.run(main_page_by_page())
-    main()
+    import asyncio
+    asyncio.run(main_page_by_page())
+    # main()
