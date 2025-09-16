@@ -69,7 +69,7 @@ class ONNXDocLayoutYOLO:
             # Auto-detect: prefer CUDA if available, otherwise CPU
             available_providers = ort.get_available_providers()
             if 'CUDAExecutionProvider' in available_providers:
-                providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+                providers = ['CUDAExecutionProvider']
             else:
                 providers = ['CPUExecutionProvider']
         else:

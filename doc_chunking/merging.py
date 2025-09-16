@@ -774,7 +774,7 @@ if __name__ == "__main__":
         )
         result = pdf_style_cv_mix_layout_extractor.detect_layout("3800.pdf")  # Test with first 3 pages
         import json
-        json.dump(result.model_dump(), open("result.json", "w"), indent=4, ensure_ascii=False)
+        json.dump(result.model_dump(), open("result.json", "w", encoding="utf-8"), indent=4, ensure_ascii=False)
 
 
     async def main_page_by_page():
@@ -786,11 +786,12 @@ if __name__ == "__main__":
         async for result in pdf_style_cv_mix_layout_extractor.detect_layout_page_by_page("3800.pdf"):  # Test with first 3 pages
             print(f"Page {i}: {len(result)} elements")
             import json
-            json.dump([r.model_dump() for r in result], open(f"result_{i}.json", "w"), indent=4, ensure_ascii=False)
+            json.dump([r.model_dump() for r in result], open(f"result_{i}.json", "w", encoding="utf-8"), indent=4, ensure_ascii=False)
             i += 1
 
-            if i == 2:
-                break
+            # if i == 2:
+            #     break
 
-    import asyncio
-    asyncio.run(main_page_by_page())
+    # import asyncio
+    # asyncio.run(main_page_by_page())
+    main()

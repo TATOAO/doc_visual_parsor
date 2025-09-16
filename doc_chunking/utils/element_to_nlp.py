@@ -32,10 +32,10 @@ class DisplayLine(BaseModel):
     page_number: Optional[int] = None
     element_type: str
     element_id: int
-    element_text: str
+    element_text: str = ""
     element_bbox: str
-    font_name: str
-    font_size: float
+    font_name: Optional[str] = None
+    font_size: Optional[float] = None
     font_color: Optional[str] = None
     font_italic: Optional[bool] = None
     font_underline: Optional[bool] = None
@@ -58,15 +58,15 @@ class DisplayLine(BaseModel):
             page_number=layout_element.metadata.get('page_number', None),
             element_type=layout_element.element_type,
             element_id=layout_element.id,
-            element_text=layout_element.text,
+            element_text=layout_element.text if layout_element.text else "",
             element_bbox=bbox_str,
-            font_name=layout_element.style.runs[0].font.name if layout_element.style.runs else None,
-            font_size=round(layout_element.style.runs[0].font.size, 1) if layout_element.style.runs else None,
-            font_color=layout_element.style.runs[0].font.color if layout_element.style.runs[0].font.color != '#000000' else None,
-            font_italic=layout_element.style.runs[0].font.italic if layout_element.style.runs else None,
-            font_underline=layout_element.style.runs[0].font.underline,
-            font_bold=layout_element.style.runs[0].font.bold if layout_element.style.runs else None,
-            alignment=layout_element.style.paragraph_format.alignment.value if layout_element.style.paragraph_format else None,
+            font_name=layout_element.style.runs[0].font.name if layout_element.style and layout_element.style.runs else None,
+            font_size=round(layout_element.style.runs[0].font.size, 1) if layout_element.style and layout_element.style.runs else None,
+            font_color=layout_element.style.runs[0].font.color if layout_element.style and layout_element.style.runs[0].font.color != '#000000' else None,
+            font_italic=layout_element.style.runs[0].font.italic if layout_element.style and layout_element.style.runs else None,
+            font_underline=layout_element.style.runs[0].font.underline if layout_element.style and layout_element.style.runs else None,
+            font_bold=layout_element.style.runs[0].font.bold if layout_element.style and layout_element.style.runs else None,
+            alignment=layout_element.style.paragraph_format.alignment.value if layout_element.style and layout_element.style.paragraph_format else None,
             metadata=layout_element.metadata
         )
 
@@ -82,7 +82,7 @@ class DisplayLine(BaseModel):
                 table_element_str = table_element.markdown_table
 
             return f"[id:{self.element_id}]" + \
-                (f"[page:{self.page_number}]" if self.page_number else "") + \
+                (f"[page:{self.page_number}]" if self.page_number is not None else "") + \
                 f"[type:{self.element_type}]" + \
                 (f"[pos:{self.element_bbox}]" if False else "") + \
                 f"[{self.font_name} {self.font_size}pt]" + \
@@ -95,7 +95,7 @@ class DisplayLine(BaseModel):
 
 
         return f"[id:{self.element_id}]" + \
-            (f"[page:{self.page_number}]" if self.page_number else "") + \
+            (f"[page:{self.page_number}]" if self.page_number is not None else "") + \
             f"[type:{self.element_type}]" + \
             (f"[pos:{self.element_bbox}]" if False else "") + \
             f"[{self.font_name} {self.font_size}pt]" + \
@@ -105,3 +105,14 @@ class DisplayLine(BaseModel):
             (f"[underline:{self.font_underline}]" if self.font_underline else "") + \
             (f"[alignment:{self.alignment}]" if self.alignment else "") + \
             f"{self.element_text}"
+
+# python -m doc_chunking.utils.element_to_nlp
+if __name__ == "__main__":
+    from doc_chunking.merging import PdfStyleCVMixLayoutExtractor
+    pdf_style_cv_mix_layout_extractor = PdfStyleCVMixLayoutExtractor(
+        model_path="model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx",
+        cv_confidence_threshold=0.1  # Use lower threshold for better detection
+    )
+    result = pdf_style_cv_mix_layout_extractor.detect_layout("3900.pdf", max_pages=5)  # Test with first 3 pages
+
+    print(display_layout(result))
