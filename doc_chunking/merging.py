@@ -326,6 +326,62 @@ class PdfStyleCVMixLayoutExtractor:
         return False
 
     
+    def _process_single_page(self, 
+                            doc, 
+                            page_num: int, 
+                            input_data: str, 
+                            confidence_threshold: float,
+                            **kwargs) -> Tuple[List[LayoutElement], List[LayoutElement], List[LayoutElement], str]:
+        """
+        Process a single page and return CV elements, PDF elements, enriched elements, and temp image path.
+        
+        Args:
+            doc: PyMuPDF document object
+            page_num: Page number to process
+            input_data: Path to input PDF file
+            confidence_threshold: Confidence threshold for CV detection
+            **kwargs: Additional detection parameters
+            
+        Returns:
+            Tuple of (cv_elements, pdf_elements, enriched_elements, temp_image_path)
+        """
+        # Convert PDF page to image first
+        temp_image_path = self._pdf_to_image(input_data, page_num)
+        
+        # Extract PDF elements
+        pdf_elements, next_id = self.pdf_extractor.extract_layout_for_page(doc[page_num], page_num, 0, 150)
+        logger.info(f"Extracted {len(pdf_elements)} PDF elements")
+        
+        # Run ONNX detection on this page
+        cv_result = self.cv_detector.detect_layout(temp_image_path, confidence_threshold, **kwargs)
+        
+        # Sort CV elements by reading order (top-to-bottom, left-to-right)
+        cv_result.elements = sort_elements_by_position(cv_result.elements)
+        
+        # Update element IDs and add page metadata for CV elements
+        for element in cv_result.elements:
+            if element.metadata is None:
+                element.metadata = {}
+            element.metadata['page_number'] = page_num
+            element.metadata['source_page'] = page_num
+        
+        logger.info(f"Page {page_num + 1}: detected {len(cv_result.elements)} elements")
+        
+        # Enrich CV elements with PDF content
+        enriched_elements = self._enrich_cv_elements_with_pdf(
+            cv_elements=cv_result.elements,
+            pdf_elements=pdf_elements
+        )
+        
+        # Update metadata for enriched elements
+        for enriched_element in enriched_elements:
+            if enriched_element.metadata is None:
+                enriched_element.metadata = {}
+            enriched_element.metadata['page_number'] = page_num
+            enriched_element.metadata['source_page'] = page_num
+        
+        return cv_result.elements, pdf_elements, enriched_elements, temp_image_path
+
     async def detect_layout_page_by_page(self, 
                                          input_data: InputDataType,
                                          confidence_threshold: Optional[float] = 0.1,
@@ -334,88 +390,30 @@ class PdfStyleCVMixLayoutExtractor:
         Detect layout using hybrid CV + PDF approach, but yield elements page by page.
         """
         try:
-            # Step 1: Extract PDF content using PyMuPDF
-            logger.info("Extracting PDF content...")
-            # Use same DPI as CV detection for coordinate alignment
+            if not self._is_pdf_file(input_data):
+                raise Exception("Non-PDF input, process directly")
             
-            # Step 2: Detect layout using ONNX model for each page
-            logger.info("Detecting layout with ONNX model...")
+            # Process multiple pages
+            doc = fitz.open(str(input_data))
+            num_pages = len(doc)
             
-            all_cv_elements = []
-            all_pdf_elements = []
-            all_enriched_elements = []
-            temp_image_paths = []
+            logger.info(f"Processing {num_pages} pages...")
             
-            if self._is_pdf_file(input_data):
-                # Process multiple pages
-                doc = fitz.open(str(input_data))
-                num_pages = len(doc)
+            for page_num in range(num_pages):
+                logger.info(f"Processing page {page_num + 1}/{num_pages}...")
                 
-                logger.info(f"Processing {num_pages} pages...")
+                cv_elements, pdf_elements, enriched_elements, temp_image_path = self._process_single_page(
+                    doc, page_num, str(input_data), confidence_threshold, **kwargs
+                )
                 
-                for page_num in range(num_pages):
-                    logger.info(f"Processing page {page_num + 1}/{num_pages}...")
-                    
-                    # Convert PDF page to image first
-                    temp_image_path = self._pdf_to_image(str(input_data), page_num)
-                    temp_image_paths.append(temp_image_path)
-                    
-                    pdf_elements, next_id = self.pdf_extractor.extract_layout_for_page(doc[page_num], page_num, 0, 150)
-                    logger.info(f"Extracted {len(pdf_elements)} PDF elements")
-                    pdf_result = LayoutExtractionResult(elements=pdf_elements)
-                    """
-                    image = self.display_layout(temp_image_path, pdf_result)
-                    image.save(f"pdf_result_{page_num}.png")
-                    """
-
-                    all_pdf_elements.extend(pdf_result.elements)
-
-                    
-                    # Run ONNX detection on this page
-                    cv_result = self.cv_detector.detect_layout(temp_image_path, confidence_threshold, **kwargs)
-
-                    # Sort CV elements by reading order (top-to-bottom, left-to-right)
-                    cv_result.elements = sort_elements_by_position(cv_result.elements)
-
-                    # display layout for debug 
-                    """
-                    image = self.display_layout(temp_image_path, cv_result)
-                    image.save(f"cv_result_{page_num}.png")
-                    """
-                    
-                    # Update element IDs and add page metadata
-                    for element in cv_result.elements:
-                        if element.metadata is None:
-                            element.metadata = {}
-                        element.metadata['page_number'] = page_num
-                        element.metadata['source_page'] = page_num
-                    
-                    logger.info(f"Page {page_num + 1}: detected {len(cv_result.elements)} elements")
-
-                    enriched_elements = self._enrich_cv_elements_with_pdf(
-                        cv_elements=cv_result.elements,
-                        pdf_elements=pdf_elements
-                    )
-                    
-                    # Update IDs for enriched elements to be unique across all pages
-                    for enriched_element in enriched_elements:
-                        if enriched_element.metadata is None:
-                            enriched_element.metadata = {}
-                        enriched_element.metadata['page_number'] = page_num
-                        enriched_element.metadata['source_page'] = page_num
-                    
-                    yield enriched_elements
-                    
-                doc.close()
+                yield enriched_elements
+                
+            doc.close()
                 
         except Exception as e:
             logger.error(f"Hybrid layout detection failed: {str(e)}")
             raise
 
-
-        
-
-    
     def detect_layout(self, 
                       input_data: InputDataType,
                       confidence_threshold: Optional[float] = None,
@@ -438,89 +436,44 @@ class PdfStyleCVMixLayoutExtractor:
         threshold = confidence_threshold if confidence_threshold is not None else self.cv_confidence_threshold
         
         try:
-            # Step 1: Extract PDF content using PyMuPDF
-            logger.info("Extracting PDF content...")
-            # Use same DPI as CV detection for coordinate alignment
+            if not self._is_pdf_file(input_data):
+                raise Exception("Non-PDF input, process directly")
             
-            # Step 2: Detect layout using ONNX model for each page
-            logger.info("Detecting layout with ONNX model...")
+            # Process multiple pages
+            doc = fitz.open(str(input_data))
+            num_pages = len(doc)
+            if max_pages is not None:
+                num_pages = min(num_pages, max_pages)
+            
+            logger.info(f"Processing {num_pages} pages...")
             
             all_cv_elements = []
             all_pdf_elements = []
             all_enriched_elements = []
             temp_image_paths = []
             
-            if self._is_pdf_file(input_data):
-                # Process multiple pages
-                doc = fitz.open(str(input_data))
-                num_pages = len(doc)
-                if max_pages is not None:
-                    num_pages = min(num_pages, max_pages)
+            for page_num in range(num_pages):
+                logger.info(f"Processing page {page_num + 1}/{num_pages}...")
                 
-                logger.info(f"Processing {num_pages} pages...")
+                cv_elements, pdf_elements, enriched_elements, temp_image_path = self._process_single_page(
+                    doc, page_num, str(input_data), threshold, **kwargs
+                )
                 
-                for page_num in range(num_pages):
-                    logger.info(f"Processing page {page_num + 1}/{num_pages}...")
-                    
-                    # Convert PDF page to image first
-                    temp_image_path = self._pdf_to_image(str(input_data), page_num)
-                    temp_image_paths.append(temp_image_path)
-                    
-                    pdf_elements, next_id = self.pdf_extractor.extract_layout_for_page(doc[page_num], page_num, 0, 150)
-                    logger.info(f"Extracted {len(pdf_elements)} PDF elements")
-                    pdf_result = LayoutExtractionResult(elements=pdf_elements)
-                    """
-                    image = self.display_layout(temp_image_path, pdf_result)
-                    image.save(f"pdf_result_{page_num}.png")
-                    """
-
-                    all_pdf_elements.extend(pdf_result.elements)
-
-                    
-                    # Run ONNX detection on this page
-                    cv_result = self.cv_detector.detect_layout(temp_image_path, threshold, **kwargs)
-
-                    # Sort CV elements by reading order (top-to-bottom, left-to-right)
-                    cv_result.elements = sort_elements_by_position(cv_result.elements)
-
-                    # display layout for debug 
-                    """
-                    image = self.display_layout(temp_image_path, cv_result)
-                    image.save(f"cv_result_{page_num}.png")
-                    """
-                    
-                    # Update element IDs and add page metadata
-                    for element in cv_result.elements:
-                        element.id = len(all_cv_elements)
-                        if element.metadata is None:
-                            element.metadata = {}
-                        element.metadata['page_number'] = page_num
-                        element.metadata['source_page'] = page_num
-                    
-                    all_cv_elements.extend(cv_result.elements)
-                    logger.info(f"Page {page_num + 1}: detected {len(cv_result.elements)} elements")
-
-
-                    enriched_elements = self._enrich_cv_elements_with_pdf(
-                        cv_elements=cv_result.elements,
-                        pdf_elements=pdf_elements
-                    )
-                    
-                    # Update IDs for enriched elements to be unique across all pages
-                    for enriched_element in enriched_elements:
-                        enriched_element.id = len(all_enriched_elements)
-                        if enriched_element.metadata is None:
-                            enriched_element.metadata = {}
-                        enriched_element.metadata['page_number'] = page_num
-                        enriched_element.metadata['source_page'] = page_num
-                        all_enriched_elements.append(enriched_element)
-                    
+                # Collect temp image paths for cleanup
+                temp_image_paths.append(temp_image_path)
                 
-                doc.close()
-                    
-            else:
-                # Non-PDF input, process directly
-                raise Exception("Non-PDF input, process directly")
+                # Update element IDs to be unique across all pages
+                for element in cv_elements:
+                    element.id = len(all_cv_elements)
+                all_cv_elements.extend(cv_elements)
+                
+                all_pdf_elements.extend(pdf_elements)
+                
+                for enriched_element in enriched_elements:
+                    enriched_element.id = len(all_enriched_elements)
+                    all_enriched_elements.append(enriched_element)
+            
+            doc.close()
             
             logger.info(f"Total detected {len(all_cv_elements)} CV elements across all pages")
             logger.info(f"Total created {len(all_enriched_elements)} enriched elements across all pages")
@@ -530,20 +483,14 @@ class PdfStyleCVMixLayoutExtractor:
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
             
-            # Use the enriched elements from page-by-page processing
-            enriched_elements = all_enriched_elements
-            logger.info(f"Using {len(enriched_elements)} enriched elements from page-by-page processing")
-
-            
-            
             return LayoutExtractionResult(
-                elements=enriched_elements,
+                elements=all_enriched_elements,
                 metadata={
                     'extraction_method': 'hybrid_cv_pdf',
                     'cv_elements_count': len(all_cv_elements),
-                    'pdf_elements_count': len(pdf_result.elements),
-                    'enriched_elements_count': len(enriched_elements),
-                    'pages_processed': num_pages if self._is_pdf_file(input_data) else 1
+                    'pdf_elements_count': len(all_pdf_elements),
+                    'enriched_elements_count': len(all_enriched_elements),
+                    'pages_processed': num_pages
                 }
             )
             
@@ -841,6 +788,9 @@ if __name__ == "__main__":
             import json
             json.dump([r.model_dump() for r in result], open(f"result_{i}.json", "w"), indent=4, ensure_ascii=False)
             i += 1
+
+            if i == 2:
+                break
 
     import asyncio
     asyncio.run(main_page_by_page())

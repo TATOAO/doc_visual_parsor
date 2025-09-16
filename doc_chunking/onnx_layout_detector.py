@@ -150,7 +150,10 @@ class ONNXDocLayoutYOLO:
         return input_tensor, original_image, scale
     
     def postprocess_output(self, outputs: List[np.ndarray], original_image: np.ndarray, 
-                          scale: float, conf_threshold: float = 0.2) -> List[dict]:
+                         scale: float, conf_threshold: float = 0.2,
+                         nms_iou_threshold: float = 0.3,
+                         suppress_contained: bool = True,
+                         contain_ratio: float = 0.7) -> List[dict]:
         """
         Post-process model outputs to get bounding boxes and labels.
         
@@ -159,6 +162,9 @@ class ONNXDocLayoutYOLO:
             original_image (np.ndarray): Original input image
             scale (float): Scale factor used in preprocessing
             conf_threshold (float): Confidence threshold for filtering detections
+            nms_iou_threshold (float): IOU threshold for class-wise NMS
+            suppress_contained (bool): If True, drop boxes almost fully contained in a higher-score box
+            contain_ratio (float): Fraction of inner box covered by outer box to consider containment
             
         Returns:
             List[dict]: List of detection results
@@ -204,7 +210,81 @@ class ONNXDocLayoutYOLO:
                     'class_name': self.get_class_name(int(cls))
                 })
         
-        return detections
+        # Apply class-wise NMS and containment suppression
+        if len(detections) == 0:
+            return detections
+        
+        def compute_iou(box_a: List[int], box_b: List[int]) -> float:
+            ax1, ay1, ax2, ay2 = box_a
+            bx1, by1, bx2, by2 = box_b
+            inter_x1 = max(ax1, bx1)
+            inter_y1 = max(ay1, by1)
+            inter_x2 = min(ax2, bx2)
+            inter_y2 = min(ay2, by2)
+            inter_w = max(0, inter_x2 - inter_x1)
+            inter_h = max(0, inter_y2 - inter_y1)
+            inter_area = inter_w * inter_h
+            area_a = max(0, ax2 - ax1) * max(0, ay2 - ay1)
+            area_b = max(0, bx2 - bx1) * max(0, by2 - by1)
+            union = area_a + area_b - inter_area
+            if union <= 0:
+                return 0.0
+            return inter_area / union
+        
+        def containment_fraction(inner: List[int], outer: List[int]) -> float:
+            ix1, iy1, ix2, iy2 = inner
+            ox1, oy1, ox2, oy2 = outer
+            inter_x1 = max(ix1, ox1)
+            inter_y1 = max(iy1, oy1)
+            inter_x2 = min(ix2, ox2)
+            inter_y2 = min(iy2, oy2)
+            inter_w = max(0, inter_x2 - inter_x1)
+            inter_h = max(0, inter_y2 - inter_y1)
+            inter_area = inter_w * inter_h
+            inner_area = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+            if inner_area == 0:
+                return 0.0
+            return inter_area / inner_area
+        
+        # Apply NMS across all classes (not just within each class)
+        # Sort all detections by confidence descending
+        all_dets_sorted = sorted(detections, key=lambda d: d['confidence'], reverse=True)
+        
+        final_detections: List[dict] = []
+        while all_dets_sorted:
+            current = all_dets_sorted.pop(0)
+            final_detections.append(current)
+            
+            remaining = []
+            for other in all_dets_sorted:
+                iou = compute_iou(current['bbox'], other['bbox'])
+                
+                # Skip if high overlap (NMS)
+                if iou > nms_iou_threshold:
+                    continue
+                
+                # Skip if other is contained in current (containment suppression)
+                if suppress_contained:
+                    cont = containment_fraction(other['bbox'], current['bbox'])
+                    if cont >= contain_ratio:
+                        continue
+                
+                # Skip if current is contained in other (reverse containment)
+                if suppress_contained:
+                    cont = containment_fraction(current['bbox'], other['bbox'])
+                    if cont >= contain_ratio:
+                        # Current is contained in other, so we should keep other instead
+                        # Remove current from final_detections and add other
+                        if final_detections and final_detections[-1] == current:
+                            final_detections.pop()
+                        remaining.insert(0, other)  # Add other at the beginning
+                        continue
+                
+                remaining.append(other)
+            
+            all_dets_sorted = remaining
+        
+        return final_detections
     
     def get_class_name(self, class_id: int) -> str:
         """
@@ -221,13 +301,19 @@ class ONNXDocLayoutYOLO:
         else:
             return f'class_{class_id}'
     
-    def predict(self, image_path: str, conf_threshold: float = 0.2) -> List[dict]:
+    def predict(self, image_path: str, conf_threshold: float = 0.2,
+                nms_iou_threshold: float = 0.5,
+                suppress_contained: bool = True,
+                contain_ratio: float = 0.9) -> List[dict]:
         """
         Run inference on an image.
         
         Args:
             image_path (str): Path to the input image
             conf_threshold (float): Confidence threshold
+            nms_iou_threshold (float): IOU threshold for class-wise NMS
+            suppress_contained (bool): If True, drop boxes almost fully contained
+            contain_ratio (float): Fraction of inner box covered by outer box
             
         Returns:
             List[dict]: Detection results
@@ -243,7 +329,15 @@ class ONNXDocLayoutYOLO:
         print(f"Inference time: {inference_time:.3f}s")
         
         # Post-process results
-        detections = self.postprocess_output(outputs, original_image, scale, conf_threshold)
+        detections = self.postprocess_output(
+            outputs,
+            original_image,
+            scale,
+            conf_threshold=conf_threshold,
+            nms_iou_threshold=nms_iou_threshold,
+            suppress_contained=suppress_contained,
+            contain_ratio=contain_ratio,
+        )
         
         return detections
     

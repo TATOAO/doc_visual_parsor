@@ -9,7 +9,7 @@ from typing import List, Dict, Tuple
 from ..schemas import LayoutElement, BoundingBox
 
 
-def sort_elements_by_position(elements: List[LayoutElement]) -> List[LayoutElement]:
+def sort_elements_by_position(elements: List[LayoutElement], reindex: bool = True) -> List[LayoutElement]:
     """
     Sort elements by natural reading order (top-to-bottom, left-to-right).
     Uses a sophisticated algorithm that:
@@ -17,6 +17,14 @@ def sort_elements_by_position(elements: List[LayoutElement]) -> List[LayoutEleme
     2. Groups elements into lines based on vertical overlap within each page
     3. Sorts elements within each line from left to right
     4. Handles elements that span multiple lines
+    5. Optionally reindexes element IDs in reading order
+    
+    Args:
+        elements: List of layout elements to sort
+        reindex: If True, reindex element IDs in reading order (default: True)
+    
+    Returns:
+        List of sorted elements with optionally reindexed IDs
     """
     if not elements:
         return elements
@@ -70,6 +78,20 @@ def sort_elements_by_position(elements: List[LayoutElement]) -> List[LayoutEleme
 
         # Add the sorted elements from this page to the final result
         sorted_elements.extend([elem for line in lines for elem in line])
+
+    # Reindex elements if requested
+    if reindex:
+        for i, elem in enumerate(sorted_elements):
+            # Create a new element with updated ID
+            sorted_elements[i] = LayoutElement(
+                id=i,
+                element_type=elem.element_type,
+                text=elem.text,
+                bbox=elem.bbox,
+                confidence=elem.confidence,
+                style=elem.style,
+                metadata=elem.metadata
+            )
 
     return sorted_elements
 
