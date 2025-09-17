@@ -1,10 +1,13 @@
 import os
 from modelscope import snapshot_download
 
-def download_onnx(cache_dir: str = './model_parameters/layout_detection', model_name: str = 'docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx'):
+def download_onnx(cache_dir: str = './model_parameters/layout_detection', 
+        model_name: str = 'docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx',
+        model_repo: str = 'tatoao/DocLayout-YOLO-DocStructBench-ONNX'
+        ):
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
-    model_dir = snapshot_download('tatoao/DocLayout-YOLO-DocStructBench-ONNX',
+    model_dir = snapshot_download(model_repo,
                                   cache_dir=cache_dir)
 
     model_path = os.path.join(model_dir, model_name)
@@ -13,6 +16,10 @@ def download_onnx(cache_dir: str = './model_parameters/layout_detection', model_
     dest_path = os.path.join(cache_dir, model_name)
     import shutil
     shutil.move(model_path, dest_path)
+
+    # add a .gitignore file to the cache_dir
+    with open(os.path.join(cache_dir, '.gitignore'), 'w') as f:
+        f.write('*')
     
     return dest_path
 

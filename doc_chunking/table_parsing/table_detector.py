@@ -336,3 +336,7 @@ class ONNXTableDetector:
             'model_loaded': self.session is not None,
             'providers': self.session.get_providers() if self.session else []
         }
+
+if __name__ == "__main__":
+    detector = ONNXTableDetector(model_path="table_detector.onnx")
+    detector.detect_tables("test.jpg")
