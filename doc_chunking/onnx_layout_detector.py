@@ -68,10 +68,13 @@ class ONNXDocLayoutYOLO:
         elif device == "auto":
             # Auto-detect: prefer CUDA if available, otherwise CPU
             available_providers = ort.get_available_providers()
-            if 'CUDAExecutionProvider' in available_providers:
+            if 'CoreMLExecutionProvider' in available_providers:
+                providers = ['CoreMLExecutionProvider']
+            elif 'CUDAExecutionProvider' in available_providers:
                 providers = ['CUDAExecutionProvider']
             else:
                 providers = ['CPUExecutionProvider']
+
         else:
             raise ValueError(f"Invalid device: {device}")
 
