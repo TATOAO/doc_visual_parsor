@@ -11,6 +11,9 @@ import onnxruntime as ort
 from typing import List, Tuple, Optional, Union, Any
 from pathlib import Path
 import logging
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from PIL import Image
 
 from .schemas import TableElement, TableType
 from ..schemas import BoundingBox, ElementType
@@ -27,7 +30,7 @@ class ONNXTableDetector:
     
     def __init__(self, 
                  model_path: Optional[str] = None,
-                 confidence_threshold: float = 0.5,
+                 confidence_threshold: float = 0.3,
                  device: str = "auto",
                  **kwargs):
         """
@@ -47,15 +50,24 @@ class ONNXTableDetector:
         self.output_names = None
         self.input_size = 640  # Default input size
         
-        # Initialize model if path provided
-        if self.model_path and os.path.exists(self.model_path):
+        # Initialize model if path provided or use default
+        if self.model_path:
+            if os.path.exists(self.model_path):
+                self._initialize_model()
+        else:
+            # Use default model - will be downloaded in _initialize_model
             self._initialize_model()
     
     def _initialize_model(self) -> None:
         """Initialize the ONNX model."""
         try:
             # Setup providers
-            providers = self._get_onnx_providers()
+            providers = self._get_onnx_providers(self.device)
+
+            if not self.model_path or not os.path.exists(self.model_path):
+                from doc_chunking.utils.download_onnx import download_onnx
+                self.model_path = download_onnx(model_name='paddle_table_cell_det.onnx')
+
             
             # Load ONNX model
             logger.info(f"Loading table detection model from: {self.model_path}")
@@ -65,8 +77,14 @@ class ONNXTableDetector:
             )
             
             # Get input/output information
-            self.input_name = self.session.get_inputs()[0].name
+            self.input_names = [input.name for input in self.session.get_inputs()]
             self.output_names = [output.name for output in self.session.get_outputs()]
+            
+            # Log input/output info for debugging
+            logger.info(f"Model inputs: {self.input_names}")
+            logger.info(f"Model outputs: {self.output_names}")
+            for i, input_info in enumerate(self.session.get_inputs()):
+                logger.info(f"Input {i}: {input_info.name}, shape: {input_info.shape}, type: {input_info.type}")
             
             # Get input shape
             input_shape = self.session.get_inputs()[0].shape
@@ -81,14 +99,32 @@ class ONNXTableDetector:
             logger.error(f"Failed to initialize table detection model: {str(e)}")
             raise
     
-    def _get_onnx_providers(self) -> List[str]:
+    def _get_onnx_providers(self, device: str) -> List[str]:
         """Get ONNX Runtime providers based on device."""
         available_providers = ort.get_available_providers()
         
-        if self.device == "cuda" and 'CUDAExecutionProvider' in available_providers:
-            return ['CUDAExecutionProvider', 'CPUExecutionProvider']
-        else:
-            return ['CPUExecutionProvider']
+        # Default provider priority: CUDA > CoreML > CPU
+        providers = ['CUDAExecutionProvider', 'CoreMLExecutionProvider', 'CPUExecutionProvider']
+        
+        # Configure providers based on device preference
+        if device == "cuda":
+            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        elif device == "cpu":
+            providers = ['CPUExecutionProvider']
+        elif device == "auto":
+            # Auto-detect: prefer CUDA if available, otherwise CPU
+            available_providers = ort.get_available_providers()
+            if 'CoreMLExecutionProvider' in available_providers:
+                providers = ['CoreMLExecutionProvider']
+            elif 'CUDAExecutionProvider' in available_providers:
+                providers = ['CUDAExecutionProvider']
+            else:
+                providers = ['CPUExecutionProvider']
+        
+        return providers
+
+        
+            
     
     def _preprocess_image(self, image: np.ndarray) -> Tuple[np.ndarray, float, float]:
         """
@@ -143,53 +179,45 @@ class ONNXTableDetector:
         """
         tables = []
         
-        # YOLO ONNX outputs typically contain:
-        # - boxes: [batch, num_detections, 4] (x1, y1, x2, y2)
-        # - scores: [batch, num_detections]
-        # - classes: [batch, num_detections]
-        
-        if len(outputs) >= 3:
-            boxes = outputs[0]  # [batch, num_detections, 4]
-            scores = outputs[1]  # [batch, num_detections]
-            classes = outputs[2]  # [batch, num_detections]
+        if len(outputs) >= 2:
+            # PaddlePaddle detection output format:
+            # outputs[0]: [num_detections, 6] - [x1, y1, x2, y2, confidence, class_id]
+            # outputs[1]: [1] - number of valid detections
             
-            # Remove batch dimension
-            boxes = boxes[0]  # [num_detections, 4]
-            scores = scores[0]  # [num_detections]
-            classes = classes[0]  # [num_detections]
+            detections = outputs[0]  # [num_detections, 6]
+            num_detections = int(outputs[1][0]) if len(outputs[1]) > 0 else len(detections)
             
-            for i in range(len(boxes)):
-                if scores[i] >= self.confidence_threshold:
-                    # Scale coordinates back to original image size
-                    x1, y1, x2, y2 = boxes[i]
-                    x1 = x1 / scale_x
-                    y1 = y1 / scale_y
-                    x2 = x2 / scale_x
-                    y2 = y2 / scale_y
+            for i in range(min(num_detections, len(detections))):
+                detection = detections[i]
+                if len(detection) >= 6:
+                    # Format: [class_id, confidence, x1, y1, x2, y2]
+                    class_id, confidence, x1, y1, x2, y2 = detection[:6]
                     
-                    # Clip coordinates to image bounds
-                    x1 = max(0, min(x1, original_shape[1]))
-                    y1 = max(0, min(y1, original_shape[0]))
-                    x2 = max(0, min(x2, original_shape[1]))
-                    y2 = max(0, min(y2, original_shape[0]))
-                    
-                    # Skip invalid boxes
-                    if x2 <= x1 or y2 <= y1:
-                        continue
-                    
-                    # Create table element
-                    table = TableElement(
-                        id=len(tables),
-                        bbox=(float(x1), float(y1), float(x2), float(y2)),
-                        confidence=float(scores[i]),
-                        metadata={
-                            'detection_method': 'onnx_table_detection',
-                            'class_id': int(classes[i]),
-                            'original_shape': original_shape
-                        }
-                    )
-                    
-                    tables.append(table)
+                    if confidence >= self.confidence_threshold:
+                        # The coordinates are already in original image space for this model
+                        # No scaling needed - just clamp to image bounds
+                        x1 = max(0, min(x1, original_shape[1]))
+                        y1 = max(0, min(y1, original_shape[0]))
+                        x2 = max(0, min(x2, original_shape[1]))
+                        y2 = max(0, min(y2, original_shape[0]))
+                        
+                        # Skip invalid boxes
+                        if x2 <= x1 or y2 <= y1:
+                            continue
+                        
+                        # Create table element
+                        table = TableElement(
+                            id=len(tables),
+                            bbox=(float(x1), float(y1), float(x2), float(y2)),
+                            confidence=float(confidence),
+                            metadata={
+                                'detection_method': 'onnx_table_detection',
+                                'class_id': int(class_id),
+                                'original_shape': original_shape
+                            }
+                        )
+                        
+                        tables.append(table)
         
         return tables
     
@@ -226,8 +254,30 @@ class ONNXTableDetector:
         input_tensor, scale_x, scale_y = self._preprocess_image(img)
         
         try:
+            # Prepare input feed dict
+            input_feed = {}
+            
+            # Add image input
+            if 'image' in self.input_names:
+                input_feed['image'] = input_tensor
+            else:
+                # Fallback to first input
+                input_feed[self.input_names[0]] = input_tensor
+            
+            # Add scale factor if required
+            if 'scale_factor' in self.input_names:
+                # Create scale factor tensor [scale_y, scale_x]
+                scale_factor = np.array([[scale_y, scale_x]], dtype=np.float32)
+                input_feed['scale_factor'] = scale_factor
+            
+            # Add im_shape if required (original image shape)
+            if 'im_shape' in self.input_names:
+                # Create im_shape tensor [height, width]
+                im_shape = np.array([[original_shape[0], original_shape[1]]], dtype=np.float32)
+                input_feed['im_shape'] = im_shape
+            
             # Run inference
-            outputs = self.session.run(self.output_names, {self.input_name: input_tensor})
+            outputs = self.session.run(self.output_names, input_feed)
             
             # Postprocess outputs
             tables = self._postprocess_detections(outputs, original_shape, scale_x, scale_y)
@@ -325,10 +375,116 @@ class ONNXTableDetector:
         
         return image[y1:y2, x1:x2]
     
+    def visualize_detections(self, 
+                            image: Union[str, np.ndarray, Path], 
+                            detections: List[TableElement],
+                            output_path: Optional[str] = None,
+                            show_confidence: bool = True,
+                            box_color: str = 'red',
+                            text_color: str = 'white',
+                            box_thickness: int = 2,
+                            font_size: int = 8) -> None:
+        """
+        Visualize detected cells on the image.
+        
+        Args:
+            image: Input image (file path, numpy array, or Path)
+            detections: List of detected cell elements
+            output_path: Path to save the visualization (optional)
+            show_confidence: Whether to show confidence scores
+            box_color: Color of bounding boxes
+            text_color: Color of confidence text
+            box_thickness: Thickness of bounding box lines
+            font_size: Font size for confidence text
+        """
+        # Load image
+        if isinstance(image, (str, Path)):
+            img = cv2.imread(str(image))
+            if img is None:
+                raise ValueError(f"Could not load image from {image}")
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        else:
+            img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) if len(image.shape) == 3 else image
+        
+        # Create figure and axis
+        fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+        ax.imshow(img_rgb)
+        ax.set_title(f'Cell Detection Results - {len(detections)} cells detected', fontsize=16)
+        
+        # Draw bounding boxes
+        for i, detection in enumerate(detections):
+            x1, y1, x2, y2 = detection.bbox
+            width = x2 - x1
+            height = y2 - y1
+            
+            # Create rectangle patch
+            rect = patches.Rectangle(
+                (x1, y1), width, height,
+                linewidth=box_thickness,
+                edgecolor=box_color,
+                facecolor='none',
+                alpha=0.8
+            )
+            ax.add_patch(rect)
+            
+            # Add confidence text if requested
+            if show_confidence:
+                confidence_text = f'{detection.confidence:.3f}'
+                ax.text(
+                    x1, y1 - 5,
+                    confidence_text,
+                    color=text_color,
+                    fontsize=font_size,
+                    bbox=dict(boxstyle="round,pad=0.3", facecolor=box_color, alpha=0.7),
+                    verticalalignment='top'
+                )
+            
+            # Add cell ID
+            ax.text(
+                x1 + 5, y1 + 15,
+                f'Cell {i+1}',
+                color=text_color,
+                fontsize=font_size,
+                bbox=dict(boxstyle="round,pad=0.3", facecolor='blue', alpha=0.7)
+            )
+        
+        # Remove axis ticks and labels
+        ax.set_xticks([])
+        ax.set_yticks([])
+        
+        # Add statistics text
+        stats_text = f'Total cells: {len(detections)}\n'
+        if detections:
+            avg_conf = sum(d.confidence for d in detections) / len(detections)
+            max_conf = max(d.confidence for d in detections)
+            min_conf = min(d.confidence for d in detections)
+            stats_text += f'Avg confidence: {avg_conf:.3f}\n'
+            stats_text += f'Max confidence: {max_conf:.3f}\n'
+            stats_text += f'Min confidence: {min_conf:.3f}'
+        
+        ax.text(
+            0.02, 0.98, stats_text,
+            transform=ax.transAxes,
+            fontsize=10,
+            verticalalignment='top',
+            bbox=dict(boxstyle="round,pad=0.5", facecolor='white', alpha=0.8)
+        )
+        
+        plt.tight_layout()
+        
+        # Save or show
+        if output_path:
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            print(f"Visualization saved to: {output_path}")
+        else:
+            plt.show()
+        
+        plt.close()
+    
     def get_detector_info(self) -> dict:
-        """Get information about the table detector."""
+        """Get information about the cell detector."""
         return {
-            'detector_type': 'onnx_table_detection',
+            'detector_type': 'onnx_cell_detection',
             'model_path': self.model_path,
             'device': self.device,
             'confidence_threshold': self.confidence_threshold,
@@ -337,6 +493,27 @@ class ONNXTableDetector:
             'providers': self.session.get_providers() if self.session else []
         }
 
+# python -m doc_chunking.table_parsing.table_detector
 if __name__ == "__main__":
-    detector = ONNXTableDetector(model_path="table_detector.onnx")
-    detector.detect_tables("test.jpg")
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    
+    detector = ONNXTableDetector(model_path=None, device="auto")
+    cells = detector.detect_tables("demo_table_wo_line.png")
+    
+    print(f"\n=== Cell Detection Results ===")
+    print(f"Found {len(cells)} cells")
+    for i, cell in enumerate(cells):
+        print(f"Cell {i+1}: bbox={cell.bbox}, confidence={cell.confidence:.3f}")
+    print("=== End Results ===\n")
+    
+    # Create visualization
+    print("Creating visualization...")
+    detector.visualize_detections(
+        "demo_table_wo_line.png", 
+        cells, 
+        output_path="cell_detection_visualization.png",
+        show_confidence=True,
+        box_color='red',
+        box_thickness=2
+    )

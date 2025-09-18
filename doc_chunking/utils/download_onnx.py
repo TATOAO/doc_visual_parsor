@@ -7,6 +7,12 @@ def download_onnx(cache_dir: str = './model_parameters/layout_detection',
         ):
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
+
+
+    # check if the model_name is already in the cache_dir
+    if os.path.exists(os.path.join(cache_dir, model_name)):
+        return os.path.join(cache_dir, model_name)
+
     model_dir = snapshot_download(model_repo,
                                   cache_dir=cache_dir)
 
