@@ -6,9 +6,7 @@ using ONNX models without PyTorch dependencies.
 """
 
 from .table_detector import ONNXTableDetector
-from .table_structure import ONNXTableStructureRecognizer
-from .table_ocr import TableOCRProcessor
-from .table_parser import TableParser
+from .table_extractor import TableExtractor
 from .schemas import TableElement, TableStructure, TableCell, TableRow, TableColumn
 
 __all__ = [
