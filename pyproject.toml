@@ -36,6 +36,7 @@ dependencies = [
     "opencv-python>=4.5.0",
     "onnxruntime>=1.15.0",
     "modelscope",
+    "pdfplumber",
 ]
 
 [project.optional-dependencies]

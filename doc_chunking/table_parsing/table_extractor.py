@@ -18,6 +18,7 @@ from typing import List, Dict, Any, Optional, Tuple, Union
 import logging
 import fitz  # PyMuPDF
 import pdfplumber
+from doc_chunking.schemas import LayoutElement
 from PIL import Image
 import io
 
@@ -73,6 +74,52 @@ class PaddleOCRCellDetector:
         except Exception as e:
             logger.error(f"Failed to initialize PaddleOCR model: {str(e)}")
             raise
+
+    def extract_table_image(self, pdf_path: Union[str, Path], layout_element: LayoutElement) -> str:
+        """
+        Extract table image from PDF using the same coordinate system as merging.py
+        
+        Args:
+            pdf_path: Path to PDF file
+            layout_element: Layout element containing table bbox and metadata
+            
+        Returns:
+            Path to temporary image file
+        """
+        page_number = layout_element.metadata["page_number"]
+        bbox = layout_element.bbox
+        
+        # Open PDF and get the specific page
+        doc = fitz.open(pdf_path)
+        page = doc[page_number]
+        
+        # Convert bbox coordinates back to PDF coordinate system (72 DPI)
+        # The bbox coordinates are in 150 DPI, so we need to scale them back to 72 DPI
+        scale_factor = 150.0 / 72.0  # Same as in merging.py
+        pdf_bbox = fitz.Rect(
+            bbox.x1 / scale_factor,
+            bbox.y1 / scale_factor, 
+            bbox.x2 / scale_factor,
+            bbox.y2 / scale_factor
+        )
+        
+        # Calculate zoom factor for 150 DPI (same as merging.py)
+        zoom = 150.0 / 72.0
+        mat = fitz.Matrix(zoom, zoom)
+        
+        # Render the page with the specific bbox clipped
+        pix = page.get_pixmap(matrix=mat, clip=pdf_bbox)
+        
+        # Save to temporary file
+        temp_fd, temp_image_path = tempfile.mkstemp(suffix='.png', prefix='table_page_')
+        os.close(temp_fd)
+        pix.save(temp_image_path)
+        
+        # Close the document
+        doc.close()
+        
+        return temp_image_path
+
     
     def detect_cells(self, image_path: Union[str, Path]) -> List[Dict[str, Any]]:
         """
@@ -91,12 +138,35 @@ class PaddleOCRCellDetector:
             # Run cell detection
             logger.info(f"Running cell detection on: {image_path}")
             output = self.model.predict(str(image_path), threshold=self.threshold, batch_size=self.batch_size)
+
+            # for debug
+            # output[0].save_to_img("./output/")
             
             # Extract cell information
             cells = []
             for res in output:
-                # Get detection results
-                if hasattr(res, 'boxes') and hasattr(res, 'scores'):
+                # Check if result is a dictionary with 'boxes' key
+                if isinstance(res, dict) and 'boxes' in res:
+                    boxes = res['boxes']
+                    for i, box_info in enumerate(boxes):
+                        # Extract coordinates and score from the box info
+                        if 'coordinate' in box_info and 'score' in box_info:
+                            coords = box_info['coordinate']
+                            score = box_info['score']
+                            
+                            # Convert box format (x1, y1, x2, y2)
+                            x1, y1, x2, y2 = coords[:4] if len(coords) >= 4 else (0, 0, 0, 0)
+                            
+                            cell_info = {
+                                'id': i,
+                                'bbox': (float(x1), float(y1), float(x2), float(y2)),
+                                'confidence': float(score),
+                                'area': (x2 - x1) * (y2 - y1)
+                            }
+                            cells.append(cell_info)
+                
+                # Fallback: Check if result has attributes (old format)
+                elif hasattr(res, 'boxes') and hasattr(res, 'scores'):
                     for i, (box, score) in enumerate(zip(res.boxes, res.scores)):
                         # Convert box format (assuming x1, y1, x2, y2)
                         x1, y1, x2, y2 = box[:4] if len(box) >= 4 else (0, 0, 0, 0)
@@ -454,30 +524,18 @@ class TableExtractor:
 
 
 # python -m doc_chunking.table_parsing.table_extractor
+def main():
+    table_extractor = PaddleOCRCellDetector()
+    table_extractor._initialize_model()
+    pdf_path = "3900.pdf"
+    element = json.load(open("result_2.json", "r", encoding="utf-8"))[0]
+    element = LayoutElement(**element)
+    # print(element)
+    temp_image_path = table_extractor.extract_table_image(pdf_path, element)
+    print(f"Table image saved to: {temp_image_path}")
+    cells = table_extractor.detect_cells(temp_image_path)
+    print(f"Detected {len(cells)} cells")
+    print(cells)
+
 if __name__ == "__main__":
-    # pdf_layout_extractor = PdfLayoutExtractor()
-    # result = pdf_layout_extractor.extract_layout("3800.pdf")
-
-    from doc_chunking.merging import PdfStyleCVMixLayoutExtractor
-
-
-    pdf_path = "/Users/tatoao_mini/Work/doc_visual_parsor/CFA ESG CURRICULUM 2024.pdf"
-    async def main_page_by_page():
-        pdf_style_cv_mix_layout_extractor = PdfStyleCVMixLayoutExtractor(
-            model_path="model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx",
-            cv_confidence_threshold=0.1  # Use lower threshold for better detection
-        )
-        i = 0
-        async for result in pdf_style_cv_mix_layout_extractor.detect_layout_page_by_page(pdf_path):  # Test with first 3 pages
-            print(f"Page {i}: {len(result)} elements")
-            import json
-            json.dump([r.model_dump() for r in result], open(f"result_{i}.json", "w", encoding="utf-8"), indent=4, ensure_ascii=False)
-            i += 1
-
-            if i == 3:
-                break
-
-
-    import asyncio
-    asyncio.run(main_page_by_page())
-    # main()
+    main()

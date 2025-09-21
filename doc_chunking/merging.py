@@ -420,6 +420,10 @@ class PdfStyleCVMixLayoutExtractor:
                 
                 # Update current element ID for next page
                 current_element_id = next_element_id
+
+                # Display the layout
+                image = self.display_layout(temp_image_path, LayoutExtractionResult(elements=enriched_elements))
+                image.save(f"page_{page_num}.png")
                 
                 yield enriched_elements
                 
@@ -678,7 +682,7 @@ class PdfStyleCVMixLayoutExtractor:
         return self.detect_layout(input_data, **kwargs)
     
     
-    def display_layout(self, image_path: str, result: LayoutExtractionResult):
+    def display_layout(self, image_path: str, result: LayoutExtractionResult) -> Image.Image:
         image = Image.open(image_path)
         draw = ImageDraw.Draw(image)
         
@@ -786,7 +790,7 @@ if __name__ == "__main__":
             model_path="model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx",
             cv_confidence_threshold=0.1  # Use lower threshold for better detection
         )
-        result = pdf_style_cv_mix_layout_extractor.detect_layout("3800.pdf")  # Test with first 3 pages
+        result = pdf_style_cv_mix_layout_extractor.detect_layout("3900.pdf")  # Test with first 3 pages
         import json
         json.dump(result.model_dump(), open("result.json", "w", encoding="utf-8"), indent=4, ensure_ascii=False)
 
@@ -797,14 +801,15 @@ if __name__ == "__main__":
             cv_confidence_threshold=0.1  # Use lower threshold for better detection
         )
         i = 0
-        async for result in pdf_style_cv_mix_layout_extractor.detect_layout_page_by_page("3800.pdf"):  # Test with first 3 pages
+        async for result in pdf_style_cv_mix_layout_extractor.detect_layout_page_by_page("3900.pdf"):  # Test with first 3 pages
             print(f"Page {i}: {len(result)} elements")
             import json
             json.dump([r.model_dump() for r in result], open(f"result_{i}.json", "w", encoding="utf-8"), indent=4, ensure_ascii=False)
             i += 1
 
-            # if i == 2:
-            #     break
+
+            if i == 3:
+                break
 
     import asyncio
     asyncio.run(main_page_by_page())
