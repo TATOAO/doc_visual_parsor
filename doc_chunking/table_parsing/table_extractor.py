@@ -78,6 +78,7 @@ class PaddleOCRCellDetector:
     def extract_table_image(self, pdf_path: Union[str, Path], layout_element: LayoutElement) -> str:
         """
         Extract table image from PDF using the same coordinate system as merging.py
+
         
         Args:
             pdf_path: Path to PDF file
@@ -90,6 +91,7 @@ class PaddleOCRCellDetector:
         bbox = layout_element.bbox
         
         # Open PDF and get the specific page
+        # maybe save some time if we pass a opened pdf document
         doc = fitz.open(pdf_path)
         page = doc[page_number]
         
@@ -210,10 +212,34 @@ class PDFWireDrawer:
         self.line_width = line_width
         self.line_color = line_color
     
+    def _merge_close_coordinates(self, coords: List[float], tolerance: float = 2.0) -> List[float]:
+        """
+        Merge coordinates that are close to each other to avoid duplicate wires.
+        
+        Args:
+            coords: Sorted list of coordinates
+            tolerance: Distance threshold for merging (in points)
+            
+        Returns:
+            List of merged coordinates
+        """
+        if not coords:
+            return []
+        
+        merged = [coords[0]]
+        
+        for coord in coords[1:]:
+            if abs(coord - merged[-1]) > tolerance:
+                merged.append(coord)
+            # If coordinates are close, we keep the previous one (no change to merged)
+        
+        return merged
+    
     def draw_wires_on_pdf(self, 
                          pdf_path: Union[str, Path], 
                          cells: List[Dict[str, Any]], 
                          page_num: int = 0,
+                         table_bbox: Optional[Tuple[float, float, float, float]] = None,
                          output_path: Optional[Union[str, Path]] = None) -> str:
         """
         Draw grid lines on a PDF based on detected cells.
@@ -222,6 +248,7 @@ class PDFWireDrawer:
             pdf_path: Path to the input PDF
             cells: List of detected cells with bounding boxes
             page_num: Page number to process (0-indexed)
+            table_bbox: Optional bounding box to constrain wire drawing (x1, y1, x2, y2)
             output_path: Output path for the modified PDF (optional)
             
         Returns:
@@ -258,24 +285,41 @@ class PDFWireDrawer:
             x_coords.update([x1, x2])
             y_coords.update([y1, y2])
         
-        # Sort coordinates
-        x_coords = sorted(x_coords)
-        y_coords = sorted(y_coords)
+        # Merge close coordinates to avoid duplicate wires
+        x_coords = self._merge_close_coordinates(sorted(x_coords))
+        y_coords = self._merge_close_coordinates(sorted(y_coords))
         
-        logger.info(f"Drawing {len(x_coords)} vertical lines and {len(y_coords)} horizontal lines")
+        logger.info(f"After merging: {len(x_coords)} vertical lines and {len(y_coords)} horizontal lines")
         
-        # Draw vertical lines
+        # Determine drawing bounds
+        if table_bbox:
+            bbox_x1, bbox_y1, bbox_x2, bbox_y2 = table_bbox
+            # Ensure coordinates are within the table region
+            x_coords = [x for x in x_coords if bbox_x1 <= x <= bbox_x2]
+            y_coords = [y for y in y_coords if bbox_y1 <= y <= bbox_y2]
+            
+            # Use table bounds for line drawing
+            min_x, max_x = bbox_x1, bbox_x2
+            min_y, max_y = bbox_y1, bbox_y2
+        else:
+            # Use page bounds
+            min_x, max_x = 0, page_width
+            min_y, max_y = 0, page_height
+        
+        logger.info(f"Drawing region: ({min_x}, {min_y}) to ({max_x}, {max_y})")
+        
+        # Draw vertical lines (constrained to table region)
         for x in x_coords:
-            if 0 <= x <= page_width:
-                start_point = fitz.Point(x, 0)
-                end_point = fitz.Point(x, page_height)
+            if min_x <= x <= max_x:
+                start_point = fitz.Point(x, min_y)
+                end_point = fitz.Point(x, max_y)
                 page.draw_line(start_point, end_point, color=self.line_color, width=self.line_width)
         
-        # Draw horizontal lines
+        # Draw horizontal lines (constrained to table region)
         for y in y_coords:
-            if 0 <= y <= page_height:
-                start_point = fitz.Point(0, y)
-                end_point = fitz.Point(page_width, y)
+            if min_y <= y <= max_y:
+                start_point = fitz.Point(min_x, y)
+                end_point = fitz.Point(max_x, y)
                 page.draw_line(start_point, end_point, color=self.line_color, width=self.line_width)
         
         # Save the modified PDF
@@ -425,6 +469,122 @@ class TableExtractor:
         
         return text, style_info
     
+    def extract_table_from_layout(self, 
+                                  pdf_path: Union[str, Path], 
+                                  layout_element: LayoutElement) -> Optional[TableStructure]:
+        """
+        Complete table extraction workflow: detect cells → draw wires → extract with pdfplumber.
+        
+        Args:
+            pdf_path: Path to the PDF file
+            layout_element: Layout element containing table bbox and metadata
+            
+        Returns:
+            TableStructure object or None if extraction failed
+        """
+        try:
+            page_num = layout_element.metadata["page_number"]
+            logger.info(f"Starting table extraction for page {page_num}")
+            
+            # Step 1: Extract table image from PDF
+            temp_image_path = self.cell_detector.extract_table_image(pdf_path, layout_element)
+            logger.info(f"Table image extracted: {temp_image_path}")
+            
+            # Step 2: Detect cells in the image
+            cells = self.cell_detector.detect_cells(temp_image_path)
+            if not cells:
+                logger.warning("No cells detected in the table image")
+                os.unlink(temp_image_path)  # Clean up
+                return None
+            
+            logger.info(f"Detected {len(cells)} cells")
+            
+            # Step 3: Convert cell coordinates from image space to PDF space
+            pdf_cells = self._convert_cells_to_pdf_coords(cells, layout_element)
+            
+            # Step 4: Draw wires on the PDF (constrained to table region)
+            # Convert layout element bbox to tuple for wire drawing bounds
+            table_bbox_tuple = (
+                layout_element.bbox.x1 / (150.0 / 72.0),  # Convert to 72 DPI
+                layout_element.bbox.y1 / (150.0 / 72.0),
+                layout_element.bbox.x2 / (150.0 / 72.0),
+                layout_element.bbox.y2 / (150.0 / 72.0)
+            )
+            
+            wired_pdf_path = self.wire_drawer.draw_wires_on_pdf(
+                pdf_path, pdf_cells, page_num, table_bbox_tuple
+            )
+            logger.info(f"Wires drawn on PDF: {wired_pdf_path}")
+            
+            # Debug: Save debug info
+            debug_info = {
+                'original_cells': cells,
+                'pdf_cells': pdf_cells,
+                'table_bbox': layout_element.bbox.model_dump(),
+                'page_num': page_num
+            }
+            with open(f"debug_cells_{page_num}.json", "w") as f:
+                json.dump(debug_info, f, indent=2, default=str)
+            logger.info(f"Debug info saved to debug_cells_{page_num}.json")
+            
+            # Step 5: Extract table structure using pdfplumber
+            table_structure = self._pdfplumber_extract_table(wired_pdf_path, page_num)
+            
+            # Clean up temporary files
+            os.unlink(temp_image_path)
+            # Don't delete the wired PDF for debugging
+            # if wired_pdf_path != str(pdf_path):  # Only delete if it's a temp file
+            #     os.unlink(wired_pdf_path)
+            
+            return table_structure
+            
+        except Exception as e:
+            logger.error(f"Table extraction failed: {str(e)}")
+            return None
+    
+    def _convert_cells_to_pdf_coords(self, 
+                                   cells: List[Dict[str, Any]], 
+                                   layout_element: LayoutElement) -> List[Dict[str, Any]]:
+        """
+        Convert cell coordinates from image space to PDF coordinate space.
+        
+        Args:
+            cells: List of detected cells with image coordinates
+            layout_element: Layout element containing table bbox and metadata
+            
+        Returns:
+            List of cells with PDF coordinates
+        """
+        bbox = layout_element.bbox
+        
+        # The cell coordinates are in image space (150 DPI)
+        # We need to convert them back to PDF space and offset by table position
+        
+        # Scale factor from 150 DPI back to 72 DPI
+        scale_factor = 72.0 / 150.0
+        
+        # Table position in PDF coordinates (already in 72 DPI from merging.py conversion)
+        table_x_offset = bbox.x1 / (150.0 / 72.0)  # Convert back to 72 DPI
+        table_y_offset = bbox.y1 / (150.0 / 72.0)  # Convert back to 72 DPI
+        
+        pdf_cells = []
+        for cell in cells:
+            image_bbox = cell['bbox']
+            x1, y1, x2, y2 = image_bbox
+            
+            # Convert to PDF coordinates and offset by table position
+            pdf_x1 = x1 * scale_factor + table_x_offset
+            pdf_y1 = y1 * scale_factor + table_y_offset
+            pdf_x2 = x2 * scale_factor + table_x_offset
+            pdf_y2 = y2 * scale_factor + table_y_offset
+            
+            pdf_cell = cell.copy()
+            pdf_cell['bbox'] = (pdf_x1, pdf_y1, pdf_x2, pdf_y2)
+            pdf_cells.append(pdf_cell)
+        
+        logger.info(f"Converted {len(pdf_cells)} cells to PDF coordinates")
+        return pdf_cells
+
     def _pdfplumber_extract_table(self, pdf_path: Union[str, Path], page_num: int = 0) -> Optional[TableStructure]:
         """
         Extract table structure using pdfplumber from a wire-enhanced PDF.
@@ -456,6 +616,8 @@ class TableExtractor:
                 chars = page.chars
                 
                 logger.info(f"Found table with {len(table.rows)} rows")
+                logger.info(f"Table bbox: {table.bbox}")
+                logger.info(f"Found {len(chars)} characters on page")
                 
                 # Process table rows and cells
                 table_rows = []
@@ -522,8 +684,33 @@ class TableExtractor:
 
 
 
+def test_table_extractor():
+    """Test the complete table extraction workflow."""
+    table_extractor = TableExtractor()
+    pdf_path = "3900.pdf"
+    
+    # Load the layout element from the result file
+    element_data = json.load(open("result_2.json", "r", encoding="utf-8"))[0]
+    element = LayoutElement(**element_data)
+    
+    print(f"Testing table extraction for page {element.metadata['page_number']}")
+    print(f"Table bbox: {element.bbox}")
+    
+    # Use the complete workflow
+    table_structure = table_extractor.extract_table_from_layout(pdf_path, element)
+    
+    if table_structure:
+        print(f"Successfully extracted table: {table_structure.row_count}x{table_structure.col_count}")
+        print(f"Table type: {table_structure.table_type}")
+        print(f"Has header: {table_structure.has_header}")
+        
+        # Print first few rows for verification
+        for i, row in enumerate(table_structure.rows):
+            print(f"Row {i}: {[cell.text for cell in row.cells]}")
+    else:
+        print("Table extraction failed")
 
-# python -m doc_chunking.table_parsing.table_extractor
+
 def main():
     table_extractor = PaddleOCRCellDetector()
     table_extractor._initialize_model()
@@ -534,8 +721,12 @@ def main():
     temp_image_path = table_extractor.extract_table_image(pdf_path, element)
     print(f"Table image saved to: {temp_image_path}")
     cells = table_extractor.detect_cells(temp_image_path)
+
+    # draw boxes on elements
     print(f"Detected {len(cells)} cells")
     print(cells)
 
+# python -m doc_chunking.table_parsing.table_extractor
 if __name__ == "__main__":
-    main()
+    # main()
+    test_table_extractor()
