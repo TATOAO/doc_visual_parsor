@@ -32,10 +32,10 @@ class DisplayLine(BaseModel):
     page_number: Optional[int] = None
     element_type: str
     element_id: int
-    element_text: str
+    element_text: Optional[str] = None
     element_bbox: str
-    font_name: str
-    font_size: float
+    font_name: Optional[str] = None
+    font_size: Optional[float] = None
     font_color: Optional[str] = None
     font_italic: Optional[bool] = None
     font_underline: Optional[bool] = None
@@ -58,10 +58,10 @@ class DisplayLine(BaseModel):
             page_number=layout_element.metadata.get('page_number', None),
             element_type=layout_element.element_type,
             element_id=layout_element.id,
-            element_text=layout_element.text,
+            element_text=layout_element.text or "",
             element_bbox=bbox_str,
-            font_name=layout_element.style.runs[0].font.name if layout_element.style.runs else None,
-            font_size=round(layout_element.style.runs[0].font.size, 1) if layout_element.style.runs else None,
+            font_name=layout_element.style.runs[0].font.name if layout_element.style.runs else "Unknown",
+            font_size=round(layout_element.style.runs[0].font.size, 1) if layout_element.style.runs else 12.0,
             font_color=layout_element.style.runs[0].font.color if layout_element.style.runs and layout_element.style.runs[0].font.color != '#000000' else None,
             font_italic=layout_element.style.runs[0].font.italic if layout_element.style.runs else None,
             font_underline=layout_element.style.runs[0].font.underline if layout_element.style.runs else None,
@@ -85,7 +85,7 @@ class DisplayLine(BaseModel):
                 (f"[page:{self.page_number}]" if self.page_number else "") + \
                 f"[type:{self.element_type}]" + \
                 (f"[pos:{self.element_bbox}]" if False else "") + \
-                f"[{self.font_name} {self.font_size}pt]" + \
+                f"[{self.font_name or 'Unknown'} {self.font_size or 12.0}pt]" + \
                 (f"[color:{self.font_color}]" if self.font_color else "") + \
                 (f"[italic:{self.font_italic}]" if self.font_italic else "") + \
                 (f"[bold:{self.font_bold}]" if self.font_bold else "") + \
@@ -98,7 +98,7 @@ class DisplayLine(BaseModel):
             (f"[page:{self.page_number}]" if self.page_number else "") + \
             f"[type:{self.element_type}]" + \
             (f"[pos:{self.element_bbox}]" if False else "") + \
-            f"[{self.font_name} {self.font_size}pt]" + \
+            f"[{self.font_name or 'Unknown'} {self.font_size or 12.0}pt]" + \
             (f"[color:{self.font_color}]" if self.font_color else "") + \
             (f"[italic:{self.font_italic}]" if self.font_italic else "") + \
             (f"[bold:{self.font_bold}]" if self.font_bold else "") + \
