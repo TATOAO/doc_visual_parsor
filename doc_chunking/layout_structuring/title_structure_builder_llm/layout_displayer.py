@@ -62,9 +62,9 @@ class DisplayLine(BaseModel):
             element_bbox=bbox_str,
             font_name=layout_element.style.runs[0].font.name if layout_element.style.runs else None,
             font_size=round(layout_element.style.runs[0].font.size, 1) if layout_element.style.runs else None,
-            font_color=layout_element.style.runs[0].font.color if layout_element.style.runs[0].font.color != '#000000' else None,
+            font_color=layout_element.style.runs[0].font.color if layout_element.style.runs and layout_element.style.runs[0].font.color != '#000000' else None,
             font_italic=layout_element.style.runs[0].font.italic if layout_element.style.runs else None,
-            font_underline=layout_element.style.runs[0].font.underline,
+            font_underline=layout_element.style.runs[0].font.underline if layout_element.style.runs else None,
             font_bold=layout_element.style.runs[0].font.bold if layout_element.style.runs else None,
             alignment=layout_element.style.paragraph_format.alignment.value if layout_element.style.paragraph_format else None,
             metadata=layout_element.metadata
