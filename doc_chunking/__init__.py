@@ -8,6 +8,7 @@ using ONNX models and merging with PyMuPDF content extraction.
 from .onnx_layout_detector import ONNXDocLayoutYOLO
 from .merging import PdfStyleCVMixLayoutExtractor
 from .schemas import LayoutElement, LayoutExtractionResult, BoundingBox, ElementType
+from .core.processors import SimplifiedProcessor
 
 __version__ = "0.4.0"
 __all__ = [
