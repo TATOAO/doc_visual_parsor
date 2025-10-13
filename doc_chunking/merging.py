@@ -20,7 +20,7 @@ except ImportError:
     fitz = None
 
 from .onnx_layout_detector import ONNXDocLayoutYOLO
-from .utils import sort_elements_by_position
+from .utils_tools import sort_elements_by_position
 from .schemas import (
     LayoutExtractionResult,
     LayoutElement,
@@ -31,7 +31,7 @@ from .schemas import (
     FontInfo,
     ParagraphFormat
 )
-from .utils import calculate_bbox_overlap, is_bbox_contained
+from .utils_tools import calculate_bbox_overlap, is_bbox_contained
 
 logger = logging.getLogger(__name__)
 

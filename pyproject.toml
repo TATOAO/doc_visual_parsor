@@ -39,6 +39,10 @@ dependencies = [
     "modelscope",
     "paddleocr",
     "pdfplumber",
+    "processor-pipeline@git+https://github.com/TATOAO/processor_architecture.git@prd",
+    "python-dotenv",
+    "langchain-openai",
+    "rapidfuzz",
 ]
 
 [project.optional-dependencies]

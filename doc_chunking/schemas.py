@@ -11,6 +11,19 @@ from enum import Enum
 import hashlib
 
 
+class Section(BaseModel):
+    title: str
+    content: str
+    level: int
+    element_id: int
+    parent_section: Optional['Section'] = None
+    sub_sections: List['Section'] = []
+
+class FileInputData(BaseModel):
+    """Input data for document layout detection."""
+    pass
+
+
 class ElementType(str, Enum):
     """Standardized element types across all detection methods."""
     PLAIN_TEXT = "Plain Text"
@@ -143,7 +156,7 @@ class BoundingBox(BaseModel):
     
     @field_validator('x2')
     @classmethod
-    def validate_coordinates(cls, v, info):
+    def validate_x2_coordinates(cls, v, info):
         """Validate that x2 > x1."""
         if 'x1' in info.data and info.data['x1'] is not None and v <= info.data['x1']:
             raise ValueError("x2 must be greater than x1")
@@ -151,7 +164,7 @@ class BoundingBox(BaseModel):
     
     @field_validator('y2')
     @classmethod
-    def validate_coordinates(cls, v, info):
+    def validate_y2_coordinates(cls, v, info):
         """Validate that y2 > y1."""
         if 'y1' in info.data and info.data['y1'] is not None and v <= info.data['y1']:
             raise ValueError("y2 must be greater than y1")

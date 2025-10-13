@@ -22,7 +22,7 @@ from typing import List, Tuple, Optional
 import onnxruntime as ort
 
 from .schemas import ElementType, LayoutExtractionResult, LayoutElement, BoundingBox
-from .utils import filter_redundant_boxes
+from .utils_tools import filter_redundant_boxes
 
 # Mapping from DocLayout-YOLO class IDs to our standardized ElementType
 DOCLAYOUT_CLASS_MAPPING = {
