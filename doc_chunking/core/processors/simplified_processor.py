@@ -75,8 +75,9 @@ class SimplifiedProcessor(AsyncProcessor):
 
     async def process(self, chunk_generator: AsyncGenerator[str, None]) -> AsyncGenerator[Section, None]:
         async for chunk in chunk_generator:
-            result = await simplified_processor(chunk, self.model)
-            yield result
+            result_lists = await simplified_processor(chunk, self.model)
+            for result in result_lists:
+                yield result
 
 
 # python -m doc_chunking.core.processors.simplified_processor
