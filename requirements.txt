@@ -1,0 +1,14 @@
+# Core dependencies for caching
+numpy==1.26.4
+PyMuPDF==1.25.1
+pillow>=10.0.0
+opencv-python>=4.5.0
+onnxruntime>=1.15.0
+onnxruntime-gpu>=1.15.0
+modelscope
+paddleocr
+processor-pipeline@git+https://${GITHUB_TOKEN}@github.com/TATOAO/processor_architecture.git@prd
+python-dotenv
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.6
