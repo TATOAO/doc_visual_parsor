@@ -30,7 +30,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "PyMuPDF<=1.26.4",
+    "PyMuPDF==1.26.3",
     "pydantic>=2.0.0",
     "Pillow>=10.0.0",
     "numpy<=1.26.4",
@@ -39,9 +39,8 @@ dependencies = [
     "modelscope",
     "paddleocr",
     "pdfplumber",
-    "processor-pipeline@git+https://github.com/TATOAO/processor_architecture.git@prd",
+    "processor-pipeline@git+https://${GITHUB_TOKEN}@github.com/TATOAO/processor_architecture.git@prd",
     "python-dotenv",
-    "langchain-openai",
     "rapidfuzz",
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",

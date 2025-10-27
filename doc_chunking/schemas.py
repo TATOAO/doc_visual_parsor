@@ -11,13 +11,30 @@ from enum import Enum
 import hashlib
 
 
+
 class Section(BaseModel):
-    title: str
-    content: str
-    level: int
-    element_id: int
-    parent_section: Optional['Section'] = None
-    sub_sections: List['Section'] = []
+    title: str = Field(description="The title of the section", default="")
+    content: str = Field(description="The content of the section", default="")
+    level: int = Field(description="The level of the section", default=0)
+    element_id: int = Field(description="The element id of the section", default=-1)
+    page_number: List[int] = Field(description="The page number of the section", default=[])
+
+    sub_sections: List['Section'] = Field(description="The sub sections of the section", default=[])
+    parent_section: Optional['Section'] = Field(description="The parent section of the section", default=None)
+
+    @computed_field
+    @property
+    def section_hash(self) -> str:
+        """
+        Get the hash of the section based on title_parsed and content_parsed only
+        """
+        # Combine title_parsed and content_parsed for hashing
+        combined_content = f"{self.title}|{self.content}"
+        
+        # Generate hash from the combined content
+        return hashlib.sha256(combined_content.encode('utf-8')).hexdigest()
+
+
 
 class FileInputData(BaseModel):
     """Input data for document layout detection."""

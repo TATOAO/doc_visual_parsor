@@ -20,29 +20,52 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    pkg-config \
+    libfreetype6-dev \
+    libharfbuzz-dev \
+    libjpeg-dev \
+    libopenjp2-7-dev \
+    libtiff-dev \
+    libjbig2dec0-dev \
+    libz-dev \
+    tesseract-ocr \
+    libleptonica-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+
 # Upgrade pip
 RUN python -m pip install --upgrade pip
 
 # Stage 2: Python dependencies
 FROM base AS python-deps
 
+RUN apt-get update && apt-get install -y build-essential
+
+RUN pip install --upgrade pip setuptools wheel 
 # Install uv for faster package management
 RUN pip install uv
 
 # Copy project files
+
+RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system numpy==1.26.4 fastapi==0.104.0 uvicorn==0.24.0 python-multipart==0.0.6 paddleocr
+RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system onnxruntime>=1.15.0
+RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system onnxruntime-gpu>=1.15.0
+RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system PyMuPDF==1.26.3
+
 WORKDIR /app
 COPY pyproject.toml ./
-COPY README.md ./
-COPY LICENSE ./
 
 # Install Python dependencies
-RUN uv pip install --system -e .[gpu]
+RUN uv pip install --system -e .[gpu] -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Stage 3: Final image
 FROM base AS final
 
 # Copy Python dependencies from previous stage
-COPY --from=python-deps /usr/local/lib/python3.12/dist-packages /usr/local/lib/python3.12/dist-packages
+COPY --from=python-deps /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 COPY --from=python-deps /usr/local/bin /usr/local/bin
 
 # Set working directory

@@ -14,6 +14,8 @@ from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from doc_chunking.rule_base_chunker import Section, simple_chunking
+from typing import List
 
 from doc_chunking.merging import PdfStyleCVMixLayoutExtractor
 from doc_chunking.schemas import LayoutExtractionResult
@@ -37,7 +39,7 @@ class ExtractionResponse(BaseModel):
     """Response model for layout extraction."""
     success: bool = Field(description="Whether the extraction was successful")
     message: str = Field(description="Status message")
-    data: Optional[dict] = Field(description="Extracted layout data", default=None)
+    data: List[Section] = Field(description="Extracted layout data", default=[])
     metadata: Optional[dict] = Field(description="Extraction metadata", default=None)
 
 
@@ -153,16 +155,15 @@ async def extract_layout(
             confidence_threshold=confidence_threshold,
             max_pages=max_pages
         )
-        
-        # Convert result to dictionary
-        result_dict = result.model_dump()
-        
+
+
+        reconstruction_list =simple_chunking(result)
         logger.info(f"Successfully processed {file.filename}: {len(result.elements)} elements extracted")
         
         return ExtractionResponse(
             success=True,
             message=f"Successfully extracted layout from {file.filename}",
-            data=result_dict,
+            data=reconstruction_list,
             metadata={
                 "filename": file.filename,
                 "file_size_bytes": len(content),

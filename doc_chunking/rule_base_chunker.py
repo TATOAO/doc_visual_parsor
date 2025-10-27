@@ -1,30 +1,13 @@
-from doc_chunking.schemas import LayoutExtractionResult, ElementType
-from pydantic import BaseModel, Field, computed_field
-from typing import List, Optional, Self
-import hashlib
+from doc_chunking.schemas import LayoutExtractionResult, ElementType, LayoutElement
+from typing import List
+from doc_chunking.schemas import Section
 
 
-class Section(BaseModel):
-    title: str = Field(description="The title of the section", default="")
-    content: str = Field(description="The content of the section", default="")
-    level: int = Field(description="The level of the section", default=0)
-    element_id: int = Field(description="The element id of the section", default=None)
-
-    sub_sections: List[Self] = Field(description="The sub sections of the section", default=[])
-    parent_section: Optional[Self] = Field(description="The parent section of the section", default=None)
-
-    @computed_field
-    @property
-    def section_hash(self) -> str:
-        """
-        Get the hash of the section based on title_parsed and content_parsed only
-        """
-        # Combine title_parsed and content_parsed for hashing
-        combined_content = f"{self.title}|{self.content}"
-        
-        # Generate hash from the combined content
-        return hashlib.sha256(combined_content.encode('utf-8')).hexdigest()
-
+def _extract_page_number(element: LayoutElement) -> int:
+    """Extract page number from element metadata."""
+    if element.metadata and 'page_number' in element.metadata:
+        return element.metadata['page_number']
+    return 0  # Default page number if not found
 
 
 def simple_chunking(layout_extraction_result: LayoutExtractionResult) -> List[Section]:
@@ -34,6 +17,7 @@ def simple_chunking(layout_extraction_result: LayoutExtractionResult) -> List[Se
     - Connects all "broken" text (PLAIN_TEXT, PARAGRAPH)
     - Uses only "TITLE" elements as separators
     - Combines continuous titles into the next title
+    - Tracks page numbers for each section
     - Returns a plain list of sections
     """
     sections = []
@@ -41,6 +25,7 @@ def simple_chunking(layout_extraction_result: LayoutExtractionResult) -> List[Se
     current_title = ""
     current_level = 0
     current_element_id = 0
+    current_page_numbers = set()  # Track page numbers for current section
     pending_titles = []  # Store continuous titles
     
     for element in layout_extraction_result.elements:
@@ -59,11 +44,13 @@ def simple_chunking(layout_extraction_result: LayoutExtractionResult) -> List[Se
                     content=content_text,
                     level=current_level,
                     element_id=current_element_id,
+                    page_number=list(current_page_numbers),
                     parent_section=None,
                     sub_sections=[]
                 )
                 sections.append(section)
                 current_content = []
+                current_page_numbers = set()  # Reset page numbers for new section
             
             # Add this title to pending titles
             if element.text and element.text.strip():
@@ -72,6 +59,8 @@ def simple_chunking(layout_extraction_result: LayoutExtractionResult) -> List[Se
             # Update current section info
             current_level = getattr(element, 'level', 0)
             current_element_id = element.id
+            # Add page number for the title
+            current_page_numbers.add(_extract_page_number(element))
             
         # Accumulate text content for current section
         elif element.element_type in [ElementType.PLAIN_TEXT, ElementType.PARAGRAPH]:
@@ -82,15 +71,11 @@ def simple_chunking(layout_extraction_result: LayoutExtractionResult) -> List[Se
                     pending_titles = []
                 
                 current_content.append(element.text.strip())
+                # Add page number for the text content
+                current_page_numbers.add(_extract_page_number(element))
         
         # Figure
         elif element.element_type == ElementType.FIGURE:
-
-
-            Section(title="", content=element.text, level=0, element_id=element.id, parent_section=None, sub_sections=[])
-        # Table
-        elif element.element_type == ElementType.TABLE:
-
             if element.text and element.text.strip():
                 # If we have pending titles, combine them with the first content
                 if pending_titles:
@@ -98,15 +83,45 @@ def simple_chunking(layout_extraction_result: LayoutExtractionResult) -> List[Se
                     pending_titles = []
                 
                 current_content.append(element.text.strip())
-
+                # Add page number for the figure
+                current_page_numbers.add(_extract_page_number(element))
+        
+        # Table
+        elif element.element_type == ElementType.TABLE:
+            if element.text and element.text.strip():
+                # If we have pending titles, combine them with the first content
+                if pending_titles:
+                    current_title = " ".join(pending_titles)
+                    pending_titles = []
+                
+                current_content.append(element.text.strip())
+                # Add page number for the table
+                current_page_numbers.add(_extract_page_number(element))
             # todo parsing table content
-            # Section(title="", content=element.text, level=0, element_id=element.id, parent_section=None, sub_sections=[])
+        
         # List
         elif element.element_type == ElementType.LIST:
-            Section(title="", content=element.text, level=0, element_id=element.id, parent_section=None, sub_sections=[])
+            if element.text and element.text.strip():
+                # If we have pending titles, combine them with the first content
+                if pending_titles:
+                    current_title = " ".join(pending_titles)
+                    pending_titles = []
+                
+                current_content.append(element.text.strip())
+                # Add page number for the list
+                current_page_numbers.add(_extract_page_number(element))
+        
         # Equation
         elif element.element_type == ElementType.ISOLATE_FORMULA:
-            Section(title="", content=element.text, level=0, element_id=element.id, parent_section=None, sub_sections=[])
+            if element.text and element.text.strip():
+                # If we have pending titles, combine them with the first content
+                if pending_titles:
+                    current_title = " ".join(pending_titles)
+                    pending_titles = []
+                
+                current_content.append(element.text.strip())
+                # Add page number for the equation
+                current_page_numbers.add(_extract_page_number(element))
 
         # Handle any other element type that has text
         else:
@@ -117,6 +132,8 @@ def simple_chunking(layout_extraction_result: LayoutExtractionResult) -> List[Se
                     pending_titles = []
                 
                 current_content.append(element.text.strip())
+                # Add page number for the other element
+                current_page_numbers.add(_extract_page_number(element))
 
     # Create final section if there's remaining content
     if current_content:
@@ -130,6 +147,7 @@ def simple_chunking(layout_extraction_result: LayoutExtractionResult) -> List[Se
             content=content_text,
             level=current_level,
             element_id=current_element_id,
+            page_number=list(current_page_numbers),
             parent_section=None,
             sub_sections=[]
         )
@@ -169,4 +187,4 @@ if __name__ == "__main__":
     #     ]
     # )
     for section in simple_chunking(layout_extraction_result):
-        print(f"title: {section.title}, content: {section.content}")
+        print(f"title: {section.title}, content: {section.content}, page_numbers: {section.page_number}")
