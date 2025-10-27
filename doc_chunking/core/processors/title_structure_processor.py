@@ -50,7 +50,7 @@ class TitleStructureProcessor(AsyncProcessor):
 if __name__ == "__main__":
     from processor_pipeline import AsyncPipeline
     import logging
-    input_file_path = '/home/tatoao-ubuntu/Downloads/tdjyqht.pdf'
+    input_file_path = './智能设备.pdf'
     async def main():
         logging.getLogger().setLevel(logging.INFO)
         pipeline = AsyncPipeline([

@@ -22,7 +22,7 @@ class PageImageLayoutProcessor(AsyncProcessor):
         super().__init__(**kwargs)
         self.detector = ONNXDocLayoutYOLO(model_path='model_parameters/layout_detection/docstructbench_doclayout_yolo_docstructbench_imgsz1024.onnx')
 
-        self.merger = PdfStyleCVMixLayoutExtractor(need_initialize=False)
+        self.merger:PdfStyleCVMixLayoutExtractor = PdfStyleCVMixLayoutExtractor(need_initialize=False)
 
     async def process(self, input_data: AsyncGenerator[Tuple[Image, List[LayoutElement]], None]) -> AsyncGenerator[List[LayoutElement], None]:
 
