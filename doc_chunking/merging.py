@@ -598,8 +598,9 @@ class PdfStyleCVMixLayoutExtractor:
         # Start with CV element as base
         enriched = deepcopy(cv_element)
         
-        # Sort PDF elements using improved superscript-aware sorting
-        sorted_pdf_elements = self.pdf_extractor._sort_elements_by_reading_order(pdf_elements)
+        # Preserve original PDF reading order instead of re-sorting
+        # The PDF elements are already in correct reading order from extract_layout_for_page
+        sorted_pdf_elements = pdf_elements
         
         # Extract and merge text content and runs
         text_parts = []
