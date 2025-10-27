@@ -3,7 +3,7 @@ from typing import Any, List, AsyncGenerator, Tuple
 from processor_pipeline import AsyncProcessor
 from .page_chunker import PdfPageImageSplitterProcessor
 from .page_image_layout_processor import PageImageLayoutProcessor
-from doc_chunking.schemas.layout_schemas import LayoutElement
+from doc_chunking.schemas import LayoutElement
 from doc_chunking.layout_structuring.title_structure_builder_llm.layout_displayer import DisplayLine
 from doc_chunking.utils.logging_config import get_logger
 
@@ -21,6 +21,7 @@ class BboxNLPProcessor(AsyncProcessor):
         async for elements in input_data:
             logger.debug(f"BboxNLPProcessor processed element {index}")
             for element in elements:
+                logger.info(f"BboxNLPProcessor processed element: {str(DisplayLine.from_layout_element(element))}")
                 yield str(DisplayLine.from_layout_element(element)), element
                 index += 1
             await asyncio.sleep(0.001)

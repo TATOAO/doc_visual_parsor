@@ -35,7 +35,7 @@ class PageImageLayoutProcessor(AsyncProcessor):
             logger.info(f"ONNXDocLayoutYOLO detected layout {index}")
 
             # merge layout
-            enriched_layout = self.merger.(cv_elements=layout_result.elements, pdf_elements=layout)
+            enriched_layout = self.merger.merge_layout(cv_elements=layout_result.elements, pdf_elements=layout)
             logger.info(f"PdfStyleCVMixLayoutExtractor merged layout {index}")
 
             await asyncio.sleep(0.001)

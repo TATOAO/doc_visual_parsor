@@ -50,8 +50,9 @@ class TitleStructureProcessor(AsyncProcessor):
 if __name__ == "__main__":
     from processor_pipeline import AsyncPipeline
     import logging
+    input_file_path = '/home/tatoao-ubuntu/Downloads/tdjyqht.pdf'
     async def main():
-        logging.getLogger().setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.INFO)
         pipeline = AsyncPipeline([
             PdfPageImageSplitterProcessor(), 
             PageImageLayoutProcessor(), 
@@ -59,7 +60,7 @@ if __name__ == "__main__":
             TitleStructureProcessor()
             ]
         )
-        async for item in pipeline.astream(input_data='/Users/tatoaoliang/Downloads/Work/doc_chunking/tests/test_data/1-1 买卖合同（通用版）.pdf'):
+        async for item in pipeline.astream(input_data=input_file_path):
             print(item)
         
         print(pipeline.session)
