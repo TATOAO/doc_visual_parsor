@@ -50,16 +50,16 @@ RUN pip install uv
 
 # Copy project files
 
-RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system numpy==1.26.4 fastapi==0.104.0 uvicorn==0.24.0 python-multipart==0.0.6 paddleocr
-RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system onnxruntime>=1.15.0
-RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system onnxruntime-gpu>=1.15.0
-RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system PyMuPDF==1.25.1
-RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system opencv-python>=4.5.0
+RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system numpy==1.26.4 fastapi>=0.104.0 uvicorn>=0.24.0 python-multipart==0.0.6 paddleocr
+RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system opencv-python>=4.5.0 pillow>=10.0.0 modelscope
+RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system onnxruntime-gpu>=1.23.0
+RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system PyMuPDF
 
 WORKDIR /app
 COPY pyproject.toml ./
 COPY requirements.txt ./
 
+RUN uv pip install git+https://${GITHUB_TOKEN}@github.com/TATOAO/processor_architecture.git@prd
 RUN uv pip install --system -r requirements.txt
 
 # Install Python dependencies
