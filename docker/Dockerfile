@@ -54,17 +54,16 @@ RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system numpy==1
 RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system onnxruntime>=1.15.0
 RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system onnxruntime-gpu>=1.15.0
 RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system PyMuPDF==1.25.1
-
-
+RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system opencv-python>=4.5.0
 
 WORKDIR /app
 COPY pyproject.toml ./
 COPY requirements.txt ./
 
-RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --system -r requirements.txt
+RUN uv pip install --system -r requirements.txt
 
 # Install Python dependencies
-RUN uv pip install --system .[gpu]
+RUN uv pip install --system .
 
 # Stage 3: Final image
 FROM base AS final
