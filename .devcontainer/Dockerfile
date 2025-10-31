@@ -14,11 +14,9 @@ RUN apt-get update && \
 
 RUN pip install --no-cache-dir -U pip uv -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-RUN echo "hhhhhh"
-
 WORKDIR /workspace
 
 COPY requirements.txt .
-COPY ./doc_chunking/ ./doc_chunking/
-COPY ./model_parameters/ ./model_parameters/
+COPY doc_chunking/ ./doc_chunking/
+COPY model_parameters/ ./model_parameters/
 
